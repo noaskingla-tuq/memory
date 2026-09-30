@@ -1,14 +1,18 @@
+import type { UiRef } from "../contracts/uiContract.js";
 import { backendClient } from "./api/backendClient.js";
 import { mount } from "./dom/html.js";
 import { t } from "./i18n/index.js";
 import { parseRoute, type Route } from "./router.js";
 import { bindHomeEvents } from "./views/homeEvents.js";
 import { createMemorySpace, type SpaceTargets } from "./views/memorySpaceController.js";
-import { SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
+import { SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
 import { bindSpaceEvents } from "./views/spaceEvents.js";
 import { createStatusLine } from "./views/statusLine.js";
 import { createTeamHome, type HomeTargets, type Preferences } from "./views/teamHomeController.js";
 import { homeShell } from "./views/teamHomeView.js";
+import { createTimeline, type TimelineTargets } from "./views/timelineController.js";
+import { bindTimelineEvents } from "./views/timelineEvents.js";
+import { TIMELINE_IDS, timelineShell } from "./views/timelineView.js";
 
 const HOME_STALE_MS = 60_000;
 
@@ -56,6 +60,11 @@ const status = createStatusLine({
 const home = createTeamHome({ client, now, preferences });
 const space = createMemorySpace({ client, now });
 
+// why: the detail drawer (S6d) plugs in here; until then an item click reaches this hook and does nothing visible
+const openDetail = (_ref: UiRef): void => undefined;
+
+const timeline = createTimeline({ client, now, onOpenDetail: openDetail });
+
 function homeTargets(): HomeTargets {
   return {
     help: element("home-help"),
@@ -77,10 +86,27 @@ function cardOf(agentId: string | undefined): HTMLElement | null {
   return Array.from(document.querySelectorAll<HTMLElement>("[data-agent-id]")).find((card) => card.dataset.agentId === agentId) ?? null;
 }
 
+function timelineTargets(): TimelineTargets {
+  return {
+    query: element(TIMELINE_IDS.query) as HTMLInputElement,
+    filters: element(TIMELINE_IDS.filters),
+    clear: element(TIMELINE_IDS.clear),
+    banner: element(TIMELINE_IDS.banner),
+    count: element(TIMELINE_IDS.count),
+    list: element(TIMELINE_IDS.list),
+  };
+}
+
+function itemButton(key: string | undefined): HTMLElement | null {
+  if (key === undefined) return null;
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-tl-key]")).find((button) => button.dataset.tlKey === key) ?? null;
+}
+
 let current: Route | null = null;
 let homeScroll = 0;
 
 function showHome(returnedFrom: string | undefined): void {
+  timeline.attach(null);
   mount(view, homeShell());
   home.attach(homeTargets());
   void home.refreshIfStale(HOME_STALE_MS);
@@ -90,8 +116,12 @@ function showHome(returnedFrom: string | undefined): void {
 
 function showAgent(agentId: string): void {
   home.attach(null);
+  const agent = home.agent(agentId);
   mount(view, spaceShell());
-  void space.open(agentId, home.agent(agentId), spaceTargets());
+  mount(element(SPACE_TIMELINE_ID), timelineShell());
+  void space.open(agentId, agent, spaceTargets());
+  timeline.attach(timelineTargets());
+  void timeline.open(agentId, { projects: agent?.counts.projects ?? [] });
   window.scrollTo(0, 0);
   document.getElementById(SPACE_TITLE_ID)?.focus();
 }
@@ -130,6 +160,25 @@ bindSpaceEvents(view, {
     void space.retry();
     document.getElementById(SPACE_TITLE_ID)?.focus();
   },
+});
+
+bindTimelineEvents(view, {
+  search: (text) => void timeline.search(text),
+  clearSearch() {
+    void timeline.clearSearch();
+    element(TIMELINE_IDS.query).focus();
+  },
+  clearFilters() {
+    void timeline.clearFilters();
+    element(TIMELINE_IDS.scope).focus();
+  },
+  reload: () => void timeline.reload(),
+  loadMore: () =>
+    void timeline.loadMore().then((added) => {
+      (itemButton(added[0]) ?? document.querySelector<HTMLElement>("[data-tl='loadMore']"))?.focus();
+    }),
+  setFilter: (name, value) => void timeline.setFilter(name, value),
+  openItem: (key) => timeline.openItem(key),
 });
 
 element("title").textContent = t("app.title");

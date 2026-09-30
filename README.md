@@ -11,7 +11,7 @@ src/backend/            外部後端入口：entry（activate）、service（派
 vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
-src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/{dialog,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間空殼）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
+src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/{dialog,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間、時間軸與搜尋）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
 src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
 src/application/ui/     七個方法的本體（overview、agentStats、listing、detail、forget、status）與零件：agentIndex（agent 索引與快取）、collect（跨 namespace 掃描）、timeSlice（時間片）、budget（UTF-8 bytes 預算）、paging、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、textQuery、workItem、dayBins、profilePort（名稱表介面）、profileTable（生效中的名稱表）、profileGeneration、names（名稱合併與降級）、jsonSafe（出口）
 types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
@@ -143,6 +143,18 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 - 頁面殼 `spaceShell()`：返回連結（首個 Tab 停駐點）、`#space-title`（`tabindex=-1`，進頁後焦點落在這裡）、`#space-body`（控制器每次整塊重畫）與**時間軸掛載點 `#space-timeline[data-slot="timeline"]`**（在 body 外，S6c 掛進去不會被重畫洗掉；S6b 不放任何內容）。資料列與代表性記憶帶 `data-scope`／`data-project-id`／`data-memory-id`，供 S6c／S6d 接篩選與詳情抽屜；目前沒有可點的元素，所以 ready 頁面沒有 Tab 停駐點，錯誤時只多一個重試按鈕。
 - 字串在 `i18n/zhTWSpace.ts`（併入 `STRINGS`）、樣式在 `styles/space.css`（全部限定在 `.space-body` 底下）。
 - 測試：`test/ui-memory-space-{state,view,states,contract}.test.mjs`（`test/spaceFixtures.mjs` 是假 agentStats 與假 client；contract 那支用真的 `ui.agentStats`／`ui.overview` 與名稱表推送驗證）、`test/ui-team-home-profile.test.mjs`。
+
+## 時間軸與搜尋（S6c）
+
+掛在記憶空間頁的 `#space-timeline` 裡（`main.ts` 的 `showAgent` 把 `timelineShell()` 掛進去），一次只看一位 agent，用 `ui.list`（沒有關鍵字）與 `ui.search`（有關鍵字）。
+
+- `state/timeline.ts`：`parsePage`（手寫檢查；型別斷言 `ITEM_CONTRACT_MATCHES` 讓契約的 item 形狀漂移時 `tsc -p tsconfig.ui.json` 失敗）、查詢與篩選（`makeQuery`／`queryParams`）、`choicesFromStats`（由 `ui.agentStats` 取得完整專案清單與用過的工具）、依寫入日分組與時間文字。
+- `views/timelineController.ts`：每個新查詢（搜尋、篩選、清除、換 agent）遞增 generation，已被取代的查詢的晚到回應一律丟棄（也丟棄 load-more 的晚到回應）；所有清單請求共用 key `timeline`，選項請求用 `timeline.options`（自己呼叫一次 `ui.agentStats`，不等記憶空間頁的請求，失敗時保留 `open` 帶入的備用選項）。續頁以游標，以 id 去重；`CURSOR_STALE` 自動從第一頁重來並顯示說明（一次嘗試只重來一次）；`nextCursor` 不為空但本頁沒有項目時仍顯示「載入更多」，不說成沒有記憶。
+- **續頁必須沿用同一組篩選**：時間範圍在查詢開始時換算成一個固定的 `sinceIso`，續頁沿用，否則游標內的篩選雜湊不符、每頁都會 `CURSOR_STALE`。
+- **`scanned.complete:false`（只有 `ui.search` 有）** 顯示「可能不完整」並在翻頁時維持標記，新搜尋才重置。搜尋框旁固定寫「比對文字，不是語意；多個詞要全部出現」。排序與文案一律用「寫入」（今天寫入、昨天寫入）；每筆另外顯示工作起訖與耗時。
+- 選單只在選項集合真的改變時才重畫（重畫會讓鍵盤焦點跑掉）；搜尋用 `<form>` 的 submit，輸入法組字中的 Enter 不會誤送出。事件只認 `data-tl*` 屬性，與首頁的 `data-act` 互不干擾。
+- 詳情介面（S6d 接）：`createTimeline({ onOpenDetail(ref) })`；每筆是 `<button data-tl="open" data-tl-key>`，`itemKey(ref)` 可找回按鈕；遺忘後呼叫 `timeline.reload()`。
+- 字串在 `i18n/timelineStrings.ts`（併入 `STRINGS`）、樣式在 `styles/timeline.css`。測試：`test/ui-timeline{,-states,-view,-choices,-contract}.test.mjs`（`test/timelineFixtures.mjs` 是假 list／search／agentStats 後端；contract 那支用真的 `ui.list`／`ui.search`／`ui.agentStats`）。
 
 ## 契約 vendor
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -62,6 +62,13 @@ if (packageJson.dependencies['cairn-memory'] !== expectedDependency) throw new E
 if (packageLock.packages[''].dependencies['cairn-memory'] !== expectedDependency) throw new Error('Cairn lock root pin differs')
 if (!packageLock.packages['node_modules/cairn-memory'].resolved.endsWith(`#${pin.commit}`)) throw new Error('Cairn lock resolution differs')
 if (!Array.isArray(pin.accepted) || !pin.accepted.includes(pin.commit)) throw new Error('Cairn pin commit is not in accepted[]')
+const dataLayoutSource = readFileSync(join(repoRoot, 'src/adapters/storage/dataLayout.ts'), 'utf8')
+if (!dataLayoutSource.includes(`CAIRN_COMMIT = "${pin.commit}"`)) throw new Error('dataLayout.ts CAIRN_COMMIT differs from the pin')
+for (const accepted of pin.accepted) {
+  for (const file of ['memory.sqlite', 'identity.json', 'fixture.json']) {
+    if (!existsSync(join(repoRoot, 'test/fixtures/legacy-db', accepted, file))) throw new Error(`accepted commit ${accepted} has no legacy fixture file ${file}`)
+  }
+}
 const redactFile = join(installedRoot, 'plugins/cairn-memory/lib/redact.mjs')
 const actualRedact = createHash('sha256').update(readFileSync(redactFile)).digest('hex')
 if (actualRedact !== pin.redactSha256) throw new Error(`Cairn redact.mjs sha256 mismatch: ${actualRedact}`)

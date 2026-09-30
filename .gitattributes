@@ -2,3 +2,4 @@
 *.wav binary
 *.onnx binary
 *.tuqplugin binary
+*.sqlite binary

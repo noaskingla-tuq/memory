@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
   type Stats,
@@ -21,6 +22,12 @@ import {
 import type { DataLayoutPort } from "../../application/ports.js";
 import { MemoryServiceError } from "../../domain/errors.js";
 import { openCairnCore } from "../cairn/cairnCoreAdapter.js";
+import { DEFAULT_PIN_PATH, readCairnPin } from "./cairnPin.js";
+import {
+  backupAgentDatabase,
+  defaultBackupHooks,
+  type BackupHooks,
+} from "./upgradeBackup.js";
 
 export const CAIRN_COMMIT = "83a10c3b7664b1f67485a19e7d84d24dcb3041a5";
 export const CAIRN_CORE_TREE = "c5ba8efa24876b77e2279b9cbc827c221ae277f5";
@@ -114,19 +121,74 @@ function assertRegularFile(root: string, path: string, label: string): void {
   assertRealWithin(root, path);
 }
 
-function writeIdentity(root: string, path: string, agentHash: string): void {
-  const payload = {
-    schemaVersion: 1,
-    agentHash,
-    cairnCommit: CAIRN_COMMIT,
-    createdAt: new Date().toISOString(),
-  };
+interface StoredIdentity {
+  readonly createdAt?: unknown;
+  readonly [key: string]: unknown;
+}
+
+interface IdentityPolicy {
+  readonly currentCommit: string;
+  readonly accepted: readonly string[];
+}
+
+function identityPayload(
+  agentHash: string,
+  commit: string,
+  createdAt: string,
+  extra: Readonly<Record<string, unknown>> = {},
+): string {
+  return `${JSON.stringify(
+    { schemaVersion: 1, agentHash, cairnCommit: commit, createdAt, ...extra },
+    null,
+    2,
+  )}\n`;
+}
+
+function rewriteIdentity(
+  root: string,
+  path: string,
+  agentHash: string,
+  stored: StoredIdentity,
+  fromCommit: string,
+  policy: IdentityPolicy,
+): void {
+  const createdAt =
+    typeof stored.createdAt === "string"
+      ? stored.createdAt
+      : new Date().toISOString();
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(
+      temporary,
+      identityPayload(agentHash, policy.currentCommit, createdAt, {
+        upgradedFromCommit: fromCommit,
+        upgradedAt: new Date().toISOString(),
+      }),
+      { encoding: "utf8", flag: "wx", mode: 0o600 },
+    );
+    renameSync(temporary, path);
+  } catch {
+    rmSync(temporary, { force: true });
+    throw new MemoryServiceError(
+      "STORAGE_BUSY",
+      "Memory identity metadata could not be rewritten after the upgrade",
+    );
+  }
+  assertRegularFile(root, path, "Memory identity metadata");
+}
+
+function resolveIdentity(
+  root: string,
+  path: string,
+  agentHash: string,
+  policy: IdentityPolicy,
+): { readonly stored: StoredIdentity; readonly upgradeFrom?: string } {
   if (!existsSync(path)) {
-    writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, {
-      encoding: "utf8",
-      flag: "wx",
-      mode: 0o600,
-    });
+    writeFileSync(
+      path,
+      identityPayload(agentHash, policy.currentCommit, new Date().toISOString()),
+      { encoding: "utf8", flag: "wx", mode: 0o600 },
+    );
     assertRegularFile(root, path, "Memory identity metadata");
   } else {
     assertRegularFile(root, path, "Memory identity metadata");
@@ -143,22 +205,52 @@ function writeIdentity(root: string, path: string, agentHash: string): void {
   if (
     typeof stored !== "object" ||
     stored === null ||
-    (stored as { agentHash?: unknown }).agentHash !== agentHash ||
-    (stored as { cairnCommit?: unknown }).cairnCommit !== CAIRN_COMMIT
+    (stored as { agentHash?: unknown }).agentHash !== agentHash
   ) {
     throw new MemoryServiceError(
       "STORAGE_UNSUPPORTED",
       "Memory identity metadata is incompatible",
     );
   }
+  const identity = stored as StoredIdentity;
+  const commit = identity.cairnCommit;
+  if (commit === policy.currentCommit) return { stored: identity };
+  if (typeof commit === "string" && policy.accepted.includes(commit)) {
+    return { stored: identity, upgradeFrom: commit };
+  }
+  throw new MemoryServiceError(
+    "STORAGE_UNSUPPORTED",
+    "Memory identity metadata is incompatible",
+  );
+}
+
+export interface CairnDataLayoutOptions {
+  readonly pinPath?: string;
+  readonly currentCommit?: string;
+  readonly acceptedCommits?: readonly string[];
+  readonly backupHooks?: Partial<BackupHooks>;
 }
 
 export class CairnDataLayout implements DataLayoutPort {
   private readonly root: string;
   private readonly realRoot: string;
   private readonly agentsRoot: string;
+  private readonly backupsRoot: string;
+  private readonly policy: IdentityPolicy;
+  private readonly backupHooks: BackupHooks;
 
-  constructor(dataRoot: string) {
+  constructor(dataRoot: string, options: CairnDataLayoutOptions = {}) {
+    const currentCommit = options.currentCommit ?? CAIRN_COMMIT;
+    const accepted =
+      options.acceptedCommits ??
+      readCairnPin(options.pinPath ?? DEFAULT_PIN_PATH).accepted;
+    this.policy = {
+      currentCommit,
+      accepted: accepted.includes(currentCommit)
+        ? accepted
+        : [...accepted, currentCommit],
+    };
+    this.backupHooks = { ...defaultBackupHooks, ...options.backupHooks };
     if (parse(resolve(dataRoot)).base !== "memory-cairn-v1") {
       throw new MemoryServiceError(
         "STORAGE_UNSAFE",
@@ -172,6 +264,7 @@ export class CairnDataLayout implements DataLayoutPort {
     this.agentsRoot = join(this.root, "agents");
     ensureRegularDirectory(this.agentsRoot);
     assertRealWithin(this.realRoot, this.agentsRoot);
+    this.backupsRoot = join(this.root, "backups");
   }
 
   agentDbPath(agentId: string): string {
@@ -180,7 +273,13 @@ export class CairnDataLayout implements DataLayoutPort {
     assertWithin(this.root, agentRoot);
     ensureRegularDirectory(agentRoot);
     assertRealWithin(this.realRoot, agentRoot);
-    writeIdentity(this.realRoot, join(agentRoot, "identity.json"), agentHash);
+    const identityPath = join(agentRoot, "identity.json");
+    const identity = resolveIdentity(
+      this.realRoot,
+      identityPath,
+      agentHash,
+      this.policy,
+    );
     const databasePath = join(agentRoot, "memory.sqlite");
     for (const path of [
       databasePath,
@@ -189,7 +288,58 @@ export class CairnDataLayout implements DataLayoutPort {
     ]) {
       assertRegularFile(this.realRoot, path, "Memory database");
     }
+    if (identity.upgradeFrom !== undefined) {
+      this.upgradeAgent({
+        agentHash,
+        identityPath,
+        databasePath,
+        stored: identity.stored,
+        fromCommit: identity.upgradeFrom,
+      });
+    }
     return databasePath;
+  }
+
+  private upgradeAgent(input: {
+    readonly agentHash: string;
+    readonly identityPath: string;
+    readonly databasePath: string;
+    readonly stored: StoredIdentity;
+    readonly fromCommit: string;
+  }): void {
+    if (existsSync(input.databasePath)) {
+      backupAgentDatabase(
+        {
+          backupsRoot: this.backupsRoot,
+          agentHash: input.agentHash,
+          databasePath: input.databasePath,
+          identityPath: input.identityPath,
+          fromCommit: input.fromCommit,
+          ensureDirectory: (path) => {
+            ensureRegularDirectory(path);
+            assertRealWithin(this.realRoot, path);
+          },
+        },
+        this.backupHooks,
+      );
+      try {
+        openCairnCore(input.databasePath).close();
+      } catch (error) {
+        if (error instanceof MemoryServiceError) throw error;
+        throw new MemoryServiceError(
+          "STORAGE_UNSUPPORTED",
+          "Memory database could not be opened after the backup; identity metadata is unchanged",
+        );
+      }
+    }
+    rewriteIdentity(
+      this.realRoot,
+      input.identityPath,
+      input.agentHash,
+      input.stored,
+      input.fromCommit,
+      this.policy,
+    );
   }
 
   preflight(): void {

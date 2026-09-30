@@ -1,10 +1,12 @@
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { openCairnCore } from "../adapters/cairn/cairnCoreAdapter.js";
 import { CairnDataLayout } from "../adapters/storage/dataLayout.js";
+import { PROFILE_DIRECTORY, PROFILE_FILE, loadProfileFile, type ProfileIo } from "../adapters/ui/profileStore.js";
 import { CoreHandlePool } from "../application/coreHandlePool.js";
 import { MemoryApplication } from "../application/memoryApplication.js";
 import type { MemoryCorePort } from "../application/ports.js";
 import { createClock, type Clock } from "../application/ui/timeSlice.js";
+import { ProfileTable } from "../application/ui/profileTable.js";
 import { createUiServices, type UiServices } from "../application/ui/uiServices.js";
 import { MemoryServiceError } from "../domain/errors.js";
 import {
@@ -16,6 +18,7 @@ import { CallError, callError } from "./contractErrors.js";
 import { buildDiagnose } from "./diagnose.js";
 import { inspect, inspectStorageFailure, parseInspectRequest } from "./inspectCall.js";
 import { parseRememberRequest, remember, rememberStorageFailure } from "./rememberCall.js";
+import { createProfileSync } from "./profileSync.js";
 import { dispatchUi, isUiMethod } from "./uiDispatch.js";
 
 export interface BackendOptions {
@@ -27,6 +30,8 @@ export interface BackendOptions {
   readonly uiSampleRows?: number;
   readonly uiNow?: () => number;
   readonly uiReceiptChunk?: number;
+  readonly profilePath?: string;
+  readonly profileIo?: ProfileIo;
 }
 
 export interface MemoryBackend {
@@ -59,6 +64,10 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   let disposed = false;
   let disposing: Promise<void> | undefined;
   let warming: Promise<void> | undefined;
+  const profilePath = options.profilePath ?? join(dirname(options.dataRoot), PROFILE_DIRECTORY, PROFILE_FILE);
+  // why: the name table is independent of Cairn storage, so it loads and accepts pushes even while the Cairn layout is unavailable
+  const profile = new ProfileTable(loadProfileFile(profilePath));
+  const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
   const ensure = (): Ready => {
     if (ready !== undefined) return ready;
@@ -73,6 +82,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
         ui: createUiServices({
           layout,
           application,
+          profile,
           ...(options.uiClock === undefined ? {} : { newClock: options.uiClock }),
           ...(options.uiSampleRows === undefined ? {} : { sampleRows: options.uiSampleRows }),
           ...(options.uiNow === undefined ? {} : { now: options.uiNow }),
@@ -135,8 +145,10 @@ export function createBackend(options: BackendOptions): MemoryBackend {
         }
         return buildDiagnose(storageStatus());
       }
+      case MEMORY_PLUGIN_METHODS.profileSync:
+        return profileSync.handle(params);
       default:
-        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices });
+        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile });
         throw callError("unknown_method", "Unknown method");
     }
   };

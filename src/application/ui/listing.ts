@@ -3,6 +3,7 @@ import type { UiFailure, UiItem, UiListRequest, UiSearchRequest } from "../../co
 import { collectCandidates, prepareTargets } from "./collect.js";
 import { uiFailure, UiResultTooLarge } from "./failures.js";
 import { fitPage } from "./paging.js";
+import { refNames } from "./names.js";
 import { parseQuery } from "./textQuery.js";
 import type { Clock } from "./timeSlice.js";
 import type { UiServices } from "./uiServices.js";
@@ -64,7 +65,10 @@ export async function runListing(
     page = page.filter((candidate) => candidate.row.updatedAt > horizon);
     more = true;
   }
-  const items: UiItem[] = page.map((candidate) => toItem(candidate.row, candidate.origin, method === "search" ? terms : undefined));
+  const items: UiItem[] = page.map((candidate) => {
+    const item = toItem(candidate.row, candidate.origin, method === "search" ? terms : undefined);
+    return { ...item, names: refNames(services.profile, item.ref) };
+  });
   const complete = !collected.timedOut && collected.unavailable === 0 && snapshot.unavailable.length === 0;
   const wrap = (kept: readonly UiItem[], nextCursor: string | null): Record<string, unknown> =>
     method === "search"

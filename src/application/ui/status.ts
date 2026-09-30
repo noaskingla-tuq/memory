@@ -1,5 +1,6 @@
 import { CAIRN_COMMIT } from "../../adapters/storage/dataLayout.js";
 import type { UiStatus } from "../../contracts/uiContract.js";
+import type { ProfilePort } from "./profilePort.js";
 import type { Clock } from "./timeSlice.js";
 import type { UiServices } from "./uiServices.js";
 
@@ -7,6 +8,7 @@ export interface StatusFacts {
   readonly version: string;
   readonly storageStatus: string;
   readonly uptimeSec: number;
+  readonly profile: ProfilePort;
 }
 
 async function lastWriteOf(services: UiServices, clock: Clock): Promise<string | null> {
@@ -25,15 +27,27 @@ async function lastWriteOf(services: UiServices, clock: Clock): Promise<string |
 }
 
 export async function runStatus(services: UiServices | undefined, clock: Clock, facts: StatusFacts): Promise<UiStatus> {
-  const profile = services?.profile;
-  const stamp = profile?.stamp() ?? { generation: null, receivedAt: null };
-  const counts = profile?.counts() ?? { agents: 0, projects: 0 };
+  const { profile } = facts;
+  const stamp = profile.stamp();
+  const counts = profile.counts();
+  const health = profile.health();
   return {
     ok: true,
     version: facts.version,
     cairnCommit: CAIRN_COMMIT,
     storage: { status: facts.storageStatus },
-    profile: { generation: stamp.generation, receivedAt: stamp.receivedAt, agents: counts.agents, projects: counts.projects, sink: profile?.sink() ?? null },
+    profile: {
+      generation: stamp.generation,
+      receivedAt: stamp.receivedAt,
+      agents: counts.agents,
+      projects: counts.projects,
+      teams: counts.teams,
+      incomplete: health.incomplete,
+      corrupt: health.corrupt,
+      omitted: health.omitted,
+      sink: profile.sink(),
+      sinkReceivedAt: profile.sinkReceivedAt(),
+    },
     lastWriteAt: services === undefined ? null : await lastWriteOf(services, clock),
     uptimeSec: facts.uptimeSec,
   };

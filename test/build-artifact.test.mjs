@@ -111,6 +111,8 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.equal(manifest.resources.maxSessions, 4);
   assert.deepEqual(manifest.backendMethods, UI_METHOD_NAMES);
   assert.equal(manifest.backendMethods.some((method) => method.startsWith("memory.")), false);
+  assert.equal(manifest.backendMethods.includes("memory.profile.sync@1"), false);
+  assert.equal(UI_METHOD_NAMES.some((method) => method.includes("profile")), false);
   const html = readFileSync(join(dist, "stage", "ui", "index.html"), "utf8");
   assert.deepEqual(scanUiFile("ui/index.html", html), []);
   assert.deepEqual([...html.matchAll(/<script\b[^>]*>/gu)].map((match) => match[0]), ['<script src="app.js" defer>']);
@@ -213,6 +215,16 @@ test("verify-artifact rejects a manifest that exposes memory.* methods, adds a p
   assert.ok(failedChecks(permissions).some((name) => name.startsWith("manifest permissions are exactly")));
   const sessions = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"maxSessions": 4', '"maxSessions": 2')));
   assert.ok(failedChecks(sessions).some((name) => name.startsWith("manifest resources follow")));
+});
+
+test("verify-artifact rejects a manifest whose backendMethods list memory.profile.sync@1 in any spelling", async (t) => {
+  for (const spelling of ["memory.profile.sync@1", "profile.sync", "ui.profile.sync"]) {
+    const report = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"ui.status"', `"ui.status",
+    "${spelling}"`)));
+    const failed = failedChecks(report);
+    assert.equal(report.ok, false, spelling);
+    assert.ok(failed.some((name) => name.startsWith("manifest backendMethods do not list memory.profile.sync@1")), spelling);
+  }
 });
 
 test("verify-artifact rejects a missing UI file and a smuggled extra file under ui/", async (t) => {

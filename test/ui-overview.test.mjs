@@ -59,13 +59,20 @@ test("overview tiles and cards equal a brute-force computation over the seeded r
     assert.equal(card.latest.at, expected.newest.updatedAt);
     assert.ok(expected.newest.content.normalize("NFKC").includes(card.latest.snippet), "the latest snippet is the request title of the newest memory");
     assert.equal("name" in card, false, "no name table yet, so no name");
+    assert.equal(typeof card.displayName, "string", "without a name table the card still has a degraded display name");
   }
   const dev = response.agents.find((card) => card.id === "sw/dev");
   assert.equal(dev.counts.personal, 5);
-  assert.deepEqual(dev.counts.projects, [{ projectId: "p1", count: 4 }, { projectId: "p2", count: 3 }, { projectId: "p3", count: 3 }, { projectId: "p4", count: 2 }, { projectId: "p5", count: 2 }]);
+  assert.deepEqual(dev.counts.projects, [
+    { projectId: "p1", displayName: "專案 p1", count: 4 },
+    { projectId: "p2", displayName: "專案 p2", count: 3 },
+    { projectId: "p3", displayName: "專案 p3", count: 3 },
+    { projectId: "p4", displayName: "專案 p4", count: 2 },
+    { projectId: "p5", displayName: "專案 p5", count: 2 },
+  ]);
   assert.equal(dev.counts.otherProjects, 2);
   assert.equal(dev.counts.total, 5 + 4 + 3 + 3 + 2 + 2 + 1 + 1);
-  assert.deepEqual(response.profile, { generation: null, receivedAt: null });
+  assert.deepEqual(response.profile, { generation: null, receivedAt: null, incomplete: false, corrupt: false, omitted: { agents: 0, teams: 0, projects: 0 } });
   assert.deepEqual(response.storage, { status: "ready", unavailableAgents: 0 });
   assert.equal(response.nextCursor, null);
 });

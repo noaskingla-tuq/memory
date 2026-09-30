@@ -43,9 +43,19 @@ for (const fixture of requestFixtures) {
   test(`request fixture ${fixture.case} is ${fixture.valid ? "accepted" : "rejected as invalid_params"}`, async (t) => {
     const { backend } = startBackend(t);
     if (fixture.method === PROFILE_SYNC) {
-      // why: memory.profile.sync@1 is part of the vendored contract but this plugin does not serve it yet, so the fixture is checked against the vendored schema and the backend must still answer unknown_method
       assert.equal(contract.memoryProfileSyncRequestSchema.safeParse(fixture.params).success, fixture.valid);
-      await assert.rejects(backend.call(fixture.method, fixture.params), { code: "unknown_method" });
+      if (!fixture.valid) {
+        await assert.rejects(backend.call(fixture.method, fixture.params), (error) => {
+          assert.equal(error.code, "invalid_params");
+          return true;
+        });
+        return;
+      }
+      const response = await backend.call(fixture.method, fixture.params);
+      assert.equal(contract.memoryProfileSyncResponseSchema.safeParse(response).success, true, JSON.stringify(response));
+      assert.equal(response.generation, fixture.params.generation);
+      // why: a lone part of a several-part fixture is staged and cannot make the table effective, whatever its content
+      assert.equal(response.complete, fixture.params.parts === 1);
       return;
     }
     if (!fixture.valid) {
@@ -89,7 +99,7 @@ for (const fixture of responseFixtures) {
   });
 }
 
-test("only the three contract methods are served; everything else is unknown_method", async (t) => {
+test("only the four contract methods are served; everything else is unknown_method", async (t) => {
   const { backend } = startBackend(t);
   const params = rememberParams([op("Never written.", "op-unreachable")]);
   const others = [
@@ -97,7 +107,9 @@ test("only the three contract methods are served; everything else is unknown_met
     "memory.capture@1",
     "memory.correct@1",
     "memory.forget@1",
-    PROFILE_SYNC,
+    "profile.sync",
+    "memory.profile.sync",
+    "memory.profile.sync@2",
     "memory_recall",
     "memory_capture",
     "memory_correct",

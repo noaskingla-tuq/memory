@@ -6,6 +6,7 @@ import { binCounts } from "./dayBins.js";
 import { uiFailure, UiResultTooLarge } from "./failures.js";
 import { compareText } from "./ordering.js";
 import { fitPage } from "./paging.js";
+import { agentNames, projectNames } from "./names.js";
 import { teamKeyOf } from "./profilePort.js";
 import type { Clock } from "./timeSlice.js";
 import type { UiServices } from "./uiServices.js";
@@ -38,7 +39,7 @@ function binsOf(indexed: IndexedAgent, edges: readonly number[]): number[] {
 
 function cardOf(indexed: IndexedAgent, services: UiServices, teamKey: string, bins: readonly number[]): Card {
   const { agent, latest } = indexed;
-  const profile = services.profile.agent(agent.agentId);
+  const names = agentNames(services.profile, agent.agentId);
   const personal = agent.namespaces.find((namespace) => namespace.scope === "personal")?.count ?? 0;
   const projects = agent.namespaces
     .filter((namespace) => namespace.scope === "project")
@@ -47,16 +48,16 @@ function cardOf(indexed: IndexedAgent, services: UiServices, teamKey: string, bi
   const lastAt = agent.namespaces.reduce<string | null>((newest, namespace) => (namespace.lastAt !== null && (newest === null || namespace.lastAt > newest) ? namespace.lastAt : newest), null);
   return {
     id: agent.agentId,
-    name: profile?.name,
-    team: { key: teamKey, name: profile?.teamName },
-    title: profile?.title,
+    name: names.name,
+    displayName: names.displayName,
+    team: { key: teamKey, name: teamKey === "" ? undefined : services.profile.teamName(teamKey) },
+    title: names.title,
     counts: {
       personal,
-      projects: shown.map((namespace) => ({
-        projectId: namespace.projectId ?? "",
-        name: services.profile.projectName(namespace.projectId ?? ""),
-        count: namespace.count,
-      })),
+      projects: shown.map((namespace) => {
+        const project = projectNames(services.profile, namespace.projectId ?? "");
+        return { projectId: namespace.projectId ?? "", name: project.name, displayName: project.displayName, count: namespace.count };
+      }),
       otherProjects: projects.slice(UI_LIMITS.overviewProjectsMax).reduce((sum, namespace) => sum + namespace.count, 0),
       total: agent.total,
     },
@@ -102,13 +103,14 @@ export async function runOverview(
     return at !== null && (newest === null || at > newest) ? at : newest;
   }, null);
   const stamp = services.profile.stamp();
+  const health = services.profile.health();
   const wrap = (kept: readonly Card[], nextCursor: string | null): Record<string, unknown> => ({
     ok: true,
     tiles: { totalMemories: total, writtenToday, activeAgents7d, agents: entries.length, lastWriteAt },
     agents: kept,
     nextCursor,
     complete: snapshot.complete,
-    profile: { generation: stamp.generation, receivedAt: stamp.receivedAt },
+    profile: { generation: stamp.generation, receivedAt: stamp.receivedAt, incomplete: health.incomplete, corrupt: health.corrupt, omitted: health.omitted },
     storage: { status: storageStatus, unavailableAgents: snapshot.unavailable.length },
   });
   const paged = fitPage({

@@ -1,8 +1,9 @@
 import { openCairn, type CairnSession, type SessionMate, type StoredMemory, type StoredReceipt } from "../../adapters/ui/cairnReader.js";
-import { UI_LIMITS, type UiFailure, type UiGetRequest } from "../../contracts/uiContract.js";
+import { UI_LIMITS, type UiFailure, type UiGetRequest, type UiItem } from "../../contracts/uiContract.js";
 import { HEAD_CHARS } from "./agentIndex.js";
 import { clipCodePoints } from "./budget.js";
 import { readerFailure, uiFailure } from "./failures.js";
+import { refNames } from "./names.js";
 import { newestFirst } from "./ordering.js";
 import { parsePunchContent } from "./punchContent.js";
 import type { Clock } from "./timeSlice.js";
@@ -44,10 +45,12 @@ export async function runGet(request: UiGetRequest, services: UiServices, clock:
   }
   if (!Array.isArray(mates)) return mates;
   const parsed = parsePunchContent(found.memory.content);
+  const ref = refOf(request, found.memory.id);
+  const withNames = (item: UiItem): UiItem => ({ ...item, names: refNames(services.profile, item.ref) });
   return {
     ok: true,
     memory: {
-      ref: refOf(request, found.memory.id),
+      ref,
       kind: found.memory.kind,
       revision: found.memory.revision,
       createdAt: found.memory.createdAt,
@@ -55,7 +58,8 @@ export async function runGet(request: UiGetRequest, services: UiServices, clock:
       content: clipCodePoints(found.memory.content, UI_LIMITS.contentMaxChars),
     },
     ...(parsed.parsed ? { work: parsed.work } : {}),
+    names: refNames(services.profile, ref),
     receipts: found.receipts.map(({ client, sessionId, eventId, role, createdAt }) => ({ client, sessionId, eventId, role, createdAt })),
-    sameSession: mates.map((mate) => toItem(mate, { agentId: request.agentId, scope: mate.namespace.scope, projectId: mate.namespace.projectId })),
+    sameSession: mates.map((mate) => withNames(toItem(mate, { agentId: request.agentId, scope: mate.namespace.scope, projectId: mate.namespace.projectId }))),
   };
 }

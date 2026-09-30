@@ -123,6 +123,23 @@ export const uiForgetRequest = z
 
 export const uiStatusRequest = z.object({}).strict();
 
+/** 名稱表合併後的顯示欄位；名稱缺漏時 displayName 是降級名稱（agent：id 最後一段加（team key）；專案：「專案 」加 id 前 8 碼），name 只在名稱表有時才出現。 */
+export const uiAgentNamesSchema = z
+  .object({
+    displayName: z.string(),
+    name: z.string().optional(),
+    title: z.string().optional(),
+    teamKey: z.string(),
+    teamName: z.string().optional(),
+  })
+  .strict();
+
+export const uiProjectNamesSchema = z.object({ displayName: z.string(), name: z.string().optional() }).strict();
+
+export const uiNamesSchema = z
+  .object({ agent: uiAgentNamesSchema.omit({ title: true }), project: uiProjectNamesSchema.nullable() })
+  .strict();
+
 export const uiWorkSchema = z
   .object({
     startIso: timestamp,
@@ -142,15 +159,17 @@ export const uiItemSchema = z
     snippet: codePointsAtMost(UI_LIMITS.listSnippetChars),
     work: uiWorkSchema.optional(),
     receiptCount: count,
+    names: uiNamesSchema.optional(),
   })
   .strict();
 
-const projectCount = z.object({ projectId: identifier, name: z.string().optional(), count }).strict();
+const projectCount = z.object({ projectId: identifier, name: z.string().optional(), displayName: z.string().optional(), count }).strict();
 
 export const uiAgentCardSchema = z
   .object({
     id: identifier,
     name: z.string().optional(),
+    displayName: z.string().optional(),
     team: z.object({ key: z.string(), name: z.string().optional() }).strict(),
     title: z.string().optional(),
     counts: z
@@ -167,7 +186,18 @@ export const uiAgentCardSchema = z
   })
   .strict();
 
-const profileStamp = z.object({ generation: z.string().nullable(), receivedAt: z.string().nullable() }).strict();
+const profileOmitted = z.object({ agents: count, teams: count, projects: count }).strict();
+
+/** incomplete＝Core 因上限丟掉了部分名稱（omitted 任一項大於 0）；corrupt＝磁碟上的名稱表壞了、目前以空表運作。 */
+const profileStamp = z
+  .object({
+    generation: z.string().nullable(),
+    receivedAt: z.string().nullable(),
+    incomplete: z.boolean().optional(),
+    corrupt: z.boolean().optional(),
+    omitted: profileOmitted.optional(),
+  })
+  .strict();
 
 export const uiOverviewSuccess = z
   .object({
@@ -190,13 +220,21 @@ export const uiOverviewSuccess = z
   .strict();
 
 const namespaceStat = z
-  .object({ scope, projectId: identifier.nullable(), count, firstAt: timestamp.nullable(), lastAt: timestamp.nullable() })
+  .object({
+    scope,
+    projectId: identifier.nullable(),
+    count,
+    firstAt: timestamp.nullable(),
+    lastAt: timestamp.nullable(),
+    project: uiProjectNamesSchema.nullable().optional(),
+  })
   .strict();
 
 export const uiAgentStatsSuccess = z
   .object({
     ok: z.literal(true),
     agentId: identifier,
+    agent: uiAgentNamesSchema.optional(),
     namespaces: z.array(namespaceStat),
     byDay30: z.array(z.object({ date: z.string().length(10), count }).strict()).max(30),
     byHour: z.array(count).length(24),
@@ -247,6 +285,7 @@ export const uiGetSuccess = z
       })
       .strict(),
     work: uiWorkSchema.optional(),
+    names: uiNamesSchema.optional(),
     receipts: z.array(uiReceiptSchema).max(UI_LIMITS.receiptsMax),
     sameSession: z.array(uiItemSchema).max(UI_LIMITS.sameSessionMax),
   })
@@ -266,7 +305,12 @@ export const uiStatusSuccess = z
         receivedAt: z.string().nullable(),
         agents: count,
         projects: count,
+        teams: count.optional(),
+        incomplete: z.boolean().optional(),
+        corrupt: z.boolean().optional(),
+        omitted: profileOmitted.optional(),
         sink: z.object({ pending: count, lastWrittenAtMs: count.nullable() }).strict().nullable(),
+        sinkReceivedAt: z.string().nullable().optional(),
       })
       .strict(),
     lastWriteAt: timestamp.nullable(),
@@ -298,6 +342,9 @@ export type UiStatus = z.infer<typeof uiStatusSuccess>;
 export type UiRef = z.infer<typeof uiRefSchema>;
 export type UiItem = z.infer<typeof uiItemSchema>;
 export type UiWork = z.infer<typeof uiWorkSchema>;
+export type UiNames = z.infer<typeof uiNamesSchema>;
+export type UiAgentNames = z.infer<typeof uiAgentNamesSchema>;
+export type UiProjectNames = z.infer<typeof uiProjectNamesSchema>;
 export type UiOverviewRequest = z.infer<typeof uiOverviewRequest>;
 export type UiAgentStatsRequest = z.infer<typeof uiAgentStatsRequest>;
 export type UiGetRequest = z.infer<typeof uiGetRequest>;

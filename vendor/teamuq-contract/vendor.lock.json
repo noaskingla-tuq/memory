@@ -5,7 +5,7 @@
   "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
   "source": {
     "repo": "teamuq-electron",
-    "coreCommit": "017d549c823e2327f8c7e47bc1e9e332d93aa782",
+    "coreCommit": "00732fb954d6d8bcebbe3f14f729b8440309a2c9",
     "contractCommit": "c07ae684f6d440df12a48567f5c90239b8fea385",
     "contractDir": "packages/features/agent-memory/contract/v1"
   },

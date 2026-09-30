@@ -25,7 +25,18 @@ test("ui.status reports real data that survives a JSON round trip", async (t) =>
   assert.equal(empty.storage.status, "ready");
   assert.equal(typeof empty.uptimeSec, "number");
   assert.equal(empty.lastWriteAt, null, "nothing was written yet");
-  assert.deepEqual(empty.profile, { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null });
+  assert.deepEqual(empty.profile, {
+    generation: null,
+    receivedAt: null,
+    agents: 0,
+    projects: 0,
+    teams: 0,
+    incomplete: false,
+    corrupt: false,
+    omitted: { agents: 0, teams: 0, projects: 0 },
+    sink: null,
+    sinkReceivedAt: null,
+  });
   const written = await callRemember(backend, [op("Something the status must notice.", "op-status-1")]);
   assert.equal(written.results[0].ok, true);
   const after = await backend.call("ui.status", {});

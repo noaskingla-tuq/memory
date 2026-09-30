@@ -9,6 +9,7 @@ import { runListing } from "../application/ui/listing.js";
 import { runOverview } from "../application/ui/overview.js";
 import { runStatus } from "../application/ui/status.js";
 import { createClock } from "../application/ui/timeSlice.js";
+import type { ProfilePort } from "../application/ui/profilePort.js";
 import type { UiServices } from "../application/ui/uiServices.js";
 import { MemoryServiceError } from "../domain/errors.js";
 import { callError } from "./contractErrors.js";
@@ -17,6 +18,7 @@ import { PLUGIN_VERSION } from "./diagnose.js";
 export interface UiDispatchDeps {
   readonly storageStatus: () => string;
   readonly services: () => UiServices | undefined;
+  readonly profile: ProfilePort;
 }
 
 export function isUiMethod(method: unknown): method is UiMethodName {
@@ -36,7 +38,7 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   // why: calls that arrive in the same loop turn would otherwise all start their first slice back to back, so each call first waits for its own turn
   await clock.yieldNow();
   if (method === "ui.status") {
-    return runStatus(services, clock, { version: PLUGIN_VERSION, storageStatus: deps.storageStatus(), uptimeSec: Math.round(process.uptime()) });
+    return runStatus(services, clock, { version: PLUGIN_VERSION, storageStatus: deps.storageStatus(), uptimeSec: Math.round(process.uptime()), profile: deps.profile });
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;

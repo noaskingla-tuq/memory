@@ -3,6 +3,7 @@ import { UI_LIMITS, type UiAgentStatsRequest, type UiFailure, type UiItem } from
 import { HEAD_CHARS, type IndexedAgent } from "./agentIndex.js";
 import { clipCodePoints, fitToBudget } from "./budget.js";
 import { readerFailure, uiFailure, UiResultTooLarge } from "./failures.js";
+import { agentNames, projectNames, refNames } from "./names.js";
 import { compareText, newestFirst } from "./ordering.js";
 import { parsePunchContent, type PunchContent } from "./punchContent.js";
 import type { Clock } from "./timeSlice.js";
@@ -71,7 +72,8 @@ export async function runAgentStats(
   if (found.kind === "unavailable") return readerFailure(found.reason === "identity_mismatch" || found.reason === "owner_conflict" ? "unsupported_schema" : found.reason);
   const { indexed } = found;
   const localNow = services.now() + request.tzOffsetMin * 60_000;
-  const cacheKey = `${indexed.agent.agentHash}|${request.tzOffsetMin}|${dateOf(localNow)}|${services.sampleRows}`;
+  // why: the cached answer carries the merged names, so a new name table generation must miss the cache
+  const cacheKey = `${indexed.agent.agentHash}|${request.tzOffsetMin}|${dateOf(localNow)}|${services.sampleRows}|${services.profile.stamp().generation ?? ""}`;
   const cached = services.statsCache.get(cacheKey);
   if (cached !== undefined && cached.version === indexed.version) return cached.response as Record<string, unknown>;
 
@@ -104,10 +106,14 @@ export async function runAgentStats(
   const chosen = representativeOf(rows, parsed, titles);
   const counted = readCairn(indexed.path, (reader) => reader.receiptCounts(chosen.map((entry) => entry.row.id)));
   if (!counted.ok) return readerFailure(counted.code);
-  const representative: UiItem[] = chosen.map((entry) => toItem({ ...entry.row, receiptCount: counted.value.get(entry.row.id) ?? 0 }, entry.origin));
+  const representative: UiItem[] = chosen.map((entry) => {
+    const item = toItem({ ...entry.row, receiptCount: counted.value.get(entry.row.id) ?? 0 }, entry.origin);
+    return { ...item, names: refNames(services.profile, item.ref) };
+  });
   const build = (namespaces: readonly unknown[]): Record<string, unknown> => ({
     ok: true,
     agentId: indexed.agent.agentId,
+    agent: agentNames(services.profile, indexed.agent.agentId),
     namespaces,
     byDay30: Array.from({ length: DAYS }, (_, back) => {
       const date = dateOf(today - (DAYS - 1 - back) * DAY_MS);
@@ -129,7 +135,14 @@ export async function runAgentStats(
   const namespaces = [...indexed.agent.namespaces]
     .sort((left, right) => right.count - left.count || compareText(left.projectId ?? "", right.projectId ?? ""))
     .slice(0, NAMESPACES_MAX)
-    .map(({ scope, projectId, count, firstAt, lastAt }) => ({ scope, projectId, count, firstAt, lastAt }));
+    .map(({ scope, projectId, count, firstAt, lastAt }) => ({
+      scope,
+      projectId,
+      count,
+      firstAt,
+      lastAt,
+      project: projectId === null ? null : projectNames(services.profile, projectId),
+    }));
   // why: every other part of this answer is bounded, so the namespace list is the only thing that can push it over the byte budget
   const fitted = fitToBudget(namespaces, build);
   if (!fitted.ok) throw new UiResultTooLarge();

@@ -130,6 +130,7 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   const methods = Array.isArray(manifest.backendMethods) ? manifest.backendMethods : []
   check('manifest backendMethods are exactly the seven ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
   check('no memory.* method (nor diagnose) is exposed to the view through backendMethods', !methods.some((method) => /^(?:memory\.|diagnose$)/u.test(method)), methods.join(', '))
+  check('manifest backendMethods do not list memory.profile.sync@1: Core pushes the name table through its own gate and the view never calls it', !methods.some((method) => String(method).includes('profile.sync')), methods.join(', '))
   const resources = manifest.resources ?? {}
   check('manifest resources follow the S0 recommendation', resources.cpuThreads === 1 && resources.maxSessions === EXPECTED_MAX_SESSIONS && resources.idleUnloadSec === 180 && Object.entries(RESOURCE_RANGES).every(([field, [low, high]]) => resources[field] >= low && resources[field] <= high), JSON.stringify(resources))
   check(dev ? `manifest version is a 1.0.x patch above package.json version ${packageJson.version} (dev-pack --bump-patch)` : `manifest version equals package.json version ${packageJson.version}`, dev ? isPatchAbove(manifest.version, packageJson.version) : manifest.version === packageJson.version, String(manifest.version))

@@ -7,16 +7,16 @@ TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust�
 ## 目錄
 
 ```
-src/backend/            外部後端入口：entry（activate）、service（派送與生命週期）、rememberCall、inspectCall、uiDispatch、diagnose、contractErrors
+src/backend/            外部後端入口：entry（activate）、service（派送與生命週期）、rememberCall、inspectCall、uiDispatch、profileSync（名稱表推送）、diagnose、contractErrors
 vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
 src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/dialog.ts、i18n/、styles/{app.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
 src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
-src/application/ui/     七個方法的本體（overview、agentStats、listing、detail、forget、status）與零件：agentIndex（agent 索引與快取）、collect（跨 namespace 掃描）、timeSlice（時間片）、budget（UTF-8 bytes 預算）、paging、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、textQuery、workItem、dayBins、profilePort（名稱表介面，S4 接上）、jsonSafe（出口）
+src/application/ui/     七個方法的本體（overview、agentStats、listing、detail、forget、status）與零件：agentIndex（agent 索引與快取）、collect（跨 namespace 掃描）、timeSlice（時間片）、budget（UTF-8 bytes 預算）、paging、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、textQuery、workItem、dayBins、profilePort（名稱表介面）、profileTable（生效中的名稱表）、profileGeneration、names（名稱合併與降級）、jsonSafe（出口）
 types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
 src/adapters/cairn/     Cairn core adapter（唯一 import cairn-memory 的檔）
-src/adapters/ui/        cairnReader（唯一對 Cairn 庫檔下 SQL、只讀）、agentCatalog（判讀一個 agent 庫、列出所有 agent）
+src/adapters/ui/        cairnReader（唯一對 Cairn 庫檔下 SQL、只讀）、agentCatalog（判讀一個 agent 庫、列出所有 agent）、profileStore（名稱表檔 `memory-ui/profile.json` 的讀寫）
 src/adapters/model/     Cairn 模型 callback adapter
 src/adapters/storage/   每 agent 一顆 SQLite 的資料配置、檔案安全檢查、identity 相容（cairnPin、upgradeBackup）
 src/application/        memory application、handle pool、write lane、resource governor、tool contract、ports
@@ -44,7 +44,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 
 - 資料根：`<dataDir>/memory-cairn-v1`。啟動時 `warmUp` 會建 `CairnDataLayout(root, { pinPath })` 並 `preflight`；失敗不擋啟動，之後每次 `call` 與 `diagnose` 會重試。
 - `pinPath`：backend 模組同目錄有 `cairn-pin.json`（打包後）就用它，否則取模組往上兩層（`out/backend` 的 repo 根）。P3 stage 必須把 `cairn-pin.json` 放在 `backend.mjs` 旁。
-- `call(method, params)` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose` 與七個 `ui.*`（`uiDispatch`，見「UI 方法（S3）」；預期錯誤回 `{ok:false, code}` 不 throw，出口一律 JSON 來回一次）；其餘（含 `memory.recall@1`、`memory.forget@1` 等，recall／capture／correct／forget 的程式碼雖在但沒有入口）一律拋 `unknown_method`。
+- `call(method, params)` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`（見「名稱表（S4）」）與七個 `ui.*`（`uiDispatch`，見「UI 方法（S3）」；預期錯誤回 `{ok:false, code}` 不 throw，出口一律 JSON 來回一次）；其餘（含 `memory.recall@1`、`memory.forget@1` 等，recall／capture／correct／forget 的程式碼雖在但沒有入口）一律拋 `unknown_method`。
 - 整次呼叫失敗只會拋帶 `code` 的錯誤，且碼只能是 `unknown_method`、`invalid_params`、`result_too_large`、`internal`（host 把 `code` 原樣回給 Core）。請求違反契約 schema 是 `invalid_params`；訊息只含欄位路徑，不回顯內容。dispose 之後的呼叫拋 `internal`。
 - 個別操作的失敗是回應內的 `{ok:false, error}`，碼取自契約 `MEMORY_ERROR_CODES`；契約沒有的碼（`CAPABILITY_*`、`SESSION_BINDING_MISMATCH`、`IDENTITY_UNBOUND`）收成 `INTERNAL`，且原始碼中沒有任何地方會產生它們。儲存層起不來時，每個 op 依實際碼（`STORAGE_*`、`DEPENDENCY_INCOMPATIBLE`）回失敗，不用 `INTERNAL`。
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
@@ -82,18 +82,30 @@ UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段�
 - **agent 索引與快取**（`agentIndex.ts`）：每個 agent 一筆，內容是 namespace 清單（筆數、首末時間、**完整的更新時間序列**）與最新一筆的文字。有效條件是「行程內 dirty 世代沒變」（`memory.remember@1` 與 `ui.forget` 在 `finally` 標記，成功、失敗、半途失敗都標）**且**「庫檔 mtime＋size 沒變」（第二層，抓不經本行程的寫入）。目錄清單以 `agents/` 的 mtime 為指紋重用（新 agent 目錄、對未知 agent 的寫入都會讓它重建，最長 30 s）。`AgentIndex.snapshot` 逐個 agent 更新且會讓出；`createBackend().warmIndex()` 在 activate 時於背景先建好（`entry.ts` 呼叫），dispose 會等它結束。
 - **時間序列的用途**：`ui.list`／`ui.search` 的「掃哪些 namespace」由它決定：每個 namespace 的 head 是「游標之後、時間窗之內最新一列」的時間，依 head 由新到舊逐個掃，掃到 limit+1 筆且下一個 head 比第 limit+1 筆還舊就停。所以翻很深的頁也只開幾個庫；`overview` 的日統計（14 天火花線、今天寫入、7 天活躍）直接由它算，不查庫。
 - **逾時仍精確**：逾時時只保留「比下一個尚未掃的 head 更新」的項目（這部分不可能被漏掉的 namespace 插隊），游標接在最後一筆之後；一筆都留不下就把游標移到 head。掃不完的呼叫下一次會從暖的索引接著做。要在 4 s 內走完所有仍在游標之後的 namespace 才保證前進，這在 223 個 namespace 下綽綽有餘。
-- `ui.status`：真實資料（版本、Cairn commit、儲存狀態、`lastWriteAt` 取自索引、`uptimeSec`、profile 名稱表尚未接入時為空表）；沒有 `stub`。
+- `ui.status`：真實資料（版本、Cairn commit、儲存狀態、`lastWriteAt` 取自索引、`uptimeSec`、名稱表狀態）；沒有 `stub`。`profile` 含 `generation`、`receivedAt`、`agents`／`teams`／`projects` 筆數、`incomplete`（`omitted` 任一項大於 0）、`omitted`、`corrupt`、`sink`（Core 附帶的待寫數與最後寫入時間）與 `sinkReceivedAt`。
 
 各方法的語意：
 
-- `ui.overview`：磚塊（總筆數、今天寫入＝`updated_at` 落在 `dayStartIso` 起 24 小時內、7 天活躍 agent、agent 數、最後寫入）與卡片（依 `(teamKey, id)` 排序；`teamKey` 在名稱表未接入前取 agent id 斜線前的部分）。`counts.projects` 取筆數最多的 5 個 project（同筆數依 id），其餘合計在 `otherProjects`（筆數，不是 project 數）。`complete:false` 表示逾時、只含已掃到的 agent。游標位置是 `(teamKey, id)`；兩者太長放不進游標時改放摘要，該 agent 消失時回 `CURSOR_STALE`。`profile` 由 `profilePort.ts` 的介面供應（預設 `NO_PROFILE`，S4 接上）。
-- `ui.agentStats`：取該 agent 每個 namespace 最新 2,000 筆（合計）聚合：日（本地日，`tzOffsetMin`）、時、星期（0＝週日）、工具（cli／model，解析不了的歸 `null`）、重複的請求標題（≥2 次，前 8）、代表項（最常重複的前 4 個標題各取最新一筆，不足再補最新的）；`namespaces` 是精確筆數，超過預算時截尾；`sampled` 表示總數超過取樣上限。結果依 agent 版本、時區、本地日快取（最多 16 筆）。
-- `ui.list`：所有篩選（agent、scope、project、`sinceIso` 含、`untilIso` 不含、`cli`）先套在 namespace 與 SQL；`cli` 比對的是內容前綴（見 `punchContent.ts`）。項目的 `snippet` 是解析後的成果文字前 160 字（解析失敗則是原文），`work` 為工作起訖、cli、model、標題。
+- `ui.overview`：磚塊（總筆數、今天寫入＝`updated_at` 落在 `dayStartIso` 起 24 小時內、7 天活躍 agent、agent 數、最後寫入）與卡片（依 `(teamKey, id)` 排序；`teamKey` 取名稱表給的部門 key，名稱表沒有該 agent 或沒給部門時取 agent id 斜線前的部分）。`counts.projects` 取筆數最多的 5 個 project（同筆數依 id），其餘合計在 `otherProjects`（筆數，不是 project 數）。`complete:false` 表示逾時、只含已掃到的 agent。游標位置是 `(teamKey, id)`；兩者太長放不進游標時改放摘要，該 agent 消失時回 `CURSOR_STALE`。`profile` 由 `profilePort.ts` 的介面供應（生產是 `profileTable.ts`）；除 `generation`、`receivedAt` 外另有 `incomplete`、`corrupt`、`omitted`。卡片另有 `displayName`（名稱缺漏時的降級名稱），`team.name` 取自名稱表的 `teams[]`。
+- `ui.agentStats`：取該 agent 每個 namespace 最新 2,000 筆（合計）聚合：日（本地日，`tzOffsetMin`）、時、星期（0＝週日）、工具（cli／model，解析不了的歸 `null`）、重複的請求標題（≥2 次，前 8）、代表項（最常重複的前 4 個標題各取最新一筆，不足再補最新的）；`namespaces` 是精確筆數，超過預算時截尾；`sampled` 表示總數超過取樣上限。結果依 agent 版本、時區、本地日、名稱表 generation 快取（最多 16 筆）；回應另有 `agent`（名稱合併結果）與每個 namespace 的 `project`。
+- `ui.list`：所有篩選（agent、scope、project、`sinceIso` 含、`untilIso` 不含、`cli`）先套在 namespace 與 SQL；`cli` 比對的是內容前綴（見 `punchContent.ts`）。項目的 `snippet` 是解析後的成果文字前 160 字（解析失敗則是原文），`work` 為工作起訖、cli、model、標題，`names` 是名稱合併結果（`agent`：`displayName`、選填的 `name`、`teamKey`、選填的 `teamName`；`project`：個人記憶為 `null`，否則 `displayName` 與選填的 `name`）。
 - `ui.search`：查詢先 NFKC、壓縮空白；以空白切成詞（去重、上限 16 個，超過或全空白回 `INVALID_PARAMS`），**每個詞都要出現（AND）**，大小寫只有 ASCII 不分（SQLite `lower()` 的範圍；`é` 與 `É` 視為不同）。逐 namespace 以 `instr(lower(content), 詞)` 掃，snippet 以第一個命中處為中心（命中在標題或前綴時取成果開頭）。`scanned.complete:false` 表示有 agent 讀不了。
-- `ui.get`：完整內容（≤4,000 字）、工作資訊、最多 12 筆收據、`sameSession`（同一 agent 庫內、任一收據 session 相同的其他記憶，最多 8，新到舊；`receipts.session_id` 沒有索引，超大庫這一步是全表掃描）。找不到、agent 不存在都是 `NOT_FOUND`，且不會建立任何目錄。
+- `ui.get`：完整內容（≤4,000 字）、工作資訊、最多 12 筆收據、`sameSession`（同一 agent 庫內、任一收據 session 相同的其他記憶，最多 8，新到舊；`receipts.session_id` 沒有索引，超大庫這一步是全表掃描）。回應另有 `names`（同 `ui.list` 的項目），`sameSession` 的項目也帶 `names`。找不到、agent 不存在都是 `NOT_FOUND`，且不會建立任何目錄。
 - `ui.forget`：走 `MemoryApplication.execute('memory_forget')`，與 sink 共用寫入通道與 handle pool。過期的 `expectedRevision` 回 `REVISION_CONFLICT`；已忘記或不存在的記憶回 `{ok:true, forgotten:false}`（第二次 forget 也是）；agent 不存在回 `NOT_FOUND`。忘記後 Cairn 記下指紋，同內容再 `memory.remember@1` 會得到 `MEMORY_SUPPRESSED`。
 
 效能與並行的量測工具是 `npm run perf:ui -- --data <含 memory-cairn-v1 的資料集目錄>`（node 與 Electron run-as-node 都能跑；資料集用設計目錄的 `gen-dataset.mjs` 在 repo 外產生）：讀取階段量 overview／list／search 等的耗時與事件迴圈最長停頓並斷言上限，並行階段在 16 筆一批的 sink 式寫入與單筆寫入下同時跑所有 `ui.*`，斷言 0 錯誤、總筆數精確。已知限制：單一 agent 庫超過數萬筆時，該 agent 的索引更新（一次同步掃描）與 `ui.get` 的 `sameSession` 會各佔數十毫秒；冷啟動第一次呼叫（索引還沒建好）要對每個 agent 庫開一次檔（每個約 3～6 ms 的 schema 載入），100 個 agent 約 0.4～0.7 s。
+
+## 名稱表（S4）
+
+Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 分段推給 plugin（契約在 `vendor/teamuq-contract`，Core 端規則見 Core 的 agent-memory README）。這個方法**只有 Core 的 sink 通道會呼叫**，不在 manifest 的 `backendMethods`，view 呼叫不到；`verify-artifact` 有專屬檢查。
+
+- **暫存與生效**（`src/backend/profileSync.ts`）：各段只暫存在記憶體，以 generation 為鍵；收到別的 generation 或不同的 `parts` 就丟棄舊暫存，同一段重送覆蓋，段序不限。收齊 `parts` 段後把三個清單串起來，用契約匯出的 `memoryProfileCanonicalText` 加 sha256 重算 generation：不符（含跨段重複 id、各段 `omitted` 不一致、超過個數上限）回 `invalid_params`，不改變目前生效的表；相符才寫檔並整份換上。未收齊時回 `complete:false, changed:false, received:<已收段數>`，個數欄位是目前生效表的筆數。
+- **同 generation**：已生效的 generation 再來任一段，直接回 `complete:true, changed:false, received:1`，不驗證內容、不動名稱表，只用該段的 `sink` 刷新 sink 與 `sinkReceivedAt`（`null` 存成未知）。
+- **落地**（`src/adapters/ui/profileStore.ts`）：`<dataDir>/memory-ui/profile.json`，內容 `{version:1, generation, receivedAt, agents, teams, projects, omitted, sink, sinkReceivedAt}`。先寫 `profile.json.<16 hex>.tmp`、fsync、再 rename（Node 權限模型下 fsync 被停用並回 `ERR_ACCESS_DENIED`，此時只忽略這個碼、靠 rename 保證原子；其他 fsync 錯誤照常算寫入失敗）；寫入失敗（含 rename 失敗）清掉 tmp、回 `internal`（Core 視為可重試，整組重送）、目前的表不變；殘留的 tmp 讀取時被忽略、下一次寫入時移除。`memory-ui` 或檔案是 symlink／junction 一律拒絕（讀為 corrupt、寫回 `internal`）。
+- **壞檔**：不是 JSON、schema 不符、版本不符、內容重算的 generation 與檔內不符、超過 16 MiB，都視為空表並在 `ui.status.profile.corrupt`、`ui.overview.profile.corrupt` 標記；下一次完整推送會覆寫修復。檔案不存在是空表、不算 corrupt。載入在 `createBackend` 建構時同步完成，與 Cairn 儲存是否可用無關。
+- **不完整**：`omitted` 任一項大於 0 表示 Core 因上限丟掉部分名稱，`ui.status.profile` 與 `ui.overview.profile` 的 `incomplete` 為 `true`，`omitted` 帶各項數量。
+- **合併與降級**（`src/application/ui/names.ts`）：名稱表有就用（`name`、`title`、`teamName`＝`teams[]` 依 team key 取，agent 沒列部門或沒列在表內時 team key 取 id 斜線前的部分，其名稱一樣去 `teams[]` 查）；沒有時 `displayName`＝agent「id 最後一段（team key）」、專案「專案 」加 id 前 8 個字元。新增的回應欄位都是 schema 內選填、後端一律送出：overview 卡片 `displayName`、`counts.projects[].displayName`，overview／status 的 `profile.{incomplete,corrupt,omitted}`，status 的 `profile.{teams,sinkReceivedAt}`，list／search／get 的項目 `names`，get 的 `names`，agentStats 的 `agent` 與 `namespaces[].project`。
+- 名稱表不入 generation 的欄位（`sink`）與名稱一起存檔；Core 在 plugin READY 時會整組重送，所以檔案遺失只影響到下一次推送。
 
 ## UI 基礎（S5）
 
@@ -118,7 +130,7 @@ UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段�
 | `contract.d.mts` | 本 repo 加的一行橋接（tsc 把對 `contract.mjs` 的 import 解析到 `.d.mts`），列在 `vendor.lock.json` 的 `pluginOwnedFiles` |
 | `vendor.lock.json` | Core commit（HEAD）、最後改到契約目錄的 commit、Core `lock.json` 的 sha256、每個 vendored 檔的 sha256 |
 
-- 同步：`node tools/sync-vendor.mjs --core <TeamUQ 路徑>`。先驗 Core 的 lock（每檔 hash、無多餘檔、方法清單、pluginId；方法清單現為 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`，後者本 plugin 尚未服務，呼叫端會得到 `unknown_method`），且契約目錄不得有未提交變更；再重寫 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`（`diagnose.contractLockSha256` 的來源）。
+- 同步：`node tools/sync-vendor.mjs --core <TeamUQ 路徑>`。先驗 Core 的 lock（每檔 hash、無多餘檔、方法清單、pluginId；方法清單現為 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`，見「名稱表（S4）」），且契約目錄不得有未提交變更；再重寫 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`（`diagnose.contractLockSha256` 的來源）。
 - 驗證：`npm run contract:verify`（不需要 Core）比對 vendored 檔與兩份 lock、橋接檔內容、`vendoredContractLock.ts`；加 `--core <路徑>` 會另外對照 Core 的 lock 與 commit。
 
 ## 升級 Cairn 後的舊庫（G7）

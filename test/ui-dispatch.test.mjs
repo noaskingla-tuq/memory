@@ -14,23 +14,59 @@ test("the manifest template lists exactly the ui.* methods of the contract and n
   assert.equal(template.resources.maxSessions, 4);
 });
 
-test("ui.status answers with placeholder data that survives a JSON round trip", async (t) => {
+test("ui.status reports real data that survives a JSON round trip", async (t) => {
   const { backend } = startBackend(t);
-  const status = await backend.call("ui.status", {});
-  assert.deepEqual(JSON.parse(JSON.stringify(status)), status);
-  assert.equal(status.ok, true);
-  assert.equal(status.stub, true);
-  assert.equal(status.version, JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).version);
-  assert.equal(status.storage.status, "ready");
-  assert.equal(typeof status.uptimeSec, "number");
-  assert.equal(status.lastWriteAt, null);
+  const empty = await backend.call("ui.status", {});
+  assert.deepEqual(JSON.parse(JSON.stringify(empty)), empty);
+  assert.equal(empty.ok, true);
+  assert.equal("stub" in empty, false);
+  assert.equal(empty.version, JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).version);
+  assert.equal(empty.cairnCommit, JSON.parse(readFileSync(join(REPO_ROOT, "cairn-pin.json"), "utf8")).commit);
+  assert.equal(empty.storage.status, "ready");
+  assert.equal(typeof empty.uptimeSec, "number");
+  assert.equal(empty.lastWriteAt, null, "nothing was written yet");
+  assert.deepEqual(empty.profile, { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null });
+  const written = await callRemember(backend, [op("Something the status must notice.", "op-status-1")]);
+  assert.equal(written.results[0].ok, true);
+  const after = await backend.call("ui.status", {});
+  assert.match(after.lastWriteAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  assert.ok(Math.abs(Date.parse(after.lastWriteAt) - Date.now()) < 60_000);
 });
 
-test("the other six ui.* methods answer NOT_IMPLEMENTED instead of throwing", async (t) => {
+test("every ui.* method rejects a wrong or missing parameter with INVALID_PARAMS and never throws", async (t) => {
   const { backend } = startBackend(t);
-  for (const method of UI_METHOD_NAMES.filter((name) => name !== "ui.status")) {
-    assert.deepEqual(await backend.call(method, {}), { ok: false, code: "NOT_IMPLEMENTED", retryable: false }, method);
+  const invalid = {
+    "ui.overview": [{}, { tzOffsetMin: 0 }, { tzOffsetMin: 0, dayStartIso: "2026-09-30", limit: 1 }],
+    "ui.agentStats": [{}, { agentId: "a/b" }],
+    "ui.list": [{ limit: 25 }, { scope: "personal", projectId: "p" }, { extra: 1 }],
+    "ui.search": [{}, { q: "" }, { q: "x".repeat(101) }],
+    "ui.get": [{}, { agentId: "a/b", scope: "personal", projectId: "p", memoryId: "m" }],
+    "ui.forget": [{}, { agentId: "a/b", scope: "personal", projectId: null, memoryId: "m" }],
+    "ui.status": [{ extra: true }],
+  };
+  for (const [method, list] of Object.entries(invalid)) {
+    for (const params of list) {
+      assert.deepEqual(await backend.call(method, params), { ok: false, code: "INVALID_PARAMS", retryable: false }, `${method} ${JSON.stringify(params)}`);
+    }
   }
+});
+
+test("on an empty store every read method answers ok with empty data or NOT_FOUND", async (t) => {
+  const { backend } = startBackend(t);
+  const overview = await backend.call("ui.overview", { tzOffsetMin: 480, dayStartIso: "2026-09-29T16:00:00.000Z" });
+  assert.equal(overview.ok, true);
+  assert.deepEqual(overview.tiles, { totalMemories: 0, writtenToday: 0, activeAgents7d: 0, agents: 0, lastWriteAt: null });
+  assert.deepEqual(overview.agents, []);
+  assert.equal(overview.nextCursor, null);
+  assert.deepEqual(await backend.call("ui.list", {}), { ok: true, items: [], nextCursor: null });
+  const search = await backend.call("ui.search", { q: "  ＡＢＣ   def " });
+  assert.equal(search.ok, true);
+  assert.equal(search.normalizedQuery, "ABC def");
+  assert.equal(search.mode, "literal");
+  const ref = { agentId: "no/one", scope: "personal", projectId: null, memoryId: "nothing" };
+  assert.deepEqual(await backend.call("ui.get", ref), { ok: false, code: "NOT_FOUND", retryable: false });
+  assert.deepEqual(await backend.call("ui.forget", { ...ref, expectedRevision: 1 }), { ok: false, code: "NOT_FOUND", retryable: false });
+  assert.deepEqual(await backend.call("ui.agentStats", { agentId: "no/one", tzOffsetMin: 0 }), { ok: false, code: "NOT_FOUND", retryable: false });
 });
 
 test("ui.* methods need an object as params", async (t) => {

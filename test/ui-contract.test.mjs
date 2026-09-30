@@ -88,7 +88,7 @@ test("failures use a closed code list and carry retryable", () => {
   for (const code of UI_FAILURE_CODES) assert.equal(uiFailureSchema.safeParse({ ok: false, code, retryable: false }).success, true, code);
   assert.equal(uiFailureSchema.safeParse({ ok: false, code: "INTERNAL", retryable: false }).success, false);
   assert.equal(uiFailureSchema.safeParse({ ok: false, code: "NOT_FOUND" }).success, false);
-  assert.equal(parseUiResponse("ui.list", { ok: false, code: "INVALID_CURSOR", retryable: false }), true);
+  assert.equal(parseUiResponse("ui.list", { ok: false, code: "CURSOR_STALE", retryable: false }), true);
 });
 
 test("ui.overview takes an offset, an exact ISO day start and a bounded limit with the documented default", () => {

@@ -24,6 +24,7 @@ export function activate(context: unknown): MemoryPluginBackend {
     pinPath: resolvePinPath(import.meta.url),
   });
   backend.warmUp();
+  void backend.warmIndex();
   return Object.freeze({
     call: (method: string, params: unknown) => backend.call(method, params),
     dispose: () => backend.dispose(),

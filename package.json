@@ -20,7 +20,8 @@
     "verify:artifact": "node tools/verify-artifact.mjs",
     "release": "node tools/release.mjs",
     "check:secrets": "node tools/check-no-secrets.mjs",
-    "check": "npm run test && npm run typecheck:ui && npm run contract:verify && npm run verify:source && npm run check:secrets"
+    "check": "npm run test && npm run typecheck:ui && npm run contract:verify && npm run verify:source && npm run check:secrets",
+    "perf:ui": "node tools/perf-ui.mjs"
   },
   "dependencies": {
     "cairn-memory": "git+https://github.com/Cairn-ink/cairn-memory.git#83a10c3b7664b1f67485a19e7d84d24dcb3041a5",

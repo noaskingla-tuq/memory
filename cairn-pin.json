@@ -1,0 +1,14 @@
+{
+  "package": "cairn-memory",
+  "repository": "https://github.com/Cairn-ink/cairn-memory.git",
+  "commit": "83a10c3b7664b1f67485a19e7d84d24dcb3041a5",
+  "coreTree": "c5ba8efa24876b77e2279b9cbc827c221ae277f5",
+  "redactSha256": "f4bcfdc8edd177060b62a75f9dbc229443328eb822e40d814f0a48684c253f88",
+  "accepted": [
+    "83a10c3b7664b1f67485a19e7d84d24dcb3041a5"
+  ],
+  "license": "Apache-2.0",
+  "reviewedAt": "2026-09-20",
+  "allowedImport": "cairn-memory/core/index.mjs",
+  "allowedExport": "openMemoryCore"
+}

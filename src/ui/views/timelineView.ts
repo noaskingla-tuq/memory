@@ -41,6 +41,7 @@ export interface TimelineView {
 }
 
 export const TIMELINE_IDS = {
+  title: "tl-title",
   form: "tl-form",
   query: "tl-query",
   filters: "tl-filters",
@@ -54,7 +55,7 @@ export const TIMELINE_IDS = {
 const number = (value: number): string => value.toLocaleString("zh-TW");
 
 export const timelineShell = (): SafeHtml => html`<section class="tl" aria-labelledby="tl-title">
-<h2 id="tl-title" class="tl-h">${t("tl.title")}</h2>
+<h2 id="tl-title" class="tl-h" tabindex="-1">${t("tl.title")}</h2>
 <form id="tl-form" class="tl-search" role="search" data-tl-form><label class="sr" for="tl-query">${t("tl.search.label")}</label><input id="tl-query" name="q" type="search" maxlength="100" autocomplete="off" placeholder="${t("tl.search.placeholder")}" aria-describedby="tl-hint"><button type="submit" class="btn btn-primary">${t("tl.search.submit")}</button></form>
 <p id="tl-hint" class="muted tl-hint">${t("tl.search.hint")}</p>
 <div class="tl-tools"><div id="tl-filters" class="tl-filters"></div><div id="tl-clear"></div></div>

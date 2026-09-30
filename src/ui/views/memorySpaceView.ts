@@ -2,7 +2,7 @@ import type { ErrorDescription } from "../api/errors.js";
 import { avatar } from "../components/avatar.js";
 import { EMPTY_HTML, html, type SafeHtml } from "../dom/html.js";
 import { t, type StringKey } from "../i18n/index.js";
-import { timeOfDay, monthDay } from "../i18n/localClock.js";
+import { clockTime, monthDay } from "../i18n/clock.js";
 import { localDate, parseInstant, relativeTime } from "../i18n/relativeTime.js";
 import {
   firstText,
@@ -114,9 +114,9 @@ function repeatSection(stats: AgentStats): SafeHtml {
 function whenOf(item: SpaceItem): string {
   const start = parseInstant(item.work?.startIso);
   const end = parseInstant(item.work?.endIso);
-  if (start !== null && end !== null) return t("space.rep.worked", { date: localDate(new Date(start)), from: timeOfDay(start), to: timeOfDay(end) });
+  if (start !== null && end !== null) return t("space.rep.worked", { date: localDate(new Date(start)), from: clockTime(start), to: clockTime(end) });
   const written = parseInstant(item.updatedAt);
-  return written === null ? t("time.unknown") : t("space.rep.written", { at: `${localDate(new Date(written))} ${timeOfDay(written)}` });
+  return written === null ? t("time.unknown") : t("space.rep.written", { at: `${localDate(new Date(written))} ${clockTime(written)}` });
 }
 
 function representativeCard(item: SpaceItem): SafeHtml {

@@ -1,8 +1,9 @@
-import type { UiRef } from "../contracts/uiContract.js";
 import { backendClient } from "./api/backendClient.js";
 import { mount } from "./dom/html.js";
 import { t } from "./i18n/index.js";
+import { itemKey } from "./state/timeline.js";
 import { parseRoute, type Route } from "./router.js";
+import { createDetail } from "./views/detailController.js";
 import { bindHomeEvents } from "./views/homeEvents.js";
 import { createMemorySpace, type SpaceTargets } from "./views/memorySpaceController.js";
 import { SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
@@ -60,10 +61,17 @@ const status = createStatusLine({
 const home = createTeamHome({ client, now, preferences });
 const space = createMemorySpace({ client, now });
 
-// why: the detail drawer (S6d) plugs in here; until then an item click reaches this hook and does nothing visible
-const openDetail = (_ref: UiRef): void => undefined;
+const timeline = createTimeline({ client, now, onOpenDetail: (ref) => void detail.open(ref) });
 
-const timeline = createTimeline({ client, now, onOpenDetail: openDetail });
+// why: the drawer makes the whole page inert while it is open, and a card is found again by its key because the list is re-rendered after a forget
+const detail = createDetail({
+  client,
+  reloadList: () => timeline.reload(),
+  listKeys: () => timeline.view().items.map((item) => itemKey(item.ref)),
+  cardFor: (key) => itemButton(key),
+  listHeading: () => document.getElementById(TIMELINE_IDS.title),
+  backgrounds: () => [document.querySelector<HTMLElement>("header.hdr"), document.querySelector<HTMLElement>("main")].filter((found): found is HTMLElement => found !== null),
+});
 
 function homeTargets(): HomeTargets {
   return {
@@ -131,6 +139,7 @@ function route(): void {
   const previous = current;
   if (previous?.name === next.name && (next.name === "home" || (previous.name === "agent" && previous.agentId === next.agentId))) return;
   if (previous?.name === "home") homeScroll = window.scrollY;
+  detail.close({ force: true });
   if (previous?.name === "agent") space.close();
   current = next;
   if (next.name === "agent") showAgent(next.agentId);

@@ -123,7 +123,7 @@ const isCount = (value: unknown): value is number => typeof value === "number" &
 const isText = (value: unknown): value is string => typeof value === "string";
 const textOrNull = (value: unknown): string | null | undefined => (value === null ? null : isText(value) ? value : undefined);
 
-function parseWork(value: unknown): UiWork | null {
+export function parseWork(value: unknown): UiWork | null {
   if (!isRecord(value) || !isText(value.startIso) || !isText(value.endIso)) return null;
   const cli = textOrNull(value.cli);
   const model = textOrNull(value.model);
@@ -137,16 +137,22 @@ function projectNameOf(names: unknown): string | undefined {
   return isText(displayName) && displayName.trim() !== "" ? displayName : undefined;
 }
 
-export function parseItem(value: unknown): TimelineItem | null {
-  if (!isRecord(value) || !isRecord(value.ref)) return null;
-  const { ref } = value;
+export function parseRef(ref: unknown): UiRef | null {
+  if (!isRecord(ref)) return null;
   const projectId = textOrNull(ref.projectId);
   if (!isText(ref.agentId) || !isText(ref.memoryId) || projectId === undefined || (ref.scope !== "personal" && ref.scope !== "project")) return null;
+  return { agentId: ref.agentId, scope: ref.scope, projectId, memoryId: ref.memoryId };
+}
+
+export function parseItem(value: unknown): TimelineItem | null {
+  if (!isRecord(value)) return null;
+  const ref = parseRef(value.ref);
+  if (ref === null) return null;
   if (!isText(value.kind) || !isCount(value.revision) || !isText(value.updatedAt) || !isText(value.snippet) || !isCount(value.receiptCount)) return null;
   const work = value.work === undefined ? undefined : parseWork(value.work);
   if (work === null) return null;
   return {
-    ref: { agentId: ref.agentId, scope: ref.scope, projectId, memoryId: ref.memoryId },
+    ref,
     kind: value.kind,
     revision: value.revision,
     updatedAt: value.updatedAt,

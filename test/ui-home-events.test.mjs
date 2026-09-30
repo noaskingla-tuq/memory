@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NOW, makeAgent, tokenize, ALLOWED_ATTRIBUTES, ALLOWED_TAGS, ui } from "./homeFixtures.mjs";
+import { tokenize, ui } from "./homeFixtures.mjs";
 
-const { bindHomeEvents, renderMemorySpaceShell, homeShell, STRINGS } = ui;
+const { bindHomeEvents, homeShell } = ui;
 
 function recorder() {
   const log = [];
@@ -45,29 +45,4 @@ test("the home shell has every container the controller writes into, and only sa
   for (const id of ["home-help", "home-banner", "home-tiles", "home-tools", "home-count", "home-note", "home-wall"]) assert.ok(markup.includes(`id="${id}"`), id);
   assert.ok(markup.includes('id="home-count" class="muted count" aria-live="polite"'), "the count is a live region");
   assert.equal(tokenize(markup).rest.trim(), "");
-});
-
-test("the memory space page is an empty shell with a way back, the agent's name and a plain note that it is coming", () => {
-  const agent = makeAgent(3, { id: "sw/developer", name: "開發工程師" });
-  const markup = renderMemorySpaceShell("sw/developer", agent, NOW).value;
-  assert.ok(markup.includes('href="#/"') && markup.includes(STRINGS["space.back"]));
-  assert.ok(markup.includes('<h2 id="space-title" tabindex="-1">開發工程師</h2>'), "focus can land on the title after navigation");
-  assert.ok(markup.includes(">sw/developer<") && markup.includes("累積 ") && markup.includes("最近寫入"));
-  assert.ok(markup.includes(STRINGS["space.soon.title"]));
-  assert.ok(markup.includes("之後這裡會顯示 開發工程師 的個人與專案記憶"));
-  const unknown = renderMemorySpaceShell("hw/layout", undefined, NOW).value;
-  assert.ok(unknown.includes(">layout</h2>") && unknown.includes(">hw/layout<"), "an agent that is not loaded still gets a title from its id");
-  assert.ok(!/undefined|null/u.test(unknown));
-});
-
-test("the memory space page escapes a hostile id and name", () => {
-  const payload = `"><script>alert(1)</script><img src=x onerror=alert(2)>`;
-  const markup = renderMemorySpaceShell(`t/${payload}`, makeAgent(1, { id: `t/${payload}`, name: payload }), NOW).value;
-  const { tags, rest } = tokenize(markup);
-  assert.ok(!/[<>]/u.test(rest));
-  for (const tag of tags) {
-    assert.ok(ALLOWED_TAGS.has(tag.name), tag.name);
-    for (const [name] of tag.attributes) assert.ok(ALLOWED_ATTRIBUTES.has(name), name);
-  }
-  assert.ok(!markup.includes("<script") && !markup.includes("<img"));
 });

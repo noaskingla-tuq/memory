@@ -1,4 +1,7 @@
+import { SPACE_STRINGS } from "./zhTWSpace.js";
+
 export const STRINGS = {
+  ...SPACE_STRINGS,
   "app.title": "記憶",
   "status.loading": "讀取中…",
   "status.ok": "記憶服務運作中",
@@ -60,8 +63,6 @@ export const STRINGS = {
   "card.lastAt": "最近 {ago}",
   "card.spark": "近 14 天每天寫入的筆數，共 {sum} 筆",
   "space.back": "← 回到團隊",
-  "space.soon.title": "記憶空間即將推出",
-  "space.soon.body": "之後這裡會顯示 {name} 的個人與專案記憶、時間分布和代表性記憶。",
   "space.summary": "累積 {count} 筆・最近寫入 {ago}",
   "error.plugin_disabled.message": "記憶外掛目前是停用的。",
   "error.plugin_disabled.action": "請到「外掛」頁把它啟用，再回到這裡。",

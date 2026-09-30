@@ -124,14 +124,25 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 
 `main.ts` 是唯一碰 `document`／`window` 的組裝處；畫面邏輯都是可用假目標測試的純函式或小型控制器。
 
-- `router.ts`：hash 路由，`#/` 是團隊首頁，`#/agent/<encodeURIComponent(id)>` 是「記憶空間」（目前是空殼 `views/memorySpaceShell.ts`，S6b 填內容）；解不開的 hash 一律回首頁。卡片是真的 `<a href>`，所以鍵盤 Tab 可達、Enter 可開；切換路由後焦點落在記憶空間標題，回首頁時回到原卡片。
-- `state/teamHome.ts`：`parseOverview`（UI 不能跑 zod，手寫的回應檢查；型別斷言 `OVERVIEW_CONTRACT_MATCHES` 讓契約的 overview 形狀漂移時 `tsc -p tsconfig.ui.json` 失敗）、名稱降級（`displayName`：沒有 `name` 時取 id 最後一段，全 id 仍顯示在卡片上；project 沒名字顯示「專案＋id 前 8 碼」；部門沒名字顯示 key，key 為空顯示「未分組」）、依部門分組與三種排序（最近寫入、累積筆數、名稱，都只作用在已載入的 agent）、`mergeAgents`（續頁依 id 去重）。
+- `router.ts`：hash 路由，`#/` 是團隊首頁，`#/agent/<encodeURIComponent(id)>` 是「記憶空間」（見下一節）；解不開的 hash 一律回首頁。卡片是真的 `<a href>`，所以鍵盤 Tab 可達、Enter 可開；切換路由後焦點落在記憶空間標題，回首頁時回到原卡片。
+- `state/teamHome.ts`：`parseOverview`（UI 不能跑 zod，手寫的回應檢查；型別斷言 `OVERVIEW_CONTRACT_MATCHES` 讓契約的 overview 形狀漂移時 `tsc -p tsconfig.ui.json` 失敗）、名稱降級（`displayName()`：依序取後端合併好的 `displayName`、名稱表的 `name`、id 最後一段，全 id 仍顯示在卡片上；project 沒名字顯示「專案＋id 前 8 碼」；部門沒名字顯示 key，key 為空顯示「未分組」）、依部門分組與三種排序（最近寫入、累積筆數、名稱，都只作用在已載入的 agent）、`mergeAgents`（續頁依 id 去重）。
 - `views/teamHomeController.ts`：載入狀態機（loading／ready／error）。第一頁 `ui.overview({tzOffsetMin, dayStartIso, limit: 60})`（`dayStartIso` 是本地當天 0 點的 ISO、`tzOffsetMin` 是 UTC 以東的分鐘數，與後端 `agentStats` 一致），有 `nextCursor` 就出現「載入更多」；重新整理與載入更多用不同的 backendClient key，重新整理會讓在途的載入更多失效；`CURSOR_STALE` 顯示「從第一頁重新載入」；重新整理失敗但畫面已有資料時保留資料、在橫幅顯示錯誤。第一次說明「記憶是怎麼來的」以 `localStorage` 記住已讀（讀寫失敗當作沒有）。
-- `views/teamHomeView.ts`：只產生 `SafeHtml`，所有動態字串（名稱、id、摘要、部門、project）都經 `html`／`esc`。`overview.complete === false` 時顯示「資料不完整」與重新整理；`storage.unavailableAgents > 0` 時說明有幾位 agent 讀不到。專案記憶只在任務有掛專案時才出現，這句說明（D9）在有卡片時常駐、在空狀態裡也有。
+- `views/teamHomeView.ts`：只產生 `SafeHtml`，所有動態字串（名稱、id、摘要、部門、project）都經 `html`／`esc`。`overview.complete === false` 時顯示「資料不完整」與重新整理；`profile.corrupt`／`profile.incomplete`（含 `omitted` 的筆數）時多一則給一般使用者看的說明「名稱清單讀不出來／有 N 位 agent、M 個專案沒收進來，先用代號顯示，記憶本身不受影響」（`profileNotice`，壞檔優先於不完整；戳記格式不對時視為健康，不擋卡片）；`storage.unavailableAgents > 0` 時說明有幾位 agent 讀不到。專案記憶只在任務有掛專案時才出現，這句說明（D9）在有卡片時常駐、在空狀態裡也有。
 - `views/statusLine.ts`：標題列的狀態點與「最近寫入 N 分鐘前」。`ui.status` 只在 `document.visibilityState === "visible"` 時每 30 秒輪詢一次，隱藏就取消計時器、轉為可見時立刻讀一次並重新計時；儲存狀態不是 `ready` 顯示警示而不是「運作中」。`#status[data-state]`（loading／ok／warn／error）是外部探針（真 Electron harness）讀的介面。
 - `views/homeEvents.ts`：以 `closest("[data-act]")`／`[data-role]` 的事件委派，不用事件屬性（CSP）。
 - 樣式：`styles/home.css` 由 `app.css` 匯入；頭像色由 id 的雜湊決定（`--h` 色相，唯一一條 `hsl(var(--h) 55% 75%)` 的規則，深藍字 `--accent-fg` 對 360 個色相在兩套配色都 ≥4.5:1，由 `test/ui-contrast.test.mjs` 驗）。
 - 測試：`test/ui-team-home-{state,view,contract}.test.mjs`、`ui-status-line`、`ui-home-events`；`test/homeFixtures.mjs` 是假 overview 與假 backend（依 (teamKey, id) 分頁）；`ui-team-home-contract` 以真的 `ui.overview` 回應（100 個 agent）驗證 UI 解析與續頁。注入測試用 `tokenize` 檢查輸出裡每個標籤與屬性都在白名單內、沒有殘留角括號。
+
+## Agent 記憶空間（S6b）
+
+`#/agent/<id>` 是一位 agent 的記憶空間，只用 `ui.agentStats`（不依賴 `ui.overview`，直接開網址也能用）。
+
+- `state/memorySpace.ts`：`parseAgentStats`（手寫檢查；型別斷言 `STATS_CONTRACT_MATCHES` 讓契約的 agentStats 形狀漂移時 `tsc -p tsconfig.ui.json` 失敗）與衍生資料（`spaceRows`：個人固定第一列、專案依筆數再依 id；`toolRows`；`peakOf`：同值取第一個）。讀不懂的回應一律視為 `malformed_response` 錯誤，不當成空的記憶空間。
+- `views/memorySpaceController.ts`：`open(agentId, hint, targets)`／`retry`／`close`。每次載入遞增 generation，已離開的 agent 或已關閉頁面的晚到回應一律丟棄；請求 key 是 `space`，不會被狀態列或首頁的請求取代。`NOT_FOUND` 是「這位 agent 沒有記憶」的空狀態，不是錯誤；總筆數 0 也一樣。標題元素永遠不被取代，只改文字，所以鍵盤焦點停在標題不會因資料到達而跑掉。
+- `views/memorySpaceView.ts`／`memorySpaceCharts.ts`：只產生 `SafeHtml`。區塊依序是個人與專案（專案區沒有專案時照樣顯示並說明，D9）、每天寫入（30 欄）、時段與星期、工具、重複出現的請求、四張代表性記憶；`sampled` 時多一則「只統計最新的一部分」。**時段、每天、星期都是依寫入時間（`updatedAt`）算的**，所以一律寫「寫入」，不寫「開工」；每張代表性記憶另外顯示工作起訖。圖是 `<div role="img" aria-label>`＋`<i style="height:Npx">`，標籤已含總數與尖峰，每欄的 `title` 只是給滑鼠的提示。
+- 頁面殼 `spaceShell()`：返回連結（首個 Tab 停駐點）、`#space-title`（`tabindex=-1`，進頁後焦點落在這裡）、`#space-body`（控制器每次整塊重畫）與**時間軸掛載點 `#space-timeline[data-slot="timeline"]`**（在 body 外，S6c 掛進去不會被重畫洗掉；S6b 不放任何內容）。資料列與代表性記憶帶 `data-scope`／`data-project-id`／`data-memory-id`，供 S6c／S6d 接篩選與詳情抽屜；目前沒有可點的元素，所以 ready 頁面沒有 Tab 停駐點，錯誤時只多一個重試按鈕。
+- 字串在 `i18n/zhTWSpace.ts`（併入 `STRINGS`）、樣式在 `styles/space.css`（全部限定在 `.space-body` 底下）。
+- 測試：`test/ui-memory-space-{state,view,states,contract}.test.mjs`（`test/spaceFixtures.mjs` 是假 agentStats 與假 client；contract 那支用真的 `ui.agentStats`／`ui.overview` 與名稱表推送驗證）、`test/ui-team-home-profile.test.mjs`。
 
 ## 契約 vendor
 

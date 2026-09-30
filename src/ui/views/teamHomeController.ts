@@ -2,6 +2,7 @@ import { describeError, type ErrorDescription } from "../api/errors.js";
 import type { BackendClient, BackendParams } from "../api/backendClient.js";
 import { mount, type MountTarget } from "../dom/html.js";
 import {
+  HEALTHY_PROFILE,
   hasTeam,
   isSortKey,
   mergeAgents,
@@ -69,6 +70,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
     loadingMore: false,
     complete: true,
     unavailableAgents: 0,
+    profile: HEALTHY_PROFILE,
     team: null,
     sort: "recent",
     helpOpen: deps.preferences.get(HELP_DISMISSED_KEY) !== "1",
@@ -136,6 +138,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
       hasMore: page.nextCursor !== null,
       complete: page.complete,
       unavailableAgents: page.unavailableAgents,
+      profile: page.profile,
       team: validTeam(page.agents, state.team),
     });
     renderAll();
@@ -164,6 +167,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
       hasMore: page.nextCursor !== null,
       complete: state.complete && page.complete,
       unavailableAgents: page.unavailableAgents,
+      profile: page.profile,
     });
     announce = true;
     if (targets !== null) mount(targets.tools, renderTools(state));

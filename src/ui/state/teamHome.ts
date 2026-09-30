@@ -6,12 +6,14 @@ import { parseInstant } from "../i18n/relativeTime.js";
 export interface ProjectCount {
   readonly projectId: string;
   readonly name?: string | undefined;
+  readonly displayName?: string | undefined;
   readonly count: number;
 }
 
 export interface OverviewAgent {
   readonly id: string;
   readonly name?: string | undefined;
+  readonly displayName?: string | undefined;
   readonly team: { readonly key: string; readonly name?: string | undefined };
   readonly title?: string | undefined;
   readonly counts: {
@@ -33,6 +35,28 @@ export interface OverviewTiles {
   readonly lastWriteAt: string | null;
 }
 
+export interface ProfileOmitted {
+  readonly agents: number;
+  readonly teams: number;
+  readonly projects: number;
+}
+
+export interface ProfileHealth {
+  readonly corrupt: boolean;
+  readonly incomplete: boolean;
+  readonly omitted: ProfileOmitted;
+}
+
+export const HEALTHY_PROFILE: ProfileHealth = { corrupt: false, incomplete: false, omitted: { agents: 0, teams: 0, projects: 0 } };
+
+interface ProfileStamp {
+  readonly generation: string | null;
+  readonly receivedAt: string | null;
+  readonly incomplete?: boolean | undefined;
+  readonly corrupt?: boolean | undefined;
+  readonly omitted?: ProfileOmitted | undefined;
+}
+
 export interface OverviewPage {
   readonly tiles: OverviewTiles;
   readonly agents: readonly OverviewAgent[];
@@ -40,11 +64,12 @@ export interface OverviewPage {
   readonly complete: boolean;
   readonly unavailableAgents: number;
   readonly storageStatus: string;
+  readonly profile: ProfileHealth;
 }
 
 // why: the view cannot run zod, so a hand-written parser guards the response and this assertion fails tsc when the contract's overview shape drifts away from it
 type Contract = z.infer<typeof uiOverviewSuccess>;
-type OverviewContractMatches = Contract["agents"][number] extends OverviewAgent ? (Contract["tiles"] extends OverviewTiles ? true : never) : never;
+type OverviewContractMatches = Contract["agents"][number] extends OverviewAgent ? (Contract["tiles"] extends OverviewTiles ? (Contract["profile"] extends ProfileStamp ? true : never) : never) : never;
 export const OVERVIEW_CONTRACT_MATCHES: OverviewContractMatches = true;
 
 type JsonRecord = Readonly<Record<string, unknown>>;
@@ -58,7 +83,8 @@ const textOrNull = (value: unknown): string | null | undefined => (value === nul
 function parseProject(value: unknown): ProjectCount | null {
   if (!isRecord(value) || !isText(value.projectId) || !isCount(value.count)) return null;
   const name = optionalText(value.name);
-  return name === null ? null : { projectId: value.projectId, name, count: value.count };
+  const shown = optionalText(value.displayName);
+  return name === null || shown === null ? null : { projectId: value.projectId, name, displayName: shown, count: value.count };
 }
 
 function parseAgent(value: unknown): OverviewAgent | null {
@@ -69,10 +95,11 @@ function parseAgent(value: unknown): OverviewAgent | null {
   if (!isCount(counts.personal) || !isCount(counts.otherProjects) || !isCount(counts.total) || !Array.isArray(counts.projects)) return null;
   const projects = counts.projects.map(parseProject);
   const name = optionalText(value.name);
+  const shown = optionalText(value.displayName);
   const teamName = optionalText(team.name);
   const title = optionalText(value.title);
   const lastAt = textOrNull(value.lastAt);
-  if (projects.includes(null) || name === null || teamName === null || title === null || lastAt === undefined) return null;
+  if (projects.includes(null) || name === null || shown === null || teamName === null || title === null || lastAt === undefined) return null;
   if (!Array.isArray(value.spark14) || value.spark14.length !== 14 || !value.spark14.every(isCount)) return null;
   let latest: OverviewAgent["latest"] = null;
   if (value.latest !== null) {
@@ -82,6 +109,7 @@ function parseAgent(value: unknown): OverviewAgent | null {
   return {
     id: value.id,
     name,
+    displayName: shown,
     team: { key: team.key, name: teamName },
     title,
     counts: { personal: counts.personal, projects: projects as ProjectCount[], otherProjects: counts.otherProjects, total: counts.total },
@@ -89,6 +117,16 @@ function parseAgent(value: unknown): OverviewAgent | null {
     spark14: value.spark14 as number[],
     latest,
   };
+}
+
+// why: the name-table health is advice for the reader, so a malformed stamp degrades to "healthy" instead of throwing away a whole overview page
+export function parseProfileHealth(value: unknown): ProfileHealth {
+  if (!isRecord(value)) return HEALTHY_PROFILE;
+  const omitted = isRecord(value.omitted) ? value.omitted : {};
+  const counted = (entry: unknown): number => (isCount(entry) ? entry : 0);
+  const omittedCounts: ProfileOmitted = { agents: counted(omitted.agents), teams: counted(omitted.teams), projects: counted(omitted.projects) };
+  const lost = omittedCounts.agents + omittedCounts.teams + omittedCounts.projects;
+  return { corrupt: value.corrupt === true, incomplete: value.incomplete === true || lost > 0, omitted: omittedCounts };
 }
 
 export function parseOverview(value: unknown): OverviewPage | null {
@@ -107,6 +145,7 @@ export function parseOverview(value: unknown): OverviewPage | null {
     complete: value.complete !== false,
     unavailableAgents: value.storage.unavailableAgents,
     storageStatus: value.storage.status,
+    profile: parseProfileHealth(value.profile),
   };
 }
 
@@ -121,15 +160,15 @@ export function idTail(id: string): string {
   return tail === "" ? id : tail;
 }
 
-// why: without a name table the card still needs a readable title, and the last id segment is the part that tells agents of one team apart
-export function displayName(agent: Pick<OverviewAgent, "id" | "name">): string {
-  const named = agent.name?.trim();
-  return named === undefined || named === "" ? idTail(agent.id) : named;
+const firstText = (...candidates: readonly (string | undefined)[]): string | undefined => candidates.map((entry) => entry?.trim()).find((entry) => entry !== undefined && entry !== "");
+
+// why: the backend already merged the name table into displayName, so the card uses it first; the id's last segment only covers a backend that sent neither field
+export function displayName(agent: Pick<OverviewAgent, "id" | "name" | "displayName">): string {
+  return firstText(agent.displayName, agent.name) ?? idTail(agent.id);
 }
 
 export function projectLabel(project: ProjectCount): string {
-  const named = project.name?.trim();
-  return named === undefined || named === "" ? t("card.projectFallback", { id: [...project.projectId].slice(0, 8).join("") }) : named;
+  return firstText(project.displayName, project.name) ?? t("card.projectFallback", { id: [...project.projectId].slice(0, 8).join("") });
 }
 
 export function sparkSum(agent: OverviewAgent): number {

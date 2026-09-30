@@ -9,7 +9,10 @@ export const ui = await loadUiModule(
   "state/teamHome.ts",
   "views/teamHomeController.ts",
   "views/teamHomeView.ts",
-  "views/memorySpaceShell.ts",
+  "views/memorySpaceView.ts",
+  "views/memorySpaceController.ts",
+  "views/spaceEvents.ts",
+  "state/memorySpace.ts",
   "views/statusLine.ts",
   "views/homeEvents.ts",
   "router.ts",
@@ -58,8 +61,8 @@ export function makeTiles(agents, overrides = {}) {
 
 const keyOf = (agent) => `${agent.team.key}\u0000${agent.id}`;
 
-export function makeOverview(pageAgents, { all = pageAgents, nextCursor = null, complete = true, unavailable = 0, tiles } = {}) {
-  return { ok: true, tiles: tiles ?? makeTiles(all), agents: pageAgents, nextCursor, complete, profile: { generation: null, receivedAt: null }, storage: { status: "ready", unavailableAgents: unavailable } };
+export function makeOverview(pageAgents, { all = pageAgents, nextCursor = null, complete = true, unavailable = 0, tiles, profile = {} } = {}) {
+  return { ok: true, tiles: tiles ?? makeTiles(all), agents: pageAgents, nextCursor, complete, profile: { generation: null, receivedAt: null, ...profile }, storage: { status: "ready", unavailableAgents: unavailable } };
 }
 
 export function failure(code) {

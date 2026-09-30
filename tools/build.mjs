@@ -54,6 +54,30 @@ async function bundleBackend(outFile) {
   return { inputs: inputs.length }
 }
 
+export async function bundleUi(stageDir) {
+  const uiDir = join(stageDir, 'ui')
+  mkdirSync(uiDir, { recursive: true })
+  const result = await build({
+    entryPoints: [join(REPO_ROOT, 'src', 'ui', 'main.ts')],
+    absWorkingDir: REPO_ROOT,
+    tsconfig: join(REPO_ROOT, 'tsconfig.ui.json'),
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2022',
+    outfile: join(uiDir, 'app.js'),
+    legalComments: 'none',
+    charset: 'utf8',
+    logLevel: 'silent',
+    metafile: true,
+  })
+  const inputs = Object.keys(result.metafile.inputs)
+  if (inputs.some((input) => input.includes('node_modules'))) throw new Error('the UI bundle pulled in a package from node_modules')
+  copyFileSync(join(REPO_ROOT, 'plugin', 'ui', 'index.html'), join(uiDir, 'index.html'))
+  copyFileSync(join(REPO_ROOT, 'src', 'ui', 'styles', 'app.css'), join(uiDir, 'app.css'))
+  return { inputs: inputs.length }
+}
+
 function writeManifest(stageDir) {
   const template = readFileSync(join(REPO_ROOT, 'plugin', 'manifest.template.json'), 'utf8')
   const version = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version
@@ -71,10 +95,11 @@ export async function buildPlugin({ dist = join(REPO_ROOT, 'dist'), keyFile, key
   rmSync(stageDir, { recursive: true, force: true })
   mkdirSync(stageDir, { recursive: true })
   const bundle = await bundleBackend(join(stageDir, 'backend.mjs'))
+  const ui = await bundleUi(stageDir)
   const staged = stageCairn(stageDir)
   const manifest = writeManifest(stageDir)
   const validated = devkitJson(runDevkit(['validate', stageDir]), 'validate')
-  const report = { stageDir, id: manifest.id, version: manifest.version, bundleInputs: bundle.inputs, cairnFiles: staged.files, cairnCommit: staged.commit, validated: validated.ok === true }
+  const report = { stageDir, id: manifest.id, version: manifest.version, bundleInputs: bundle.inputs, uiInputs: ui.inputs, cairnFiles: staged.files, cairnCommit: staged.commit, validated: validated.ok === true }
   if (stageOnly) return report
 
   const ephemeral = keyFile === undefined ? createTempKey() : null

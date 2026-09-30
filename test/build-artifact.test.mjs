@@ -9,8 +9,9 @@ import { runDevkit } from "../tools/devkit.mjs";
 import { release } from "../tools/release.mjs";
 import { stageCairn } from "../tools/stage-cairn.mjs";
 import { createTempKey } from "../tools/temp-key.mjs";
-import { verifyArtifact } from "../tools/verify-artifact.mjs";
+import { scanUiFile, verifyArtifact } from "../tools/verify-artifact.mjs";
 import { REPO_ROOT } from "../tools/vendor-lock.mjs";
+import { UI_METHOD_NAMES } from "../out/contracts/uiContract.js";
 
 const pin = readPin();
 const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
@@ -102,8 +103,18 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.equal(manifest.minCoreVersion, ">=1.6.3");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
-    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { backend: "backend.mjs" }, permissions: [], data: { uninstall: "keep" } },
+    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke"], data: { uninstall: "keep" } },
   );
+  assert.deepEqual(manifest.contributes.views, [
+    { id: "memory", title: "記憶", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
+  ]);
+  assert.equal(manifest.resources.maxSessions, 4);
+  assert.deepEqual(manifest.backendMethods, UI_METHOD_NAMES);
+  assert.equal(manifest.backendMethods.some((method) => method.startsWith("memory.")), false);
+  const html = readFileSync(join(dist, "stage", "ui", "index.html"), "utf8");
+  assert.deepEqual(scanUiFile("ui/index.html", html), []);
+  assert.deepEqual([...html.matchAll(/<script\b[^>]*>/gu)].map((match) => match[0]), ['<script src="app.js" defer>']);
+  for (const name of ["app.js", "app.css"]) assert.ok(readFileSync(join(dist, "stage", "ui", name), "utf8").length > 0, name);
   const diagnoseSource = readFileSync(join(REPO_ROOT, "src", "backend", "diagnose.ts"), "utf8");
   assert.ok(diagnoseSource.includes(`PLUGIN_VERSION = "${manifest.version}"`));
 });
@@ -118,7 +129,7 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.file, join(dist, "teamuq.memory-1.0.0.tuqplugin"));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
-  assert.equal(report.fileCount, 5 + 58);
+  assert.equal(report.fileCount, 8 + 58);
   assert.equal(report.sha256, info.sha256);
   const publicFile = JSON.parse(readFileSync(info.pubFile, "utf8"));
   assert.deepEqual(Object.keys(publicFile).sort(), ["keyId", "publicKey"]);
@@ -162,6 +173,53 @@ test("verify-artifact rejects a backend that imports Cairn or a package by a bar
   const failed = failedChecks(report);
   assert.ok(failed.includes("backend.mjs imports Cairn only as ./cairn/core/index.mjs"));
   assert.ok(failed.includes("backend.mjs has no bare package import (zod is inlined)"));
+});
+
+function rewrite(stageDir, relative, change) {
+  const file = join(stageDir, ...relative.split("/"));
+  writeFileSync(file, change(readFileSync(file, "utf8")));
+}
+
+const CSP_CHECK = "CSP safety: no inline script, event handler attribute, javascript: URL, eval, new Function, http(s):// URL, fetch( or WebSocket in ui/**, and index.html loads only app.js and app.css";
+
+test("verify-artifact rejects every CSP-unsafe construct in the UI files", async (t) => {
+  const cases = [
+    ["inline script", "ui/index.html", (text) => text.replace("</body>", "<script>window.x = 1</script></body>"), /inline script/u],
+    ["inline module script", "ui/index.html", (text) => text.replace("</body>", '<script type="module">window.x = 1</script></body>'), /inline script/u],
+    ["second external script", "ui/index.html", (text) => text.replace("</body>", '<script src="other.js"></script></body>'), /other than app\.js/u],
+    ["inline event handler", "ui/index.html", (text) => text.replace("<main>", '<main onclick="void 0">'), /event handler/u],
+    ["javascript: URL", "ui/index.html", (text) => text.replace("<main>", '<main><a href="javascript:void 0">x</a>'), /javascript: URL/u],
+    ["fetch(", "ui/app.js", (text) => `${text}\nfetch("x");\n`, /fetch\( in ui\/app\.js/u],
+    ["eval", "ui/app.js", (text) => `${text}\neval("1");\n`, /eval in ui\/app\.js/u],
+    ["new Function", "ui/app.js", (text) => `${text}\nnew Function("return 1");\n`, /new Function in ui\/app\.js/u],
+    ["http URL", "ui/app.js", (text) => `${text}\nvoid "http://example.com";\n`, /http\(s\):\/\/ URL in ui\/app\.js/u],
+    ["https URL in css", "ui/app.css", (text) => `${text}\n@import url("https://example.com/a.css");\n`, /http\(s\):\/\/ URL in ui\/app\.css/u],
+    ["WebSocket", "ui/app.js", (text) => `${text}\nvoid WebSocket;\n`, /WebSocket in ui\/app\.js/u],
+  ];
+  for (const [label, relative, change, expected] of cases) {
+    const report = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, relative, change));
+    assert.equal(report.ok, false, label);
+    const failed = report.checks.find((entry) => entry.name === CSP_CHECK);
+    assert.equal(failed.ok, false, label);
+    assert.match(failed.detail, expected, label);
+  }
+});
+
+test("verify-artifact rejects a manifest that exposes memory.* methods, adds a permission or lowers maxSessions", async (t) => {
+  const exposed = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"ui.status"', '"ui.status",\n    "memory.remember@1"')));
+  assert.ok(failedChecks(exposed).some((name) => name.startsWith("no memory.* method")));
+  assert.ok(failedChecks(exposed).some((name) => name.startsWith("manifest backendMethods are exactly")));
+  const permissions = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"ui:view"', '"ui:view", "storage:plugin-data"')));
+  assert.ok(failedChecks(permissions).some((name) => name.startsWith("manifest permissions are exactly")));
+  const sessions = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"maxSessions": 4', '"maxSessions": 2')));
+  assert.ok(failedChecks(sessions).some((name) => name.startsWith("manifest resources follow")));
+});
+
+test("verify-artifact rejects a missing UI file and a smuggled extra file under ui/", async (t) => {
+  const missing = await tamperedArtifact(t, (stageDir) => rmSync(join(stageDir, "ui", "app.css")));
+  assert.ok(failedChecks(missing).some((name) => name.startsWith("file set equals")));
+  const extra = await tamperedArtifact(t, (stageDir) => writeFileSync(join(stageDir, "ui", "extra.js"), "export {}\n"));
+  assert.ok(failedChecks(extra).some((name) => name.startsWith("file set equals")));
 });
 
 test("release refuses a key path inside this repository or inside any git work tree", (t) => {

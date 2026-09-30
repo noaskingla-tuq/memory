@@ -16,12 +16,53 @@ const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY
 // 1.6.3 is the first Core release with the whitelisted invokeBackend, the methodName regex that accepts '@' and the memory sink on invoke; older Cores accept the manifest but never call it.
 const MIN_CORE_VERSION = '>=1.6.3'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
+const PLUGIN_ID = 'teamuq.memory'
+const UI_ENTRY = 'ui/index.html'
+const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css']
+const EXPECTED_PERMISSIONS = ['backend:invoke', 'ui:view']
+const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
+const EXPECTED_MAX_SESSIONS = 4
+// why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin
+const SCRIPT_TAG = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu
+const INLINE_HANDLER = /<[a-z][^>]*\son[a-z]+\s*=/iu
+const JAVASCRIPT_URL = /javascript\s*:/iu
+const FORBIDDEN_UI_PATTERNS = [
+  ['eval', /\beval\s*\(/u],
+  ['new Function', /\bnew\s+Function\b/u],
+  ['http(s):// URL', /https?:\/\//iu],
+  ['fetch(', /\bfetch\s*\(/u],
+  ['WebSocket', /\bWebSocket\b/u],
+]
+
+function isPatchAbove(version, base) {
+  const parse = (value) => /^(\d+)\.(\d+)\.(\d+)$/u.exec(String(value))?.slice(1).map(Number)
+  const [next, current] = [parse(version), parse(base)]
+  return next !== undefined && current !== undefined && next[0] === current[0] && next[1] === current[1] && next[2] > current[2]
+}
+
+export function scanUiFile(name, content) {
+  const problems = []
+  if (name.endsWith('.html')) {
+    for (const match of content.matchAll(SCRIPT_TAG)) {
+      const source = /\bsrc\s*=\s*(["'])([^"']*)\1/iu.exec(match[1])
+      if (source === null || match[2].trim() !== '') problems.push(`inline script in ${name}`)
+      else if (source[2] !== 'app.js') problems.push(`${name} loads a script other than app.js: ${source[2]}`)
+    }
+    if ((content.match(/<script\b/giu) ?? []).length !== [...content.matchAll(SCRIPT_TAG)].length) problems.push(`unterminated script tag in ${name}`)
+    if (INLINE_HANDLER.test(content)) problems.push(`inline event handler attribute in ${name}`)
+    if (JAVASCRIPT_URL.test(content)) problems.push(`javascript: URL in ${name}`)
+    const links = [...content.matchAll(/<link\b[^>]*>/giu)].map((match) => /\bhref\s*=\s*(["'])([^"']*)\1/iu.exec(match[0])?.[2])
+    if (links.some((href) => href !== 'app.css')) problems.push(`${name} links a stylesheet other than app.css`)
+  }
+  for (const [label, pattern] of FORBIDDEN_UI_PATTERNS) if (pattern.test(content)) problems.push(`${label} in ${name}`)
+  return problems
+}
 
 function specifiersOf(text) {
   return [STATIC_IMPORT, SIDE_EFFECT_IMPORT, DYNAMIC_IMPORT].flatMap((pattern) => [...text.matchAll(pattern)].map((match) => match[2]))
 }
 
-export function verifyArtifact(file, { anchors = 'self', pubFile } = {}) {
+export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } = {}) {
   const checks = []
   const check = (name, ok, detail = '') => checks.push({ name, ok: ok === true, ...(detail === '' ? {} : { detail }) })
   const pin = readPin()
@@ -37,19 +78,20 @@ export function verifyArtifact(file, { anchors = 'self', pubFile } = {}) {
   } catch (error) {
     check('devkit matches devkit.lock.json', false, error.message)
   }
-  const verifyArgs = ['verify', resolve(file), '--anchors', anchors, ...(anchors === 'self' ? ['--pub-file', resolve(pubFile ?? '')] : [])]
+  const verifyArgs = ['verify', resolve(file), '--anchors', anchors, ...(anchors === 'self' ? ['--pub-file', resolve(pubFile ?? '')] : []), ...(dev ? ['--preplanted-id', PLUGIN_ID] : [])]
+  const verifyName = `devkit verify --anchors ${anchors}${dev ? ' --preplanted-id' : ''} passes`
   let verified
   try {
     verified = devkitJson(runDevkit(verifyArgs), 'devkit verify')
-    check(`devkit verify --anchors ${anchors} passes`, verified.id === 'teamuq.memory', `signer ${JSON.stringify(verified.signer)}`)
+    check(verifyName, verified.id === PLUGIN_ID && (verified.signer?.kind === 'dev') === dev, `signer ${JSON.stringify(verified.signer)}`)
   } catch (error) {
-    check(`devkit verify --anchors ${anchors} passes`, false, error.message)
+    check(verifyName, false, error.message)
   }
 
-  const expected = ['backend.mjs', 'cairn-pin.json', 'manifest.json', ...GENERATED, ...pin.stage.files.map((entry) => `cairn/${entry.path}`)].sort()
+  const expected = ['backend.mjs', 'cairn-pin.json', 'manifest.json', ...UI_FILES, ...GENERATED, ...pin.stage.files.map((entry) => `cairn/${entry.path}`)].sort()
   const unexpected = names.filter((name) => !expected.includes(name))
   const missing = expected.filter((name) => !names.includes(name))
-  check('file set equals backend.mjs + cairn-pin.json + manifest + signature files + the pin-recorded Cairn files', unexpected.length === 0 && missing.length === 0, `unexpected: ${unexpected.join(', ') || 'none'}; missing: ${missing.join(', ') || 'none'}`)
+  check('file set equals backend.mjs + cairn-pin.json + manifest + ui/** + signature files + the pin-recorded Cairn files', unexpected.length === 0 && missing.length === 0, `unexpected: ${unexpected.join(', ') || 'none'}; missing: ${missing.join(', ') || 'none'}`)
   check(`artifact holds ${expected.length} files`, names.length === expected.length, `found ${names.length}`)
   check('no Cairn test or testing directory', !names.some((name) => /(^|\/)(?:test|testing)\//u.test(name)))
 
@@ -81,11 +123,16 @@ export function verifyArtifact(file, { anchors = 'self', pubFile } = {}) {
     manifest = {}
   }
   check('manifest identity is teamuq.memory / teamuq / full-trust', manifest.id === 'teamuq.memory' && manifest.publisher === 'teamuq' && manifest.trustTier === 'full-trust')
-  check('manifest entry.backend is backend.mjs and the file exists', manifest.entry?.backend === 'backend.mjs' && entries.has('backend.mjs'))
-  check('manifest has no permissions and keeps data on uninstall', Array.isArray(manifest.permissions) && manifest.permissions.length === 0 && manifest.data?.uninstall === 'keep')
+  check('manifest is composed: entry.backend is backend.mjs and entry.ui is ui/index.html, both files exist', manifest.entry?.backend === 'backend.mjs' && manifest.entry?.ui === UI_ENTRY && entries.has('backend.mjs') && entries.has(UI_ENTRY), JSON.stringify(manifest.entry))
+  const views = manifest.contributes?.views ?? []
+  check('manifest declares exactly the memory view (title 記憶, tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === '記憶' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
+  check('manifest permissions are exactly ui:view and backend:invoke and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
+  const methods = Array.isArray(manifest.backendMethods) ? manifest.backendMethods : []
+  check('manifest backendMethods are exactly the seven ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
+  check('no memory.* method (nor diagnose) is exposed to the view through backendMethods', !methods.some((method) => /^(?:memory\.|diagnose$)/u.test(method)), methods.join(', '))
   const resources = manifest.resources ?? {}
-  check('manifest resources follow the S0 recommendation', resources.cpuThreads === 1 && resources.maxSessions === 2 && resources.idleUnloadSec === 180 && Object.entries(RESOURCE_RANGES).every(([field, [low, high]]) => resources[field] >= low && resources[field] <= high), JSON.stringify(resources))
-  check(`manifest version equals package.json version ${packageJson.version}`, manifest.version === packageJson.version)
+  check('manifest resources follow the S0 recommendation', resources.cpuThreads === 1 && resources.maxSessions === EXPECTED_MAX_SESSIONS && resources.idleUnloadSec === 180 && Object.entries(RESOURCE_RANGES).every(([field, [low, high]]) => resources[field] >= low && resources[field] <= high), JSON.stringify(resources))
+  check(dev ? `manifest version is a 1.0.x patch above package.json version ${packageJson.version} (dev-pack --bump-patch)` : `manifest version equals package.json version ${packageJson.version}`, dev ? isPatchAbove(manifest.version, packageJson.version) : manifest.version === packageJson.version, String(manifest.version))
   check(`manifest pluginApi is set and minCoreVersion is ${MIN_CORE_VERSION}`, typeof manifest.pluginApi === 'string' && manifest.minCoreVersion === MIN_CORE_VERSION, `${manifest.pluginApi} ${manifest.minCoreVersion}`)
 
   const backend = text('backend.mjs')
@@ -111,7 +158,9 @@ export function verifyArtifact(file, { anchors = 'self', pubFile } = {}) {
   } catch {
     signature = {}
   }
-  check('signature.json is ed25519 with a non-dev keyId', signature.algorithm === 'ed25519' && typeof signature.keyId === 'string' && !signature.keyId.startsWith('dev-'), String(signature.keyId))
+  check(dev ? 'signature.json is ed25519 with a dev- keyId (development build)' : 'signature.json is ed25519 with a non-dev keyId', signature.algorithm === 'ed25519' && typeof signature.keyId === 'string' && signature.keyId.startsWith('dev-') === dev, String(signature.keyId))
+  const uiProblems = UI_FILES.filter((name) => entries.has(name)).flatMap((name) => scanUiFile(name, text(name)))
+  check('CSP safety: no inline script, event handler attribute, javascript: URL, eval, new Function, http(s):// URL, fetch( or WebSocket in ui/**, and index.html loads only app.js and app.css', uiProblems.length === 0, uiProblems.join('; '))
   check('no private key block in any file', !names.some((name) => PRIVATE_KEY_BLOCK.test(text(name))))
 
   return { ok: checks.every((entry) => entry.ok), file: resolve(file), size: archive.length, sha256: sha256Bytes(archive), fileCount: names.length, anchors, signer: verified?.signer, checks }
@@ -126,12 +175,13 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
   const file = process.argv[2]
   const anchors = argument('--anchors') ?? 'self'
   const pubFile = argument('--pub-file')
-  if (file === undefined || file.startsWith('--') || (anchors === 'self' && pubFile === undefined)) {
-    console.error('usage: node tools/verify-artifact.mjs <file.tuqplugin> --pub-file <file.pub.json> [--anchors self]\n       node tools/verify-artifact.mjs <file.tuqplugin> --anchors core')
+  const dev = process.argv.includes('--dev')
+  if (file === undefined || file.startsWith('--') || (anchors === 'self' && pubFile === undefined) || (dev && anchors !== 'self')) {
+    console.error('usage: node tools/verify-artifact.mjs <file.tuqplugin> --pub-file <file.pub.json> [--anchors self] [--dev]\n       node tools/verify-artifact.mjs <file.tuqplugin> --anchors core\n--dev checks a dev-pack build (development key, teamuq.memory preplanted id)')
     process.exit(2)
   }
   try {
-    const report = verifyArtifact(file, { anchors, pubFile })
+    const report = verifyArtifact(file, { anchors, pubFile, dev })
     console.log(JSON.stringify(report, null, 2))
     process.exitCode = report.ok ? 0 : 1
   } catch (error) {

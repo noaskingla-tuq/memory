@@ -9,8 +9,14 @@
   "pluginApi": "^2.0.0",
   "minCoreVersion": ">=1.6.3",
   "trustTier": "full-trust",
-  "entry": { "backend": "backend.mjs" },
-  "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 2, "idleUnloadSec": 180, "bootTimeoutSec": 30 },
-  "permissions": [],
+  "entry": { "ui": "ui/index.html", "backend": "backend.mjs" },
+  "contributes": {
+    "views": [
+      { "id": "memory", "title": "記憶", "entry": "ui/index.html", "presentations": ["tab", "fullpage"], "defaultPresentation": "tab" }
+    ]
+  },
+  "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 4, "idleUnloadSec": 180, "bootTimeoutSec": 30 },
+  "permissions": ["ui:view", "backend:invoke"],
+  "backendMethods": ["ui.overview", "ui.agentStats", "ui.list", "ui.search", "ui.get", "ui.forget", "ui.status"],
   "data": { "uninstall": "keep" }
 }

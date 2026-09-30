@@ -4,6 +4,8 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildPlugin } from './build.mjs'
 import { assertDevkitLock, assertKeyOutsideRepo, devkitJson, runDevkit } from './devkit.mjs'
+import { createTempDevKey } from './temp-key.mjs'
+import { verifyArtifact } from './verify-artifact.mjs'
 import { PLUGIN_ID, REPO_ROOT } from './vendor-lock.mjs'
 
 export const DEV_OUT = join(REPO_ROOT, 'dist', 'dev', `${PLUGIN_ID}.tuqplugin`)
@@ -24,6 +26,8 @@ export async function devPack({ keyFile, outFile = DEV_OUT, interactive = false,
   const packed = devkitJson(runDevkit(['dev-pack', staged.stageDir, '--key', key, '--out', out, '--bump-patch', ...common], { interactive, passphraseForTests }), 'dev-pack')
   const verified = devkitJson(runDevkit(['verify', out, '--anchors', 'self', '--pub-file', pubFile, ...common]), 'verify')
   if (verified.id !== PLUGIN_ID || verified.version !== packed.version || verified.signer?.kind !== 'dev') throw new Error('the packed artifact is not the development build of teamuq.memory that was just signed')
+  const audit = verifyArtifact(out, { anchors: 'self', pubFile, dev: true })
+  if (!audit.ok) throw new Error(`verify-artifact failed: ${audit.checks.filter((entry) => !entry.ok).map((entry) => `${entry.name}${entry.detail === undefined ? '' : ` (${entry.detail})`}`).join('; ')}`)
   return { file: packed.file, id: packed.id, version: packed.version, signer: packed.signer, sha256: packed.sha256, integritySha256: verified.integritySha256, pubFile }
 }
 
@@ -34,15 +38,24 @@ function argument(name) {
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const keyFile = argument('--key')
-  if (keyFile === undefined) {
-    console.error(`usage: node ${basename(process.argv[1])} --key <dev-<16 hex>.key.pem> [--out file.tuqplugin]\nThe passphrase is typed at the prompt; it is never accepted as an argument. The output path is reused between runs so the patch version keeps counting up.`)
+  const throwaway = process.argv.includes('--temp-key')
+  if ((keyFile === undefined) === !throwaway) {
+    console.error(`usage: node ${basename(process.argv[1])} --key <dev-<16 hex>.key.pem> [--out file.tuqplugin]
+       node ${basename(process.argv[1])} --temp-key [--out file.tuqplugin]
+The passphrase is typed at the prompt; it is never accepted as an argument. The output path is reused between runs so the patch version keeps counting up.
+--temp-key signs with a throwaway development key that is deleted when the command ends: one-shot proofs only, a later build needs the same key to update it.`)
     process.exit(2)
   }
+  const temp = throwaway ? createTempDevKey() : null
   try {
-    const result = await devPack({ keyFile, outFile: argument('--out'), interactive: true })
-    console.log(JSON.stringify({ ok: true, ...result }, null, 2))
+    const result = temp === null
+      ? await devPack({ keyFile, outFile: argument('--out'), interactive: true })
+      : await devPack({ keyFile: temp.keyFile, outFile: argument('--out'), passphraseForTests: temp.passphrase })
+    console.log(JSON.stringify({ ok: true, ...result, ...(temp === null ? {} : { throwawayKey: { keyId: temp.keyId, publicKey: temp.publicKey } }) }, null, 2))
   } catch (error) {
     console.error(JSON.stringify({ ok: false, problem: error instanceof Error ? error.message : String(error) }))
-    process.exit(1)
+    process.exitCode = 1
+  } finally {
+    temp?.cleanup()
   }
 }

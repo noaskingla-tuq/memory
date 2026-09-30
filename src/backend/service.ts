@@ -14,6 +14,7 @@ import { CallError, callError } from "./contractErrors.js";
 import { buildDiagnose } from "./diagnose.js";
 import { inspect, inspectStorageFailure, parseInspectRequest } from "./inspectCall.js";
 import { parseRememberRequest, remember, rememberStorageFailure } from "./rememberCall.js";
+import { dispatchUi, isUiMethod } from "./uiDispatch.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
@@ -99,6 +100,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
         return buildDiagnose(storageStatus());
       }
       default:
+        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus });
         throw callError("unknown_method", "Unknown method");
     }
   };

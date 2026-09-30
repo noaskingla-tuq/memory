@@ -1,0 +1,27 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  background: Canvas;
+  color: CanvasText;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+#status[data-state="error"] {
+  color: #b42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  #status[data-state="error"] {
+    color: #f97066;
+  }
+}

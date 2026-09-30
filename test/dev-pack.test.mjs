@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -6,6 +7,7 @@ import test from "node:test";
 import { devPack } from "../tools/dev-pack.mjs";
 import { runDevkit } from "../tools/devkit.mjs";
 import { createTempDevKey, createTempKey } from "../tools/temp-key.mjs";
+import { verifyArtifact } from "../tools/verify-artifact.mjs";
 import { REPO_ROOT } from "../tools/vendor-lock.mjs";
 
 const packageVersion = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).version;
@@ -76,4 +78,27 @@ test("dev-pack refuses keys that are not development keys, are inside this repos
   copyFileSync(key.keyFile, loneKey);
   await assert.rejects(() => devPack({ keyFile: loneKey, outFile: join(scratch(t), "z.tuqplugin"), passphraseForTests: key.passphrase }), /public key file/u);
   assert.equal(existsSync(join(lone, "z.tuqplugin")), false);
+});
+
+test("verify-artifact accepts the dev-pack build only in dev mode and its CSP scan passes", async (t) => {
+  const key = devKey(t);
+  const out = join(scratch(t), "teamuq.memory.tuqplugin");
+  await devPack({ keyFile: key.keyFile, outFile: out, passphraseForTests: key.passphrase });
+  const report = verifyArtifact(out, { anchors: "self", pubFile: key.pubFile, dev: true });
+  assert.deepEqual(report.checks.filter((entry) => !entry.ok).map((entry) => entry.name), []);
+  assert.equal(report.ok, true);
+  assert.equal(verifyArtifact(out, { anchors: "self", pubFile: key.pubFile }).ok, false);
+});
+
+test("dev:pack --temp-key signs with a throwaway development key and leaves no key behind", (t) => {
+  const out = join(scratch(t), "teamuq.memory.tuqplugin");
+  const run = spawnSync(process.execPath, [join(REPO_ROOT, "tools", "dev-pack.mjs"), "--temp-key", "--out", out], { encoding: "utf8", windowsHide: true, timeout: 180_000 });
+  assert.equal(run.status, 0, run.stderr);
+  const result = JSON.parse(run.stdout);
+  assert.equal(result.version, bump(packageVersion));
+  assert.equal(result.signer.kind, "dev");
+  assert.equal(result.throwawayKey.keyId, result.signer.keyId);
+  assert.equal(existsSync(result.pubFile), false);
+  const refused = spawnSync(process.execPath, [join(REPO_ROOT, "tools", "dev-pack.mjs"), "--temp-key", "--key", "x.key.pem"], { encoding: "utf8", windowsHide: true });
+  assert.equal(refused.status, 2);
 });

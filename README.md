@@ -7,10 +7,13 @@ TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust�
 ## 目錄
 
 ```
-src/backend/            外部後端入口：entry（activate）、service（派送與生命週期）、rememberCall、inspectCall、diagnose、contractErrors
+src/backend/            外部後端入口：entry（activate）、service（派送與生命週期）、rememberCall、inspectCall、uiDispatch、diagnose、contractErrors
 vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
-plugin/                 manifest.template.json（版本由 package.json 帶入）
+plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
+src/ui/                 view 的純 TypeScript（main.ts → ui/app.js、api/backendClient.ts、styles/app.css）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
+src/contracts/uiContract.ts  七個 ui.* 方法名單與回應型別（backend 與 UI 共用）
+types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
 src/adapters/cairn/     Cairn core adapter（唯一 import cairn-memory 的檔）
 src/adapters/model/     Cairn 模型 callback adapter
 src/adapters/storage/   每 agent 一顆 SQLite 的資料配置、檔案安全檢查、identity 相容（cairnPin、upgradeBackup）
@@ -39,7 +42,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 
 - 資料根：`<dataDir>/memory-cairn-v1`。啟動時 `warmUp` 會建 `CairnDataLayout(root, { pinPath })` 並 `preflight`；失敗不擋啟動，之後每次 `call` 與 `diagnose` 會重試。
 - `pinPath`：backend 模組同目錄有 `cairn-pin.json`（打包後）就用它，否則取模組往上兩層（`out/backend` 的 repo 根）。P3 stage 必須把 `cairn-pin.json` 放在 `backend.mjs` 旁。
-- `call(method, params)` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose`；其餘（含 `memory.recall@1`、`memory.forget@1` 等，recall／capture／correct／forget 的程式碼雖在但沒有入口）一律拋 `unknown_method`。
+- `call(method, params)` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose` 與七個 `ui.*`（`uiDispatch`；S0 只有 `ui.status` 回佔位資料，其餘六個回 `{ok:false, code:'NOT_IMPLEMENTED'}`，預期錯誤不 throw，出口一律 JSON 來回一次）；其餘（含 `memory.recall@1`、`memory.forget@1` 等，recall／capture／correct／forget 的程式碼雖在但沒有入口）一律拋 `unknown_method`。
 - 整次呼叫失敗只會拋帶 `code` 的錯誤，且碼只能是 `unknown_method`、`invalid_params`、`result_too_large`、`internal`（host 把 `code` 原樣回給 Core）。請求違反契約 schema 是 `invalid_params`；訊息只含欄位路徑，不回顯內容。dispose 之後的呼叫拋 `internal`。
 - 個別操作的失敗是回應內的 `{ok:false, error}`，碼取自契約 `MEMORY_ERROR_CODES`；契約沒有的碼（`CAPABILITY_*`、`SESSION_BINDING_MISMATCH`、`IDENTITY_UNBOUND`）收成 `INTERNAL`，且原始碼中沒有任何地方會產生它們。儲存層起不來時，每個 op 依實際碼（`STORAGE_*`、`DEPENDENCY_INCOMPATIBLE`）回失敗，不用 `INTERNAL`。
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
@@ -94,10 +97,11 @@ build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock�
 | `backend.mjs`、`cairn-pin.json` | 同目錄（`resolvePinPath` 的規則）；pin 檔以 LF 寫入 |
 | `cairn/core/**` | 56 檔，排除 `core/test` 與 `core/testing`（沒有任何執行期 import；`verify-artifact` 會檢查每個 staged `.mjs` 的相對 import 與 `new URL` 資產都解得到） |
 | `cairn/plugins/cairn-memory/lib/redact.mjs`、`cairn/LICENSE` | 保留 `core/validation.mjs` 需要的相對路徑 |
+| `ui/index.html`、`ui/app.js`、`ui/app.css` | `bundleUi`：esbuild 把 `src/ui/main.ts` 打成 IIFE `app.js`（不得拉進 node_modules）；`index.html` 來自 `plugin/ui/`、`app.css` 來自 `src/ui/styles/`。`verify-artifact` 對這三檔做 CSP 安全掃描（無 inline script／事件屬性／`javascript:`、`eval`、`new Function`、`http(s)://`、`fetch(`、`WebSocket`） |
 | `manifest.json`、`integrity.json`、`signature.json` | manifest 見下；後兩者由 devkit 產生 |
 
 - `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 58 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。
-- manifest：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.backend: backend.mjs`、`permissions: []`、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.6.3`（1.6.3 是第一個含白名單 `invokeBackend`、接受 `@` 的 methodName 與走 invoke 的記憶 sink 的 Core；1.6.0～1.6.2 會通過 manifest 檢查但不會有人呼叫本 plugin，`verify-artifact` 斷言此值）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 2`、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
+- manifest（composed）：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.ui: ui/index.html`＋`entry.backend: backend.mjs`、`contributes.views` 一個 view（id `memory`、標題「記憶」、presentations `tab`＋`fullpage`、預設 `tab`）、`permissions: ["ui:view","backend:invoke"]`、`backendMethods` 為七個 `ui.*`（不得含 `memory.*`）、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.6.3`（1.6.3 是第一個含白名單 `invokeBackend`、接受 `@` 的 methodName 與走 invoke 的記憶 sink 的 Core；1.6.0～1.6.2 會通過 manifest 檢查但不會有人呼叫本 plugin，`verify-artifact` 斷言此值）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 4`（UI 與 Core sink 共用的在途呼叫上限）、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
 - devkit：`vendor/teamuq-devkit/tuq-plugin-tool.mjs` 是 TeamUQ `npm run build:plugin-devkit -- --out <路徑>` 的產物，禁止手改；`devkit.lock.json` 記 Core commit、Core 版本與 sha256（CRLF 正規化為 LF 再雜湊）。更新：`npm run devkit:sync -- --core <TeamUQ 路徑>`（Core 內嵌來源有未提交變更時拒絕）。`release`、`build`、`verify-artifact` 執行前都會比對 lock。
 - devkit 內嵌當下 Core 的 `TEAMUQ_TRUST_ANCHORS`：現為 `teamuq-root-2026a`、`teamuq-root-2026b` 兩把公鑰（Core 1.6.3，含 `--preplanted-id` 的 commit 記在 `devkit.lock.json`）。Core 的 anchors 再變動就必須重跑 `devkit:sync`。
 
@@ -138,6 +142,7 @@ npm run dev:pack -- --key $env:LOCALAPPDATA\TeamUQ\plugin-dev-keys\<dev-keyId>.k
 - 金鑰檔必須叫 `dev-<16 碼 hex>.key.pem`，旁邊要有 `.pub.json`；release 金鑰（`teamuq-…`）、repo 內的金鑰路徑都會被拒。passphrase 只在互動提示輸入，不接受參數。
 - 到 Core：以隔離 profile 啟動 dev build，設定 → 外掛 → 開發者匯入 `.pub.json` 的公鑰，再選取 `dist/dev/teamuq.memory.tuqplugin` 安裝。第一次是取代預植的官方版（走更新流程，版本要較新），之後是同一把金鑰的原地更新；換金鑰或想回官方版要先移除再從「預植外掛」還原。
 - 只有 `dev:pack` 帶 `--preplanted-id teamuq.memory`；`build` 與 `release` 的行為不變，正式簽章仍照上面的 H2。`dev:pack` 的產物帶開發簽章，Core 的打包版一律拒絕。
+- 沒有 TTY（CI、agent、一次性證明）時用 `npm run dev:pack -- --temp-key`：以暫時開發金鑰簽章並在結束時刪除，輸出 JSON 帶 `throwawayKey.publicKey`；只適合單次驗證，之後的更新要用同一把金鑰才能過簽章者鏈。`dev:pack` 出檔前會以 `verify-artifact --dev` 自我檢查（含 CSP 掃描），不合格就 exit 1。`node tools/verify-artifact.mjs <檔> --pub-file <.pub.json> --dev` 可單獨檢查 dev-pack 產物。
 - 開發版 manifest 的版本是 1.0.x 遞增，`diagnose` 回報的 `plugin.version` 仍是 `src/backend/diagnose.ts` 的常數，兩者在開發版本不一致是預期的。
 - devkit 必須是含 `--preplanted-id` 的 Core 版本：目前 vendor 的是 Core worktree `task/ext-mem-devtrust` 的 commit（見 `devkit.lock.json`）；合回 V1 後 commit 雜湊改變，重跑 `npm run devkit:sync -- --core <TeamUQ 路徑>`。
 

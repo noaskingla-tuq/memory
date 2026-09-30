@@ -43,7 +43,7 @@ function syncContract(coreRoot) {
 
   const lock = JSON.parse(readFileSync(join(sourceDir, CORE_LOCK), 'utf8'))
   if (lock.pluginId !== PLUGIN_ID) fail('Core lock pluginId is not teamuq.memory')
-  if (JSON.stringify(lock.methods) !== JSON.stringify(METHODS)) fail('Core lock methods differ from the three served methods')
+  if (JSON.stringify(lock.methods) !== JSON.stringify(METHODS)) fail('Core lock methods differ from the four contract methods')
   if (lock.hashRule !== HASH_RULE) fail('Core lock hashRule changed')
   const listed = Object.keys(lock.files).sort()
   const present = walkFiles(sourceDir).filter((file) => file !== CORE_LOCK)

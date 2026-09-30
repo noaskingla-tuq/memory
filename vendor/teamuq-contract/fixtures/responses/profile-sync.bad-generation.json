@@ -1,0 +1,15 @@
+{
+  "case": "profile-sync.bad-generation",
+  "method": "memory.profile.sync@1",
+  "accept": false,
+  "response": {
+    "accepted": true,
+    "generation": "xyz",
+    "complete": true,
+    "changed": true,
+    "received": 1,
+    "agents": 4,
+    "teams": 2,
+    "projects": 2
+  }
+}

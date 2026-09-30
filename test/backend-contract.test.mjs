@@ -37,9 +37,17 @@ test("every fixture the vendored lock lists is exercised", () => {
   assert.ok(requestFixtures.length >= 12 && responseFixtures.length >= 15);
 });
 
+const PROFILE_SYNC = contract.MEMORY_PLUGIN_METHODS.profileSync;
+
 for (const fixture of requestFixtures) {
   test(`request fixture ${fixture.case} is ${fixture.valid ? "accepted" : "rejected as invalid_params"}`, async (t) => {
     const { backend } = startBackend(t);
+    if (fixture.method === PROFILE_SYNC) {
+      // why: memory.profile.sync@1 is part of the vendored contract but this plugin does not serve it yet, so the fixture is checked against the vendored schema and the backend must still answer unknown_method
+      assert.equal(contract.memoryProfileSyncRequestSchema.safeParse(fixture.params).success, fixture.valid);
+      await assert.rejects(backend.call(fixture.method, fixture.params), { code: "unknown_method" });
+      return;
+    }
     if (!fixture.valid) {
       await assert.rejects(backend.call(fixture.method, fixture.params), (error) => {
         assert.equal(error.code, "invalid_params");
@@ -73,6 +81,7 @@ for (const fixture of responseFixtures) {
       [contract.MEMORY_PLUGIN_METHODS.remember]: contract.memoryRememberResponseSchema,
       [contract.MEMORY_PLUGIN_METHODS.inspect]: contract.memoryInspectResponseSchema,
       [contract.MEMORY_PLUGIN_METHODS.diagnose]: contract.memoryDiagnoseResponseSchema,
+      [PROFILE_SYNC]: contract.memoryProfileSyncResponseSchema,
     };
     const parsed = schemas[fixture.method].safeParse(fixture.response);
     assert.equal(parsed.success, fixture.accept);
@@ -88,6 +97,7 @@ test("only the three contract methods are served; everything else is unknown_met
     "memory.capture@1",
     "memory.correct@1",
     "memory.forget@1",
+    PROFILE_SYNC,
     "memory_recall",
     "memory_capture",
     "memory_correct",

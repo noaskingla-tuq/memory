@@ -1,0 +1,22 @@
+{
+  "case": "remember.work-prefix-no-text.core-form",
+  "method": "memory.remember@1",
+  "valid": true,
+  "note": "exact text Core writes: fullwidth colon and wave dash, before Cairn NFKC",
+  "params": {
+    "actor": {
+      "agentId": "sw/developer",
+      "projectId": null,
+      "sessionId": "s1",
+      "providerId": "claude"
+    },
+    "ops": [
+      {
+        "scope": "personal",
+        "content": "[工作紀錄 2026-09-29T03:15Z～2026-09-29T03:42Z claude/claude-opus-4-7] 請求：修正登入頁的表單驗證。成果：（無文字）",
+        "kind": "context",
+        "operationId": "punch:3cbf102e77fcc110fcf40bdfd498eccf"
+      }
+    ]
+  }
+}

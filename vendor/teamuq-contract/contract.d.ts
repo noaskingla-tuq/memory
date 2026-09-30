@@ -6,8 +6,9 @@ export declare const MEMORY_PLUGIN_METHODS: {
     readonly remember: "memory.remember@1";
     readonly inspect: "memory.inspect@1";
     readonly diagnose: "diagnose";
+    readonly profileSync: "memory.profile.sync@1";
 };
-export declare const MEMORY_PLUGIN_METHOD_NAMES: readonly ["memory.remember@1", "memory.inspect@1", "diagnose"];
+export declare const MEMORY_PLUGIN_METHOD_NAMES: readonly ["memory.remember@1", "memory.inspect@1", "diagnose", "memory.profile.sync@1"];
 export declare const MEMORY_LIMITS: {
     readonly maxOps: 16;
     readonly paramsMaxBytes: number;
@@ -19,6 +20,19 @@ export declare const MEMORY_LIMITS: {
     readonly contentMaxChars: 4000;
     readonly inspectMaxLimit: 12;
     readonly cursorMaxChars: 8192;
+};
+/** Name-table limits: one snapshot is at most maxParts requests of at most partBudgetBytes each; anything beyond is dropped and counted in omitted. */
+export declare const MEMORY_PROFILE_LIMITS: {
+    readonly maxAgents: 4096;
+    readonly maxTeams: 1024;
+    readonly maxProjects: 4096;
+    readonly maxParts: 32;
+    readonly partBudgetBytes: number;
+    readonly agentNameMaxChars: 120;
+    readonly teamNameMaxChars: 120;
+    readonly titleMaxChars: 120;
+    readonly projectNameMaxChars: 200;
+    readonly canonicalVersion: 1;
 };
 export declare const MEMORY_ERROR_CODES: readonly ["INVALID_INPUT", "PROJECT_UNBOUND", "MODEL_NOT_CONFIGURED", "MODEL_POLICY_DENIED", "MODEL_TIMEOUT", "MODEL_OUTPUT_INVALID", "TOKEN_COUNT_UNAVAILABLE", "REVISION_CONFLICT", "CURSOR_STALE", "IDEMPOTENCY_CONFLICT", "MEMORY_SUPPRESSED", "RESOURCE_BUSY", "STORAGE_BUSY", "STORAGE_UNSAFE", "STORAGE_UNSUPPORTED", "DEPENDENCY_INCOMPATIBLE", "INTERNAL"];
 export declare const MEMORY_RETRYABLE_ERROR_CODES: readonly ["MODEL_TIMEOUT", "REVISION_CONFLICT", "CURSOR_STALE", "RESOURCE_BUSY", "STORAGE_BUSY"];
@@ -642,6 +656,301 @@ export declare const memoryDiagnoseResponseSchema: z.ZodObject<{
     };
     contractLockSha256: string;
 }>;
+export declare const memoryProfileAgentSchema: z.ZodObject<{
+    id: z.ZodString;
+    name: z.ZodString;
+    teamKey: z.ZodNullable<z.ZodString>;
+    title: z.ZodNullable<z.ZodString>;
+    enabled: z.ZodBoolean;
+}, "strict", z.ZodTypeAny, {
+    id: string;
+    name: string;
+    teamKey: string | null;
+    title: string | null;
+    enabled: boolean;
+}, {
+    id: string;
+    name: string;
+    teamKey: string | null;
+    title: string | null;
+    enabled: boolean;
+}>;
+export declare const memoryProfileTeamSchema: z.ZodObject<{
+    key: z.ZodString;
+    name: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    name: string;
+    key: string;
+}, {
+    name: string;
+    key: string;
+}>;
+export declare const memoryProfileProjectSchema: z.ZodObject<{
+    id: z.ZodString;
+    name: z.ZodString;
+    archived: z.ZodBoolean;
+}, "strict", z.ZodTypeAny, {
+    id: string;
+    name: string;
+    archived: boolean;
+}, {
+    id: string;
+    name: string;
+    archived: boolean;
+}>;
+export declare const memoryProfileOmittedSchema: z.ZodObject<{
+    agents: z.ZodNumber;
+    teams: z.ZodNumber;
+    projects: z.ZodNumber;
+}, "strict", z.ZodTypeAny, {
+    agents: number;
+    teams: number;
+    projects: number;
+}, {
+    agents: number;
+    teams: number;
+    projects: number;
+}>;
+export declare const memoryProfileSinkSchema: z.ZodObject<{
+    pending: z.ZodNumber;
+    lastWrittenAtMs: z.ZodNullable<z.ZodNumber>;
+}, "strict", z.ZodTypeAny, {
+    pending: number;
+    lastWrittenAtMs: number | null;
+}, {
+    pending: number;
+    lastWrittenAtMs: number | null;
+}>;
+/** One part of a name-table snapshot; every list is strictly ascending by key, and all parts of a snapshot share generation, parts, omitted and sink. */
+export declare const memoryProfileSyncRequestSchema: z.ZodEffects<z.ZodObject<{
+    generation: z.ZodString;
+    part: z.ZodNumber;
+    parts: z.ZodNumber;
+    agents: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        name: z.ZodString;
+        teamKey: z.ZodNullable<z.ZodString>;
+        title: z.ZodNullable<z.ZodString>;
+        enabled: z.ZodBoolean;
+    }, "strict", z.ZodTypeAny, {
+        id: string;
+        name: string;
+        teamKey: string | null;
+        title: string | null;
+        enabled: boolean;
+    }, {
+        id: string;
+        name: string;
+        teamKey: string | null;
+        title: string | null;
+        enabled: boolean;
+    }>, "many">;
+    teams: z.ZodArray<z.ZodObject<{
+        key: z.ZodString;
+        name: z.ZodString;
+    }, "strict", z.ZodTypeAny, {
+        name: string;
+        key: string;
+    }, {
+        name: string;
+        key: string;
+    }>, "many">;
+    projects: z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        name: z.ZodString;
+        archived: z.ZodBoolean;
+    }, "strict", z.ZodTypeAny, {
+        id: string;
+        name: string;
+        archived: boolean;
+    }, {
+        id: string;
+        name: string;
+        archived: boolean;
+    }>, "many">;
+    omitted: z.ZodObject<{
+        agents: z.ZodNumber;
+        teams: z.ZodNumber;
+        projects: z.ZodNumber;
+    }, "strict", z.ZodTypeAny, {
+        agents: number;
+        teams: number;
+        projects: number;
+    }, {
+        agents: number;
+        teams: number;
+        projects: number;
+    }>;
+    sink: z.ZodNullable<z.ZodObject<{
+        pending: z.ZodNumber;
+        lastWrittenAtMs: z.ZodNullable<z.ZodNumber>;
+    }, "strict", z.ZodTypeAny, {
+        pending: number;
+        lastWrittenAtMs: number | null;
+    }, {
+        pending: number;
+        lastWrittenAtMs: number | null;
+    }>>;
+}, "strict", z.ZodTypeAny, {
+    agents: {
+        id: string;
+        name: string;
+        teamKey: string | null;
+        title: string | null;
+        enabled: boolean;
+    }[];
+    teams: {
+        name: string;
+        key: string;
+    }[];
+    projects: {
+        id: string;
+        name: string;
+        archived: boolean;
+    }[];
+    generation: string;
+    part: number;
+    parts: number;
+    omitted: {
+        agents: number;
+        teams: number;
+        projects: number;
+    };
+    sink: {
+        pending: number;
+        lastWrittenAtMs: number | null;
+    } | null;
+}, {
+    agents: {
+        id: string;
+        name: string;
+        teamKey: string | null;
+        title: string | null;
+        enabled: boolean;
+    }[];
+    teams: {
+        name: string;
+        key: string;
+    }[];
+    projects: {
+        id: string;
+        name: string;
+        archived: boolean;
+    }[];
+    generation: string;
+    part: number;
+    parts: number;
+    omitted: {
+        agents: number;
+        teams: number;
+        projects: number;
+    };
+    sink: {
+        pending: number;
+        lastWrittenAtMs: number | null;
+    } | null;
+}>, {
+    agents: {
+        id: string;
+        name: string;
+        teamKey: string | null;
+        title: string | null;
+        enabled: boolean;
+    }[];
+    teams: {
+        name: string;
+        key: string;
+    }[];
+    projects: {
+        id: string;
+        name: string;
+        archived: boolean;
+    }[];
+    generation: string;
+    part: number;
+    parts: number;
+    omitted: {
+        agents: number;
+        teams: number;
+        projects: number;
+    };
+    sink: {
+        pending: number;
+        lastWrittenAtMs: number | null;
+    } | null;
+}, {
+    agents: {
+        id: string;
+        name: string;
+        teamKey: string | null;
+        title: string | null;
+        enabled: boolean;
+    }[];
+    teams: {
+        name: string;
+        key: string;
+    }[];
+    projects: {
+        id: string;
+        name: string;
+        archived: boolean;
+    }[];
+    generation: string;
+    part: number;
+    parts: number;
+    omitted: {
+        agents: number;
+        teams: number;
+        projects: number;
+    };
+    sink: {
+        pending: number;
+        lastWrittenAtMs: number | null;
+    } | null;
+}>;
+export declare const memoryProfileSyncResponseSchema: z.ZodObject<{
+    accepted: z.ZodLiteral<true>;
+    generation: z.ZodString;
+    complete: z.ZodBoolean;
+    changed: z.ZodBoolean;
+    received: z.ZodNumber;
+    agents: z.ZodNumber;
+    teams: z.ZodNumber;
+    projects: z.ZodNumber;
+}, "strip", z.ZodTypeAny, {
+    received: number;
+    agents: number;
+    teams: number;
+    projects: number;
+    generation: string;
+    accepted: true;
+    complete: boolean;
+    changed: boolean;
+}, {
+    received: number;
+    agents: number;
+    teams: number;
+    projects: number;
+    generation: string;
+    accepted: true;
+    complete: boolean;
+    changed: boolean;
+}>;
+export type MemoryProfileAgent = z.infer<typeof memoryProfileAgentSchema>;
+export type MemoryProfileTeam = z.infer<typeof memoryProfileTeamSchema>;
+export type MemoryProfileProject = z.infer<typeof memoryProfileProjectSchema>;
+export type MemoryProfileOmitted = z.infer<typeof memoryProfileOmittedSchema>;
+export type MemoryProfileSink = z.infer<typeof memoryProfileSinkSchema>;
+export type MemoryProfileSyncRequest = z.infer<typeof memoryProfileSyncRequestSchema>;
+export type MemoryProfileSyncResponse = z.infer<typeof memoryProfileSyncResponseSchema>;
+export interface MemoryProfileSnapshot {
+    readonly agents: readonly MemoryProfileAgent[];
+    readonly teams: readonly MemoryProfileTeam[];
+    readonly projects: readonly MemoryProfileProject[];
+    readonly omitted: MemoryProfileOmitted;
+}
+/** The exact text whose sha256 is the generation: version, sorted tuples for agents, teams and projects, then omitted; sink never counts. */
+export declare function memoryProfileCanonicalText(snapshot: MemoryProfileSnapshot): string;
 export type MemoryActor = z.infer<typeof memoryActorSchema>;
 export type MemoryRememberInput = z.infer<typeof memoryRememberInputSchema>;
 export type MemoryInspectInput = z.infer<typeof memoryInspectInputSchema>;

@@ -1,0 +1,20 @@
+{
+  "case": "profile-sync.empty",
+  "method": "memory.profile.sync@1",
+  "valid": true,
+  "note": "an empty snapshot is well formed; whether Core may push it is the producer rule",
+  "params": {
+    "generation": "b98a927b9600fa2d57d6a3a35a1d9c03c24c8f200798ea028d0b0dcd647f2795",
+    "part": 1,
+    "parts": 1,
+    "agents": [],
+    "teams": [],
+    "projects": [],
+    "omitted": {
+      "agents": 0,
+      "teams": 0,
+      "projects": 0
+    },
+    "sink": null
+  }
+}

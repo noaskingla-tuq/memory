@@ -1,5 +1,6 @@
 import { UI_METHOD_NAMES, type UiFailure, type UiMethodName, type UiStatus } from "../contracts/uiContract.js";
 import { CAIRN_COMMIT } from "../adapters/storage/dataLayout.js";
+import { jsonSafe } from "../application/ui/jsonSafe.js";
 import { PLUGIN_VERSION } from "./diagnose.js";
 
 export interface UiDispatchDeps {
@@ -8,11 +9,6 @@ export interface UiDispatchDeps {
 
 export function isUiMethod(method: unknown): method is UiMethodName {
   return typeof method === "string" && (UI_METHOD_NAMES as readonly string[]).includes(method);
-}
-
-// why: preload's zod rejects undefined and NaN in a return value, so every UI answer leaves through one JSON round trip
-function jsonSafe<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function isPlainObject(value: unknown): boolean {

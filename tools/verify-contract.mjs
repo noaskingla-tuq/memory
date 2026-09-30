@@ -44,7 +44,7 @@ let lockSha256 = ''
 
 if (lock !== undefined && vendorLock !== undefined) {
   check(lock.pluginId === PLUGIN_ID && vendorLock.pluginId === PLUGIN_ID, 'pluginId is not teamuq.memory')
-  check(JSON.stringify(lock.methods) === JSON.stringify(METHODS), 'lock methods differ from the three served methods')
+  check(JSON.stringify(lock.methods) === JSON.stringify(METHODS), 'lock methods differ from the four contract methods')
   check(lock.hashRule === HASH_RULE && vendorLock.hashRule === HASH_RULE, 'hashRule differs')
   check(lock.contractVersion === vendorLock.contractVersion, 'contractVersion differs between the two locks')
 

@@ -1,0 +1,67 @@
+{
+  "case": "profile-sync.truncated",
+  "method": "memory.profile.sync@1",
+  "valid": true,
+  "note": "entries beyond the caps or the part budget are dropped and counted in omitted; omitted is part of the generation",
+  "params": {
+    "generation": "e44f94f24244d5233e28d2a1123dce79a8aed669d864cfdcce37ab14091ee245",
+    "part": 1,
+    "parts": 1,
+    "agents": [
+      {
+        "id": "agent-ops/manager",
+        "name": "系統維運組長",
+        "teamKey": "agent-ops",
+        "title": null,
+        "enabled": true
+      },
+      {
+        "id": "sw/developer",
+        "name": "開發工程師",
+        "teamKey": "sw",
+        "title": null,
+        "enabled": true
+      },
+      {
+        "id": "sw/manager",
+        "name": "軟體開發組長",
+        "teamKey": "sw",
+        "title": null,
+        "enabled": true
+      },
+      {
+        "id": "sw/retired-reviewer",
+        "name": "舊審查員",
+        "teamKey": "sw",
+        "title": null,
+        "enabled": false
+      }
+    ],
+    "teams": [
+      {
+        "key": "agent-ops",
+        "name": "系統維運組"
+      },
+      {
+        "key": "sw",
+        "name": "軟體開發組"
+      }
+    ],
+    "projects": [
+      {
+        "id": "project:00000000-0000-4000-8000-000000000001",
+        "name": "TeamUQ 桌面版",
+        "archived": false
+      }
+    ],
+    "omitted": {
+      "agents": 3,
+      "teams": 0,
+      "projects": 1
+    },
+    "sink": {
+      "pending": 12,
+      "lastWrittenAtMs": 1790000000000
+    }
+  }
+}

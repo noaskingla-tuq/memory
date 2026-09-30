@@ -12,7 +12,8 @@ vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、f
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
 src/ui/                 view 的純 TypeScript（main.ts → ui/app.js、api/backendClient.ts、styles/app.css）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
-src/contracts/uiContract.ts  七個 ui.* 方法名單與回應型別（backend 與 UI 共用）
+src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
+src/application/ui/     budget（UTF-8 bytes 預算）、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、jsonSafe（出口）
 types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
 src/adapters/cairn/     Cairn core adapter（唯一 import cairn-memory 的檔）
 src/adapters/ui/        cairnReader（唯一對 Cairn 庫檔下 SQL、只讀）、agentCatalog（列出所有 agent）
@@ -61,6 +62,16 @@ UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段�
 - `layout.listAgentDirectories()`（`CairnDataLayout`）列出 `agents/<64 位 hex>/`，不建目錄、不改 identity，對每個目錄與檔案套用和 `agentDbPath` 相同的 reparse point 檢查，狀態為 `ready`、`no_database`、`unsafe`、`unreadable`。
 - `listAgents(layout)`（`agentCatalog.ts`）從 `namespace_epochs` 取 `owner_id` 與 namespace、計算每個 namespace 的未刪除筆數；0 筆的 agent 與 namespace 不列出；`owner_id` 的 sha256 必須等於目錄名（否則 `identity_mismatch`）、同一庫只能有一個 `owner_id`（否則 `owner_conflict`）；讀不了的 agent 放進 `unavailable[]` 並附原因。
 
+## UI 契約與工具（S2）
+
+七個 `ui.*` 方法的本體尚未實作（`uiDispatch` 只有 `ui.status` 佔位）；本節是它們共用的零件，形狀依設計 §1.3。
+
+- `uiContract.ts`：每個方法一組請求 schema 與成功回應 schema（全部 `strict`），`UI_METHOD_SCHEMAS`、`parseUiParams`、`parseUiResponse`。時間篩選必須是 `toISOString()` 的完整形式（Cairn 的 `updated_at` 以字串比較），`scope` 與 `projectId` 必須相符，snippet 以 code point 計。失敗一律 `{ok:false, code, retryable}`，碼取自 `UI_FAILURE_CODES`。
+- `budget.ts`：回傳大小是 `Buffer.byteLength(JSON.stringify(x))`（UTF-8 bytes），上限 56,000；`fitToBudget` 以二分法取「放得下的最長前綴」並回 `truncated`，連第一筆都放不下才回 `result_too_large`（不回指向同一筆的游標）。CJK 每字 3 bytes，用 `.length` 會低估。
+- `cursor.ts`：游標是 `base64url(payload).base64url(HMAC-SHA256)`，payload 為版本、篩選條件雜湊與 1 到 4 段 keyset 位置；金鑰預設是行程內隨機值，所以重啟後舊游標會被拒（畫面從第一頁重來）。雜湊不含 `limit` 與 `cursor`，換頁大小仍可續頁；篩選條件不同回 `filter_mismatch`；任何字元被改、簽章被換、格式不符都拒收。
+- `punchContent.ts`：以 NFKC 後的前綴 `[工作紀錄 <起>~<迄> <cli>/<model>] 請求:<標題>。成果:<內文>` 解析工作起訖（UTC 分鐘，轉成完整 ISO）、cli、model、標題；`unknown` 的 cli／model 與 `(未命名)` 標題成為 `null`，`(無文字)` 內文成為空字串。前綴格式與 Core 的 `punchMemoryContent.ts` 耦合，樣本是 `vendor/teamuq-contract/fixtures/requests/remember.work-prefix-*`（每種各有寫入形式與 NFKC 形式）。解析失敗（含只讀了內容前 160 字、標題被截斷）回 `{parsed:false, body:<原文>}`。標題本身若含「。成果:」會在該處被切開，這是格式本身的歧義。
+- `jsonSafe.ts`：出口的 `JSON.parse(JSON.stringify(x))`，去掉 `undefined`、把 `NaN` 與無限大變成 `null`（preload 的 zod 會拒收前者）。
+
 ## 契約 vendor
 
 `vendor/teamuq-contract/` 是 TeamUQ `packages/features/agent-memory/contract/v1/` 的副本，Core 是唯一權威，禁止手改。
@@ -71,7 +82,7 @@ UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段�
 | `contract.d.mts` | 本 repo 加的一行橋接（tsc 把對 `contract.mjs` 的 import 解析到 `.d.mts`），列在 `vendor.lock.json` 的 `pluginOwnedFiles` |
 | `vendor.lock.json` | Core commit（HEAD）、最後改到契約目錄的 commit、Core `lock.json` 的 sha256、每個 vendored 檔的 sha256 |
 
-- 同步：`node tools/sync-vendor.mjs --core <TeamUQ 路徑>`。先驗 Core 的 lock（每檔 hash、無多餘檔、方法清單、pluginId），且契約目錄不得有未提交變更；再重寫 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`（`diagnose.contractLockSha256` 的來源）。
+- 同步：`node tools/sync-vendor.mjs --core <TeamUQ 路徑>`。先驗 Core 的 lock（每檔 hash、無多餘檔、方法清單、pluginId；方法清單現為 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`，後者本 plugin 尚未服務，呼叫端會得到 `unknown_method`），且契約目錄不得有未提交變更；再重寫 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`（`diagnose.contractLockSha256` 的來源）。
 - 驗證：`npm run contract:verify`（不需要 Core）比對 vendored 檔與兩份 lock、橋接檔內容、`vendoredContractLock.ts`；加 `--core <路徑>` 會另外對照 Core 的 lock 與 commit。
 
 ## 升級 Cairn 後的舊庫（G7）

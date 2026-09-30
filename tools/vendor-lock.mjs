@@ -10,7 +10,7 @@ export const CORE_LOCK = 'lock.json'
 export const GENERATED_TS = join(REPO_ROOT, 'src', 'backend', 'vendoredContractLock.ts')
 export const CORE_CONTRACT_DIR = 'packages/features/agent-memory/contract/v1'
 export const PLUGIN_ID = 'teamuq.memory'
-export const METHODS = ['memory.remember@1', 'memory.inspect@1', 'diagnose']
+export const METHODS = ['memory.remember@1', 'memory.inspect@1', 'diagnose', 'memory.profile.sync@1']
 export const HASH_RULE = 'sha256 hex of file bytes with CRLF normalised to LF'
 
 // why: tsc resolves an import of contract.mjs to contract.d.mts, so Core's contract.d.ts needs this one-line bridge

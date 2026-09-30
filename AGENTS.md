@@ -10,6 +10,7 @@
 - 每個 `accepted[]` 項目都必須有 `test/fixtures/legacy-db/<commit>/` 真實舊庫 fixture（`tools/make-legacy-fixture.mjs` 產生）；備份失敗一律回 `STORAGE_BUSY`、不得回 `INTERNAL`。
 - `vendor/teamuq-contract/` 是 TeamUQ Core 契約的副本，禁止手改；只用 `tools/sync-vendor.mjs --core <TeamUQ 路徑>` 更新，`npm run contract:verify` 必須 exit 0。
 - `src/backend/` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose` 與 `ui.*`（七個 UI 方法，名單在 `src/contracts/uiContract.ts`，只由 view 經 `window.tuqPlugin.backend.call` 呼叫）；manifest 的 `backendMethods` 只准列 `ui.*`，不得列 `memory.*` 或 `diagnose`（`verify-artifact` 斷言）；`ui.*` 的預期錯誤回 `{ok:false, code}`，不 throw。整次呼叫失敗的碼只能是 `unknown_method`、`invalid_params`、`result_too_large`、`internal`，個別操作的錯誤碼只能取自契約 `MEMORY_ERROR_CODES`。
+- `ui.*` 的回傳大小一律以 UTF-8 bytes 計、上限 56,000（`src/application/ui/budget.ts`），不得用 `.length`；出口一律經 `jsonSafe`；分頁游標只用 `src/application/ui/cursor.ts`（簽章加篩選雜湊，不用 Cairn 游標）；工作紀錄前綴只由 `punchContent.ts` 解析，Core 改前綴格式前要先在 `contract/v1/fixtures` 加樣本。
 - 私鑰、`*.pem`、`*.key`、`keys/` 永不進 repo，也不進 agent context；`tools/check-no-secrets.mjs` 必須 exit 0。`tools/release.mjs` 拒絕 repo 內或任何 git 工作樹內的金鑰路徑；只用暫時金鑰（`tools/temp-key.mjs`，用完即刪）驗證，正式金鑰由使用者親手簽章。
 - 測試檔（`test/*.test.mjs`）在測試執行期間不得寫 stdout（`console.log`／`process.stdout.write`／子行程 inherit stdout）；附註走 `console.error` 或 `t.diagnostic()`。
 - 新程式檔 ≤500 行；不新增 `utils`、`helpers`、`common`、`misc`。

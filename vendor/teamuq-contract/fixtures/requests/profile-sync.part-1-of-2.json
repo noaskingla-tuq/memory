@@ -1,0 +1,52 @@
+{
+  "case": "profile-sync.part-1-of-2",
+  "method": "memory.profile.sync@1",
+  "valid": true,
+  "note": "parts partition the sorted stream agents, teams, projects; the plugin recomputes the generation from the assembled parts",
+  "params": {
+    "generation": "783875e41d932603e71850485b428aeae9dfd97a123f0e562d7a65cd931d2ac2",
+    "part": 1,
+    "parts": 2,
+    "agents": [
+      {
+        "id": "agent-ops/manager",
+        "name": "系統維運組長",
+        "teamKey": "agent-ops",
+        "title": "Agent Ops Manager",
+        "enabled": true
+      },
+      {
+        "id": "sw/developer",
+        "name": "開發工程師",
+        "teamKey": "sw",
+        "title": "Developer Agent",
+        "enabled": true
+      },
+      {
+        "id": "sw/manager",
+        "name": "軟體開發組長",
+        "teamKey": "sw",
+        "title": null,
+        "enabled": true
+      },
+      {
+        "id": "sw/retired-reviewer",
+        "name": "舊審查員",
+        "teamKey": "sw",
+        "title": null,
+        "enabled": false
+      }
+    ],
+    "teams": [],
+    "projects": [],
+    "omitted": {
+      "agents": 0,
+      "teams": 0,
+      "projects": 0
+    },
+    "sink": {
+      "pending": 12,
+      "lastWrittenAtMs": 1790000000000
+    }
+  }
+}

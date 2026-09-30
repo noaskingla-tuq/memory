@@ -6,12 +6,14 @@ var MEMORY_CONTRACT_VERSIONS = [1];
 var MEMORY_PLUGIN_METHODS = {
   remember: "memory.remember@1",
   inspect: "memory.inspect@1",
-  diagnose: "diagnose"
+  diagnose: "diagnose",
+  profileSync: "memory.profile.sync@1"
 };
 var MEMORY_PLUGIN_METHOD_NAMES = [
   MEMORY_PLUGIN_METHODS.remember,
   MEMORY_PLUGIN_METHODS.inspect,
-  MEMORY_PLUGIN_METHODS.diagnose
+  MEMORY_PLUGIN_METHODS.diagnose,
+  MEMORY_PLUGIN_METHODS.profileSync
 ];
 var MEMORY_LIMITS = {
   maxOps: 16,
@@ -24,6 +26,18 @@ var MEMORY_LIMITS = {
   contentMaxChars: 4e3,
   inspectMaxLimit: 12,
   cursorMaxChars: 8192
+};
+var MEMORY_PROFILE_LIMITS = {
+  maxAgents: 4096,
+  maxTeams: 1024,
+  maxProjects: 4096,
+  maxParts: 32,
+  partBudgetBytes: 192 * 1024,
+  agentNameMaxChars: 120,
+  teamNameMaxChars: 120,
+  titleMaxChars: 120,
+  projectNameMaxChars: 200,
+  canonicalVersion: 1
 };
 var MEMORY_ERROR_CODES = [
   "INVALID_INPUT",
@@ -132,6 +146,59 @@ var memoryDiagnoseResponseSchema = z.object({
   }),
   contractLockSha256: z.string().regex(/^[0-9a-f]{64}$/)
 });
+var sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
+var count = z.number().int().min(0);
+var memoryProfileAgentSchema = z.object({
+  id: identifier,
+  name: z.string().min(1).max(MEMORY_PROFILE_LIMITS.agentNameMaxChars),
+  teamKey: identifier.nullable(),
+  title: z.string().min(1).max(MEMORY_PROFILE_LIMITS.titleMaxChars).nullable(),
+  enabled: z.boolean()
+}).strict();
+var memoryProfileTeamSchema = z.object({ key: identifier, name: z.string().min(1).max(MEMORY_PROFILE_LIMITS.teamNameMaxChars) }).strict();
+var memoryProfileProjectSchema = z.object({ id: identifier, name: z.string().min(1).max(MEMORY_PROFILE_LIMITS.projectNameMaxChars), archived: z.boolean() }).strict();
+var memoryProfileOmittedSchema = z.object({ agents: count, teams: count, projects: count }).strict();
+var memoryProfileSinkSchema = z.object({ pending: count, lastWrittenAtMs: count.nullable() }).strict();
+var strictlyAscending = (keys) => keys.every((key, index) => index === 0 || keys[index - 1] < key);
+var memoryProfileSyncRequestSchema = z.object({
+  generation: sha256Hex,
+  part: z.number().int().min(1).max(MEMORY_PROFILE_LIMITS.maxParts),
+  parts: z.number().int().min(1).max(MEMORY_PROFILE_LIMITS.maxParts),
+  agents: z.array(memoryProfileAgentSchema).max(MEMORY_PROFILE_LIMITS.maxAgents),
+  teams: z.array(memoryProfileTeamSchema).max(MEMORY_PROFILE_LIMITS.maxTeams),
+  projects: z.array(memoryProfileProjectSchema).max(MEMORY_PROFILE_LIMITS.maxProjects),
+  omitted: memoryProfileOmittedSchema,
+  sink: memoryProfileSinkSchema.nullable()
+}).strict().superRefine((value, ctx) => {
+  if (value.part > value.parts) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["part"], message: "part_exceeds_parts" });
+  if (!strictlyAscending(value.agents.map((entry) => entry.id))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["agents"], message: "agents_not_ascending" });
+  if (!strictlyAscending(value.teams.map((entry) => entry.key))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["teams"], message: "teams_not_ascending" });
+  if (!strictlyAscending(value.projects.map((entry) => entry.id))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["projects"], message: "projects_not_ascending" });
+});
+var memoryProfileSyncResponseSchema = z.object({
+  accepted: z.literal(true),
+  generation: sha256Hex,
+  complete: z.boolean(),
+  changed: z.boolean(),
+  received: z.number().int().min(1).max(MEMORY_PROFILE_LIMITS.maxParts),
+  agents: count,
+  teams: count,
+  projects: count
+});
+var byKey = (key) => (left, right) => {
+  const a = key(left);
+  const b = key(right);
+  return a < b ? -1 : a > b ? 1 : 0;
+};
+function memoryProfileCanonicalText(snapshot) {
+  return JSON.stringify([
+    MEMORY_PROFILE_LIMITS.canonicalVersion,
+    [...snapshot.agents].sort(byKey((entry) => entry.id)).map((entry) => [entry.id, entry.name, entry.teamKey, entry.title, entry.enabled]),
+    [...snapshot.teams].sort(byKey((entry) => entry.key)).map((entry) => [entry.key, entry.name]),
+    [...snapshot.projects].sort(byKey((entry) => entry.id)).map((entry) => [entry.id, entry.name, entry.archived]),
+    [snapshot.omitted.agents, snapshot.omitted.teams, snapshot.omitted.projects]
+  ]);
+}
 export {
   MEMORY_CALL_ERROR_CODES,
   MEMORY_CONTRACT_VERSION,
@@ -141,6 +208,7 @@ export {
   MEMORY_PLUGIN_ID,
   MEMORY_PLUGIN_METHODS,
   MEMORY_PLUGIN_METHOD_NAMES,
+  MEMORY_PROFILE_LIMITS,
   MEMORY_RETRYABLE_ERROR_CODES,
   memoryActorSchema,
   memoryDiagnoseRequestSchema,
@@ -150,6 +218,14 @@ export {
   memoryInspectResponseSchema,
   memoryInspectResultSchema,
   memoryInspectValueSchema,
+  memoryProfileAgentSchema,
+  memoryProfileCanonicalText,
+  memoryProfileOmittedSchema,
+  memoryProfileProjectSchema,
+  memoryProfileSinkSchema,
+  memoryProfileSyncRequestSchema,
+  memoryProfileSyncResponseSchema,
+  memoryProfileTeamSchema,
   memoryRememberInputSchema,
   memoryRememberRequestSchema,
   memoryRememberResponseSchema,

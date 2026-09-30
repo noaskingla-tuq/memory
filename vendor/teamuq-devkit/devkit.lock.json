@@ -1,0 +1,21 @@
+{
+  "devkitLockVersion": 1,
+  "tool": "tuq-plugin-tool",
+  "file": "tuq-plugin-tool.mjs",
+  "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
+  "sha256": "1d82a22de5dffc2d78b15936fdb2582243529af6230915ccfec89076c47057a4",
+  "bytes": 307705,
+  "source": {
+    "repo": "teamuq-electron",
+    "coreCommit": "e604de228bfdbc35e593f670d32efea4f88364bb",
+    "coreVersion": "1.6.2",
+    "buildCommand": "npm run build:plugin-devkit -- --out <repo>/vendor/teamuq-devkit/tuq-plugin-tool.mjs",
+    "sources": [
+      ".teamuq/scripts/plugin-tools",
+      "packages/plugin-sdk",
+      "packages/platform/plugin-artifact",
+      "package.json",
+      "tsconfig.node.json"
+    ]
+  }
+}

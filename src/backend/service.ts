@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { openCairnCore } from "../adapters/cairn/cairnCoreAdapter.js";
 import { CairnDataLayout } from "../adapters/storage/dataLayout.js";
 import { CoreHandlePool } from "../application/coreHandlePool.js";
@@ -50,7 +51,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   const ensure = (): Ready => {
     if (ready !== undefined) return ready;
     try {
-      const layout = new CairnDataLayout(options.dataRoot, { pinPath: options.pinPath });
+      const layout = new CairnDataLayout(options.dataRoot, { pinPath: options.pinPath, trustedBase: dirname(options.dataRoot) });
       layout.preflight();
       const pool = new CoreHandlePool({ layout, openCore });
       ready = { application: new MemoryApplication(pool), pool };

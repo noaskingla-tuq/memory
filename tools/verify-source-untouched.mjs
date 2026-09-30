@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkPinStage } from './cairn-files.mjs'
 
 const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const pin = JSON.parse(readFileSync(join(repoRoot, 'cairn-pin.json'), 'utf8'))
@@ -74,6 +75,8 @@ const actualRedact = createHash('sha256').update(readFileSync(redactFile)).diges
 if (actualRedact !== pin.redactSha256) throw new Error(`Cairn redact.mjs sha256 mismatch: ${actualRedact}`)
 const actualTree = gitTree(join(installedRoot, 'core')).toString('hex')
 if (actualTree !== pin.coreTree) throw new Error(`Cairn core tree mismatch: ${actualTree}`)
+const stageProblems = checkPinStage(pin, installedRoot)
+if (stageProblems.length > 0) throw new Error(`Cairn stage record differs: ${stageProblems.join('; ')}`)
 const imports = sourceImports(join(repoRoot, 'src'))
 if (imports.length !== 1 || imports[0] !== CAIRN_IMPORT_FILE) {
   throw new Error(`Unexpected Cairn imports: ${JSON.stringify(imports)}`)

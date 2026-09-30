@@ -12,10 +12,15 @@ import {
   PLUGIN_OWNED,
   SHIM_FILE,
   SHIM_TEXT,
+  DEVKIT_DIR,
+  DEVKIT_FILE,
+  DEVKIT_LOCK,
+  DEVKIT_TOOL,
   VENDOR_DIR,
   VENDOR_LOCK,
   generatedSource,
   hashBytes,
+  normalise,
   walkFiles,
 } from './vendor-lock.mjs'
 
@@ -81,8 +86,28 @@ if (lock !== undefined && vendorLock !== undefined) {
   }
 }
 
+let devkitLock
+try {
+  devkitLock = JSON.parse(readFileSync(join(DEVKIT_DIR, DEVKIT_LOCK), 'utf8'))
+} catch {
+  problems.push(`${DEVKIT_LOCK}: missing or unreadable`)
+}
+if (devkitLock !== undefined) {
+  check(devkitLock.tool === DEVKIT_TOOL && devkitLock.file === DEVKIT_FILE, `${DEVKIT_LOCK}: tool or file name differs`)
+  check(devkitLock.hashRule === HASH_RULE, `${DEVKIT_LOCK}: hashRule differs`)
+  check(/^[0-9a-f]{40}$/.test(devkitLock.source?.coreCommit ?? ''), `${DEVKIT_LOCK}: source.coreCommit is not a commit hash`)
+  check(/^[0-9]+[.][0-9]+[.][0-9]+$/.test(devkitLock.source?.coreVersion ?? ''), `${DEVKIT_LOCK}: source.coreVersion is not a version`)
+  const devkitPath = join(DEVKIT_DIR, DEVKIT_FILE)
+  if (!existsSync(devkitPath)) problems.push(`${DEVKIT_FILE}: missing`)
+  else {
+    const bytes = readFileSync(devkitPath)
+    check(hashBytes(bytes) === devkitLock.sha256, `${DEVKIT_FILE}: sha256 differs from ${DEVKIT_LOCK}`)
+    check(normalise(bytes).length === devkitLock.bytes, `${DEVKIT_FILE}: size differs from ${DEVKIT_LOCK}`)
+  }
+}
+
 if (problems.length > 0) {
   console.error(JSON.stringify({ ok: false, problems }, null, 2))
   process.exit(1)
 }
-console.log(JSON.stringify({ ok: true, coreLockSha256: lockSha256, coreCommit: vendorLock.source.coreCommit, contractCommit: vendorLock.source.contractCommit, files: Object.keys(vendorLock.files).length }))
+console.log(JSON.stringify({ ok: true, coreLockSha256: lockSha256, coreCommit: vendorLock.source.coreCommit, contractCommit: vendorLock.source.contractCommit, files: Object.keys(vendorLock.files).length, devkitSha256: devkitLock?.sha256 }))

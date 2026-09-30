@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "kind": "plugin",
+  "id": "teamuq.memory",
+  "name": "TeamUQ 記憶",
+  "version": "@VERSION@",
+  "publisher": "teamuq",
+  "description": "TeamUQ 對話記憶：為每個 agent 保存可追溯的記憶，資料留在本機。",
+  "pluginApi": "^2.0.0",
+  "minCoreVersion": ">=1.6.0",
+  "trustTier": "full-trust",
+  "entry": { "backend": "backend.mjs" },
+  "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 2, "idleUnloadSec": 180, "bootTimeoutSec": 30 },
+  "permissions": [],
+  "data": { "uninstall": "keep" }
+}

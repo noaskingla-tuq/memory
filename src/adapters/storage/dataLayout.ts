@@ -11,6 +11,7 @@ import {
   type Stats,
 } from "node:fs";
 import {
+  basename,
   dirname,
   isAbsolute,
   join,
@@ -37,11 +38,11 @@ function comparablePath(path: string): string {
   return process.platform === "win32" ? absolute.toLowerCase() : absolute;
 }
 
-function assertDirectPath(path: string): Stats {
+function assertDirectPath(path: string, expectedReal: string = path): Stats {
   const stat = lstatSync(path);
   if (
     stat.isSymbolicLink() ||
-    comparablePath(realpathSync.native(path)) !== comparablePath(path)
+    comparablePath(realpathSync.native(path)) !== comparablePath(expectedReal)
   ) {
     throw new MemoryServiceError(
       "STORAGE_UNSAFE",
@@ -51,8 +52,36 @@ function assertDirectPath(path: string): Stats {
   return stat;
 }
 
-function assertSafeAncestors(path: string): void {
+// why: under node --permission a plugin can read nothing above its dataDir, so the walk starts at the host-created dataDir and only its descendants are checked
+function assertSafeBelow(absolute: string, trustedBase: string): void {
+  const suffix = relative(trustedBase, absolute);
+  if (suffix.startsWith("..") || isAbsolute(suffix)) {
+    throw new MemoryServiceError(
+      "STORAGE_UNSAFE",
+      "Memory path is outside its trusted base",
+    );
+  }
+  let current = trustedBase;
+  let expected = realpathSync.native(trustedBase);
+  for (const segment of suffix === "" ? [] : suffix.split(sep)) {
+    current = join(current, segment);
+    expected = join(expected, segment);
+    if (!existsSync(current)) break;
+    if (!assertDirectPath(current, expected).isDirectory()) {
+      throw new MemoryServiceError(
+        "STORAGE_UNSAFE",
+        "Memory path ancestor is not a directory",
+      );
+    }
+  }
+}
+
+function assertSafeAncestors(path: string, trustedBase?: string): void {
   const absolute = resolve(path);
+  if (trustedBase !== undefined) {
+    assertSafeBelow(absolute, resolve(trustedBase));
+    return;
+  }
   const root = parse(absolute).root;
   let current = root;
   if (!assertDirectPath(current).isDirectory()) {
@@ -74,16 +103,22 @@ function assertSafeAncestors(path: string): void {
   }
 }
 
-function ensureRegularDirectory(path: string): void {
-  assertSafeAncestors(path);
+function ensureRegularDirectory(path: string, trustedBase?: string): void {
+  assertSafeAncestors(path, trustedBase);
   mkdirSync(path, { recursive: true, mode: 0o700 });
-  assertSafeAncestors(path);
-  if (!assertDirectPath(path).isDirectory()) {
+  assertSafeAncestors(path, trustedBase);
+  if (!assertDirectPath(path, expectedRealOf(path, trustedBase)).isDirectory()) {
     throw new MemoryServiceError(
       "STORAGE_UNSAFE",
       "Memory path is not a regular directory",
     );
   }
+}
+
+function expectedRealOf(path: string, trustedBase?: string): string {
+  if (trustedBase === undefined) return path;
+  const base = resolve(trustedBase);
+  return join(realpathSync.native(base), relative(base, resolve(path)));
 }
 
 function assertWithin(
@@ -111,7 +146,7 @@ function assertRealWithin(root: string, candidate: string): void {
 
 function assertRegularFile(root: string, path: string, label: string): void {
   if (!existsSync(path)) return;
-  const stat = assertDirectPath(path);
+  const stat = assertDirectPath(path, join(realpathSync.native(dirname(path)), basename(path)));
   if (!stat.isFile()) {
     throw new MemoryServiceError(
       "STORAGE_UNSAFE",
@@ -229,6 +264,7 @@ export interface CairnDataLayoutOptions {
   readonly currentCommit?: string;
   readonly acceptedCommits?: readonly string[];
   readonly backupHooks?: Partial<BackupHooks>;
+  readonly trustedBase?: string;
 }
 
 export class CairnDataLayout implements DataLayoutPort {
@@ -238,6 +274,7 @@ export class CairnDataLayout implements DataLayoutPort {
   private readonly backupsRoot: string;
   private readonly policy: IdentityPolicy;
   private readonly backupHooks: BackupHooks;
+  private readonly trustedBase: string | undefined;
 
   constructor(dataRoot: string, options: CairnDataLayoutOptions = {}) {
     const currentCommit = options.currentCommit ?? CAIRN_COMMIT;
@@ -251,6 +288,7 @@ export class CairnDataLayout implements DataLayoutPort {
         : [...accepted, currentCommit],
     };
     this.backupHooks = { ...defaultBackupHooks, ...options.backupHooks };
+    this.trustedBase = options.trustedBase;
     if (parse(resolve(dataRoot)).base !== "memory-cairn-v1") {
       throw new MemoryServiceError(
         "STORAGE_UNSAFE",
@@ -258,11 +296,11 @@ export class CairnDataLayout implements DataLayoutPort {
       );
     }
     this.root = resolve(dataRoot);
-    ensureRegularDirectory(this.root);
+    ensureRegularDirectory(this.root, this.trustedBase);
     this.realRoot = realpathSync.native(this.root);
     assertWithin(this.realRoot, this.realRoot, true);
     this.agentsRoot = join(this.root, "agents");
-    ensureRegularDirectory(this.agentsRoot);
+    ensureRegularDirectory(this.agentsRoot, this.trustedBase);
     assertRealWithin(this.realRoot, this.agentsRoot);
     this.backupsRoot = join(this.root, "backups");
   }
@@ -271,7 +309,7 @@ export class CairnDataLayout implements DataLayoutPort {
     const agentHash = createHash("sha256").update(agentId).digest("hex");
     const agentRoot = resolve(this.root, "agents", agentHash);
     assertWithin(this.root, agentRoot);
-    ensureRegularDirectory(agentRoot);
+    ensureRegularDirectory(agentRoot, this.trustedBase);
     assertRealWithin(this.realRoot, agentRoot);
     const identityPath = join(agentRoot, "identity.json");
     const identity = resolveIdentity(
@@ -316,7 +354,7 @@ export class CairnDataLayout implements DataLayoutPort {
           identityPath: input.identityPath,
           fromCommit: input.fromCommit,
           ensureDirectory: (path) => {
-            ensureRegularDirectory(path);
+            ensureRegularDirectory(path, this.trustedBase);
             assertRealWithin(this.realRoot, path);
           },
         },
@@ -345,7 +383,7 @@ export class CairnDataLayout implements DataLayoutPort {
   preflight(): void {
     const preflightRoot = resolve(this.root, `.preflight-${randomUUID()}`);
     assertWithin(this.root, preflightRoot);
-    ensureRegularDirectory(preflightRoot);
+    ensureRegularDirectory(preflightRoot, this.trustedBase);
     assertRealWithin(this.realRoot, preflightRoot);
     const databasePath = join(preflightRoot, "memory.sqlite");
     try {

@@ -44,3 +44,18 @@ export function generatedSource(lockSha256) {
     '',
   ].join('\n')
 }
+
+export const DEVKIT_DIR = join(REPO_ROOT, 'vendor', 'teamuq-devkit')
+export const DEVKIT_FILE = 'tuq-plugin-tool.mjs'
+export const DEVKIT_LOCK = 'devkit.lock.json'
+export const DEVKIT_TOOL = 'tuq-plugin-tool'
+export const DEVKIT_BUILD_SCRIPT = '.teamuq/scripts/plugin-tools/build-devkit.mjs'
+export const DEVKIT_BUILD_COMMAND = 'npm run build:plugin-devkit -- --out <repo>/vendor/teamuq-devkit/tuq-plugin-tool.mjs'
+// why: the bundle embeds these sources, so a dirty copy of any of them would make the recorded Core commit a lie
+export const DEVKIT_SOURCES = [
+  '.teamuq/scripts/plugin-tools',
+  'packages/plugin-sdk',
+  'packages/platform/plugin-artifact',
+  'package.json',
+  'tsconfig.node.json',
+]

@@ -6478,6 +6478,8 @@ var PLUGIN_INSTALL_CHANNELS = Object.freeze({
   UNINSTALL: "plugin-install:uninstall",
   IMPORT_DEV_KEY: "plugin-install:import-dev-key",
   REMOVE_DEV_KEY: "plugin-install:remove-dev-key",
+  PICK_DEV_KEY: "plugin-install:pick-dev-key",
+  DECIDE_DEV_KEY: "plugin-install:decide-dev-key",
   REMOVE_ASSET_PACK: "plugin-install:remove-asset-pack",
   SET_PERMISSION: "plugin-install:set-permission",
   SET_PROVIDER: "plugin-install:set-provider",
@@ -6494,6 +6496,9 @@ var PluginDevKeyImportRequestV1Schema = external_exports.object({ protocolVersio
 var PluginAssetPackRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, packId: external_exports.string().regex(IDENTIFIER_PATTERN) }).strict();
 var PluginPermissionSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), permission: external_exports.string().min(3).max(64), revoked: external_exports.boolean() }).strict();
 var PluginDevKeyRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, keyId }).strict();
+var PluginDevKeyPickRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5 }).strict();
+var DEV_KEY_TRUST_DECISIONS = ["trust", "decline"];
+var PluginDevKeyDecideRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, trustId: installId, decision: external_exports.enum(DEV_KEY_TRUST_DECISIONS), label: external_exports.string().min(1).max(48).optional() }).strict();
 var pluginIdField = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
 var BUNDLED_LISTED_STATES = ["removed", "verification_failed"];
 var PluginBundledRestoreRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField }).strict();
@@ -6561,9 +6566,19 @@ var InstalledAssetPackViewV1Schema = external_exports.object({
 }).strict();
 var DevKeyViewV1Schema = external_exports.object({
   keyId,
+  fingerprint: external_exports.string().regex(/^[0-9a-f]{64}$/),
   label: external_exports.string().max(48),
   importedAt: external_exports.string().max(40),
   trustedHere: external_exports.boolean()
+}).strict();
+var DevKeyTrustReviewV1Schema = external_exports.object({
+  trustId: installId,
+  keyId,
+  fingerprint: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  fileName: external_exports.string().max(200),
+  defaultLabel: external_exports.string().min(1).max(48),
+  alreadyTrusted: external_exports.boolean(),
+  forPackage: external_exports.object({ fileName: external_exports.string().max(200) }).strict().nullable()
 }).strict();
 var BundledPluginEntryViewV1Schema = external_exports.object({
   id: pluginIdField,
@@ -6608,7 +6623,16 @@ var PluginInstallReviewV1Schema = external_exports.object({
 }).strict();
 var PluginInstallBeginResultV1Schema = external_exports.discriminatedUnion("status", [
   external_exports.object({ status: external_exports.literal("cancelled") }).strict(),
-  external_exports.object({ status: external_exports.literal("review"), review: PluginInstallReviewV1Schema }).strict()
+  external_exports.object({ status: external_exports.literal("review"), review: PluginInstallReviewV1Schema }).strict(),
+  external_exports.object({ status: external_exports.literal("dev_key_required"), keyId, fileName: external_exports.string().max(200), foreign: external_exports.boolean() }).strict()
+]);
+var PluginDevKeyPickResultV1Schema = external_exports.discriminatedUnion("status", [
+  external_exports.object({ status: external_exports.literal("cancelled") }).strict(),
+  external_exports.object({ status: external_exports.literal("review"), review: DevKeyTrustReviewV1Schema }).strict()
+]);
+var PluginDevKeyDecideResultV1Schema = external_exports.discriminatedUnion("status", [
+  external_exports.object({ status: external_exports.literal("declined") }).strict(),
+  external_exports.object({ status: external_exports.literal("trusted"), keyId, next: PluginInstallBeginResultV1Schema.nullable(), continueError: external_exports.string().max(96).nullable() }).strict()
 ]);
 var PluginBundledRestoreResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.literal("consented") }).strict();
 var envelope = (value) => external_exports.discriminatedUnion("ok", [
@@ -6617,6 +6641,8 @@ var envelope = (value) => external_exports.discriminatedUnion("ok", [
 ]);
 var PluginInstallListEnvelopeV1Schema = envelope(PluginInstallListV1Schema);
 var PluginInstallBeginEnvelopeV1Schema = envelope(PluginInstallBeginResultV1Schema);
+var PluginDevKeyPickEnvelopeV1Schema = envelope(PluginDevKeyPickResultV1Schema);
+var PluginDevKeyDecideEnvelopeV1Schema = envelope(PluginDevKeyDecideResultV1Schema);
 var PluginBundledRestoreEnvelopeV1Schema = envelope(PluginBundledRestoreResultV1Schema);
 
 // packages/plugin-sdk/src/backendContracts.ts
@@ -7654,6 +7680,9 @@ var DevKeyFileSchema = external_exports.object({
   version: external_exports.literal(1),
   keys: external_exports.array(DevKeyRecordSchema).max(32)
 }).strict();
+function fingerprintOf(raw) {
+  return createHash4("sha256").update(raw).digest("hex");
+}
 function defaultMachineId() {
   const user = (() => {
     try {
@@ -7673,11 +7702,17 @@ function createDevKeyStore(options2) {
   const withKeys = (keys) => ({ version: 1, keys });
   const view = (record) => ({
     keyId: record.keyId,
+    fingerprint: fingerprintOf(Buffer.from(record.publicKey, "base64")),
     label: record.label,
     importedAt: record.importedAt,
     trustedHere: record.machine === machineId()
   });
   return {
+    inspect: (text) => {
+      if (/PRIVATE KEY|privatePkcs8/i.test(text)) throw new ArtifactError("dev_key_private");
+      const raw = parsePublicKeyInput(text);
+      return { keyId: devKeyIdOf(raw), fingerprint: fingerprintOf(raw), publicKey: raw.toString("base64") };
+    },
     list: async () => (await readStateFile(file, parse2, empty)).keys.map(view),
     add: async (input) => {
       const label = input.label.trim();

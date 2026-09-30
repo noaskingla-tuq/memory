@@ -2,7 +2,7 @@
 
 TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust）的外部 plugin（id `teamuq.memory`，版本 1.0.0）。記憶 domain／application 與 Cairn adapter 自 TeamUQ `packages/platform/memory-server` 原樣搬來（P1）；`src/backend/` 是 TeamUQ 外部 full-trust 後端的入口（P2）；`tools/build.mjs` 一鍵產出 `.tuqplugin`（P3）。
 
-> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-devtrust` 的 `36c83e134`，含 `dev-pack --preplanted-id`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
+> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-devtrust` 的 `95956859c`，含 `dev-pack --preplanted-id`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
 
 ## 目錄
 

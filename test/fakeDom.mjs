@@ -2,7 +2,7 @@ const TABBABLE_TAGS = new Set(["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"]);
 
 function matchesPart(element, part) {
   const trimmed = part.trim();
-  const shape = /^([a-z]*)(?:\[([a-z-]+)\])?(?::not\(\[([a-z-]+)(?:="([^"]*)")?\]\))?$/u.exec(trimmed);
+  const shape = /^([a-z][a-z0-9]*|)(?:\[([a-z-]+)\])?(?::not\(\[([a-z-]+)(?:="([^"]*)")?\]\))?$/u.exec(trimmed);
   if (shape === null) throw new Error(`fake dom cannot match selector part ${trimmed}`);
   const [, tag, attribute, notAttribute, notValue] = shape;
   if (tag !== "" && element.tagName !== tag.toUpperCase()) return false;
@@ -31,14 +31,18 @@ export class FakeElement {
     return this.markup;
   }
 
-  // why: the fake has no HTML parser, so only anchors written as <a href="..." id="..."> are turned into children to give the dialog real body focus targets
+  // why: the fake has no HTML parser, so only anchors and buttons written with double-quoted attributes are turned into children, to give the dialog and the drawer real focus targets; like a real replacement, the old children are detached and a focus inside them falls back to the body
   set innerHTML(value) {
+    const { activeElement, body } = this.ownerDocument;
+    if (activeElement !== this && this.contains(activeElement)) this.ownerDocument.activeElement = body;
+    for (const old of this.children) old.parentNode = null;
     this.markup = value;
     this.children = [];
-    for (const match of value.matchAll(/<a(?=[ >])([^>]*)>/gu)) {
-      const anchor = new FakeElement(this.ownerDocument, "a");
-      for (const pair of match[1].matchAll(/([a-z][a-z-]*)="([^"]*)"/gu)) anchor.setAttribute(pair[1], pair[2]);
-      this.appendChild(anchor);
+    for (const match of value.matchAll(/<(a|button)(?=[ >])([^>]*)>([^<]*)/gu)) {
+      const made = new FakeElement(this.ownerDocument, match[1]);
+      for (const pair of match[2].matchAll(/([a-z][a-z-]*)="([^"]*)"/gu)) made.setAttribute(pair[1], pair[2]);
+      if (match[1] === "button") made.textContent = match[3];
+      this.appendChild(made);
     }
   }
 

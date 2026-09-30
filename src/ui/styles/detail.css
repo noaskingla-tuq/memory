@@ -1,0 +1,261 @@
+.dr-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.dr-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(470px, 100%);
+  border-left: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.14);
+  animation: dr-in 0.18s ease;
+}
+
+@keyframes dr-in {
+  from {
+    transform: translateX(102%);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+.dr-head {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.dr-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.dr-x {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.dr-x:hover {
+  background: var(--surface-muted);
+}
+
+.dr-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--sp-4);
+}
+
+.dr-body .notice {
+  margin-top: 0;
+}
+
+.dr-who {
+  margin: 0;
+}
+
+.dr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--sp-3);
+  margin: var(--sp-1) 0 0;
+  font-size: 12px;
+  color: var(--text-secondary-strong);
+}
+
+.dr-h {
+  margin: var(--sp-4) 0 var(--sp-1);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary-strong);
+}
+
+.dr-txt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dr-body p {
+  margin: var(--sp-1) 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.dr-receipts {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.dr-note {
+  font-size: 12px;
+}
+
+.dr-raw {
+  margin-top: var(--sp-4);
+}
+
+.dr-raw summary {
+  cursor: pointer;
+  color: var(--text-secondary-strong);
+}
+
+.dr-raw pre {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dr-sibs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.sib {
+  display: flex;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.sib:hover {
+  border-color: var(--accent);
+}
+
+.sib-at {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-secondary-strong);
+}
+
+.sib-text {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.dr-skel {
+  height: 64px;
+  margin-bottom: var(--sp-2);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.dr-skel-short {
+  width: 60%;
+}
+
+.dr-foot {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+
+.dr-foot:empty {
+  display: none;
+}
+
+.dr-hint {
+  font-size: 12px;
+  color: var(--text-secondary-strong);
+}
+
+.btn.btn-danger-outline {
+  border-color: var(--error-strong);
+  background: transparent;
+  color: var(--error-strong);
+}
+
+.btn.btn-danger-outline:hover {
+  background: var(--error-tint);
+}
+
+.btn.btn-danger-outline[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.dlg-quote {
+  margin: var(--sp-2) 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 6px 6px 0;
+  background: var(--surface-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.dt-status {
+  position: fixed;
+  bottom: var(--sp-4);
+  left: 50%;
+  z-index: 60;
+  max-width: min(520px, calc(100% - 32px));
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  transform: translateX(-50%);
+}
+
+.dt-status:empty {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+@media (max-width: 560px) {
+  .drawer {
+    width: 100%;
+  }
+}

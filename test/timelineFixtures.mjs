@@ -150,7 +150,7 @@ export function tokenize(markup) {
 
 export const ALLOWED_TAGS = new Set(["b", "button", "div", "form", "h2", "h3", "input", "label", "mark", "option", "p", "section", "select", "span", "strong"]);
 export const ALLOWED_ATTRIBUTES = new Set([
-  "aria-describedby", "aria-hidden", "aria-label", "aria-labelledby", "aria-live", "autocomplete", "class", "data-code", "data-tl", "data-tl-form", "data-tl-key", "data-tl-notice", "data-tl-role", "disabled", "for", "id", "maxlength", "name", "placeholder", "role", "selected", "title", "type", "value",
+  "aria-describedby", "aria-hidden", "aria-label", "aria-labelledby", "aria-live", "autocomplete", "class", "data-code", "data-tl", "data-tl-form", "data-tl-key", "data-tl-notice", "data-tl-role", "disabled", "for", "id", "maxlength", "name", "placeholder", "role", "selected", "tabindex", "title", "type", "value",
 ]);
 
 export function assertSafe(assert, markup, label) {

@@ -1,3 +1,4 @@
+import { DETAIL_STRINGS } from "./detailStrings.js";
 import { SPACE_STRINGS } from "./zhTWSpace.js";
 import { TIMELINE_STRINGS } from "./timelineStrings.js";
 
@@ -118,6 +119,7 @@ export const STRINGS = {
   "error.unknown.message": "暫時無法完成這個操作。",
   "error.unknown.action": "請稍後再試一次。",
   ...TIMELINE_STRINGS,
+  ...DETAIL_STRINGS,
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

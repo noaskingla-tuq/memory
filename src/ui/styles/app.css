@@ -2,6 +2,7 @@
 @import "./home.css";
 @import "./space.css";
 @import "./timeline.css";
+@import "./detail.css";
 
 *,
 *::before,

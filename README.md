@@ -11,7 +11,7 @@ src/backend/            外部後端入口：entry（activate）、service（派
 vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
-src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/{dialog,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間、時間軸與搜尋）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
+src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/{dialog,drawer,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間、時間軸與搜尋、詳情與遺忘）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
 src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
 src/application/ui/     七個方法的本體（overview、agentStats、listing、detail、forget、status）與零件：agentIndex（agent 索引與快取）、collect（跨 namespace 掃描）、timeSlice（時間片）、budget（UTF-8 bytes 預算）、paging、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、textQuery、workItem、dayBins、profilePort（名稱表介面）、profileTable（生效中的名稱表）、profileGeneration、names（名稱合併與降級）、jsonSafe（出口）
 types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
@@ -153,8 +153,21 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 - **續頁必須沿用同一組篩選**：時間範圍在查詢開始時換算成一個固定的 `sinceIso`，續頁沿用，否則游標內的篩選雜湊不符、每頁都會 `CURSOR_STALE`。
 - **`scanned.complete:false`（只有 `ui.search` 有）** 顯示「可能不完整」並在翻頁時維持標記，新搜尋才重置。搜尋框旁固定寫「比對文字，不是語意；多個詞要全部出現」。排序與文案一律用「寫入」（今天寫入、昨天寫入）；每筆另外顯示工作起訖與耗時。
 - 選單只在選項集合真的改變時才重畫（重畫會讓鍵盤焦點跑掉）；搜尋用 `<form>` 的 submit，輸入法組字中的 Enter 不會誤送出。事件只認 `data-tl*` 屬性，與首頁的 `data-act` 互不干擾。
-- 詳情介面（S6d 接）：`createTimeline({ onOpenDetail(ref) })`；每筆是 `<button data-tl="open" data-tl-key>`，`itemKey(ref)` 可找回按鈕；遺忘後呼叫 `timeline.reload()`。
+- 詳情介面（S6d 已接，見下一節）：`createTimeline({ onOpenDetail(ref) })`；每筆是 `<button data-tl="open" data-tl-key>`，`itemKey(ref)` 可找回按鈕；遺忘後呼叫 `timeline.reload()`。
 - 字串在 `i18n/timelineStrings.ts`（併入 `STRINGS`）、樣式在 `styles/timeline.css`。測試：`test/ui-timeline{,-states,-view,-choices,-contract}.test.mjs`（`test/timelineFixtures.mjs` 是假 list／search／agentStats 後端；contract 那支用真的 `ui.list`／`ui.search`／`ui.agentStats`）。
+
+## 詳情與遺忘（S6d）
+
+點時間軸的一筆記憶（Enter 或點擊）開右側詳情抽屜，只用 `ui.get` 與 `ui.forget`；不開放修改記憶，「開啟原對話」延到 V1.1，所以抽屜裡沒有這兩個按鈕。
+
+- `components/drawer.ts`：抽屜的 DOM 與鍵盤。`role="dialog"`、`aria-modal`、`aria-labelledby` 指向標題；開啟時焦點落在標題、把 `header` 與 `main` 設為 `inert`；Esc、關閉鈕、點背後的暗幕都走同一個 `onDismiss`。Tab 只在兩端介入（最後一個控制項往後、第一個往前或焦點在標題時 Shift+Tab 才繞回），其餘交給瀏覽器，所以 `<summary>` 與捲動區照常可達；焦點跑到抽屜外時拉回標題。`isSuspended` 為真（確認框開著）時抽屜不處理 Esc、Tab、focusin，避免與確認框互搶焦點。
+- `state/detail.ts`：`parseDetail`（手寫檢查；`DETAIL_CONTRACT_MATCHES` 讓契約的 get 形狀漂移時 `tsc -p tsconfig.ui.json` 失敗，`RECEIPTS_MAX` 綁 `UI_LIMITS`）；「請求」與「成果」一律由 `application/ui/punchContent.ts` 的 `parsePunchContent` 拆，不在 UI 另寫前綴解析；`focusCandidates`：遺忘後焦點依序找下一筆、上一筆，不在清單中的記憶（同一次工作裡載入的另一筆）則回到開抽屜的那張卡。
+- `views/detailController.ts`：狀態機（loading／ready／error）。`ui.get` 用 key `detail`，每次載入遞增 generation，已換筆或已關閉的晚到回應（含錯誤）一律丟棄；回應的 ref 與要求的不同視為 `malformed_response`。遺忘：按「遺忘這筆記憶…」開確認框（`alertdialog`，`initialFocus` 在「先不要」，Esc 與點暗幕都等於先不要，說明永久清除、收據一併刪除、相同內容之後不再寫入），確認後以抽屜內那筆的 `revision` 送 `ui.forget`（key `detail.forget`，寫入不被丟棄也不重試）。`forgetting` 期間按鈕 `aria-disabled`、再按不送也不開確認框，抽屜不能關、不能換筆（`close({force:true})` 只給換路由用）。成功（含 `forgotten:false` 與 `NOT_FOUND`，因為目的已達成）：關抽屜、`timeline.reload()`、焦點落在下一張卡（找不到就上一張、再找不到落在清單標題 `#tl-title`），並在 `role="status"` 的朗讀區寫「已遺忘這筆記憶」。`REVISION_CONFLICT`：不動清單，重讀 `ui.get` 並在抽屜最上面顯示「剛才沒有遺忘任何東西」，使用者要再確認一次才會以新的 `revision` 送出；重讀失敗就顯示錯誤、不留舊內容的遺忘鈕。其他失敗留在抽屜顯示白話說明，按鈕恢復可再試。
+- 抽屜內「同一次工作的其他記憶」是按鈕，在同一個抽屜換成那一筆（焦點移到標題）；關閉時焦點回到最初開抽屜的那張卡，用 `itemKey` 在重畫後的清單重新找出（卡片不在了就落在清單標題）。
+- `views/detailView.ts`／`detailEvents.ts`：只產生 `SafeHtml`，事件只認 `data-dt*` 屬性（與時間軸的 `data-tl`、首頁的 `data-act` 互不干擾）；原始文字放在 `<details>`；樣式在 `styles/detail.css`（`.btn.btn-danger-outline` 要疊 `.btn` 才贏得過 `app.css` 的 `.btn`），字串在 `i18n/detailStrings.ts`。
+- `main.ts` 的 `createDetail` 注入：`reloadList`＝`timeline.reload`、`listKeys`、`cardFor`（`[data-tl-key]`）、`listHeading`、`backgrounds`；換路由時 `detail.close({force:true})`。
+- 順手清理：`i18n/localClock.ts` 刪除，`timeOfDay` 併入 `clockTime`、`monthDay` 移進 `i18n/clock.ts`。
+- 測試：`test/ui-detail-{state,view,controller,contract}.test.mjs`（`test/detailFixtures.mjs` 是假 DOM 場景與假 client；contract 那支用真的 `ui.get`／`ui.forget`／`ui.list`／`ui.search` 與真的時間軸控制器，驗證遺忘後各方法都查不到、衝突重讀、已在別處遺忘）；`test/fakeDom.mjs` 現在會把 innerHTML 裡的 `<button>` 解析成子元素，並在取代內容時讓舊子元素脫離。
 
 ## 契約 vendor
 

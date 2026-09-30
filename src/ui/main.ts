@@ -1,8 +1,10 @@
 import type { UiStatus } from "../contracts/uiContract.js";
-import { callBackend } from "./api/backendClient.js";
+import { backendClient, type BackendResult } from "./api/backendClient.js";
+import { html, mount } from "./dom/html.js";
+import { t } from "./i18n/index.js";
 
 function isStatus(value: unknown): value is UiStatus {
-  return typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === true && typeof (value as { version?: unknown }).version === "string";
+  return typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === true && typeof (value as { version?: unknown }).version === "string" && typeof (value as { storage?: { status?: unknown } }).storage?.status === "string";
 }
 
 function element(id: string): HTMLElement {
@@ -11,22 +13,27 @@ function element(id: string): HTMLElement {
   return found;
 }
 
-async function showStatus(): Promise<void> {
-  const target = element("status");
-  const result = await callBackend("ui.status", {});
-  if (!result.ok) {
-    target.dataset.state = "error";
-    target.textContent = result.message;
+function renderStatus(target: HTMLElement, result: BackendResult): void {
+  if (result.ok && isStatus(result.value)) {
+    mount(target, html`<p class="state" data-state="ok">${t("status.ok", { version: result.value.version, storage: result.value.storage.status })}</p>`);
     return;
   }
-  if (!isStatus(result.value)) {
-    target.dataset.state = "error";
-    target.textContent = "記憶服務回傳了看不懂的內容，請稍後再試。";
+  if (result.ok) {
+    mount(target, html`<p class="state" data-state="error">${t("status.malformed")}</p>`);
     return;
   }
-  target.dataset.state = "ok";
-  target.textContent = `記憶服務運作中（版本 ${result.value.version}，儲存狀態 ${result.value.storage.status}）`;
+  const retry = result.retryable ? html` <button type="button" class="btn" data-retry>${t("common.retry")}</button>` : "";
+  mount(target, html`<p class="state" data-state="error"><strong>${result.message}</strong> <span>${result.action}</span>${retry}</p>`);
 }
 
-element("title").textContent = "記憶";
+async function showStatus(): Promise<void> {
+  const target = element("status");
+  mount(target, html`<p class="state" data-state="loading">${t("status.loading")}</p>`);
+  renderStatus(target, await backendClient().call("ui.status", {}));
+}
+
+element("title").textContent = t("app.title");
+element("status").addEventListener("click", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-retry]") !== null) void showStatus();
+});
 void showStatus();

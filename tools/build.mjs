@@ -74,7 +74,16 @@ export async function bundleUi(stageDir) {
   const inputs = Object.keys(result.metafile.inputs)
   if (inputs.some((input) => input.includes('node_modules'))) throw new Error('the UI bundle pulled in a package from node_modules')
   copyFileSync(join(REPO_ROOT, 'plugin', 'ui', 'index.html'), join(uiDir, 'index.html'))
-  copyFileSync(join(REPO_ROOT, 'src', 'ui', 'styles', 'app.css'), join(uiDir, 'app.css'))
+  // why: the view may link only app.css, so tokens.css is inlined into it here
+  await build({
+    entryPoints: [join(REPO_ROOT, 'src', 'ui', 'styles', 'app.css')],
+    absWorkingDir: REPO_ROOT,
+    bundle: true,
+    outfile: join(uiDir, 'app.css'),
+    legalComments: 'none',
+    charset: 'utf8',
+    logLevel: 'silent',
+  })
   return { inputs: inputs.length }
 }
 

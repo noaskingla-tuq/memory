@@ -11,7 +11,7 @@ src/backend/            外部後端入口：entry（activate）、service（派
 vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
-src/ui/                 view 的純 TypeScript（main.ts → ui/app.js、api/backendClient.ts、styles/app.css）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
+src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/dialog.ts、i18n/、styles/{app.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
 src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
 src/application/ui/     budget（UTF-8 bytes 預算）、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、jsonSafe（出口）
 types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
@@ -72,6 +72,19 @@ UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段�
 - `punchContent.ts`：以 NFKC 後的前綴 `[工作紀錄 <起>~<迄> <cli>/<model>] 請求:<標題>。成果:<內文>` 解析工作起訖（UTC 分鐘，轉成完整 ISO）、cli、model、標題；`unknown` 的 cli／model 與 `(未命名)` 標題成為 `null`，`(無文字)` 內文成為空字串。前綴格式與 Core 的 `punchMemoryContent.ts` 耦合，樣本是 `vendor/teamuq-contract/fixtures/requests/remember.work-prefix-*`（每種各有寫入形式與 NFKC 形式）。解析失敗（含只讀了內容前 160 字、標題被截斷）回 `{parsed:false, body:<原文>}`。標題本身若含「。成果:」會在該處被切開，這是格式本身的歧義。
 - `jsonSafe.ts`：出口的 `JSON.parse(JSON.stringify(x))`，去掉 `undefined`、把 `NaN` 與無限大變成 `null`（preload 的 zod 會拒收前者）。
 
+## UI 基礎（S5）
+
+畫面（S6a～S6d）共用的零件；`main.ts` 只用它們顯示標題與 `ui.status`。
+
+- `api/backendClient.ts`：`createBackendClient({call})` 是唯一呼叫 `window.tuqPlugin.backend.call` 的地方（`backendClient()` 綁定真的 bridge）。同時在途最多 2 個、其餘照順序排隊；同一個 key（預設是方法名，可用 `{key}` 分開，例如抽屜與同工作清單）的舊請求在新請求送出時以 epoch 丟棄，結果是 `{ok:false, superseded:true}`，排隊中的舊請求根本不送出；`ui.forget` 是寫入，永不丟棄、也不自動重試。只有平台碼 `plugin_backend_unavailable` 自動重試最多 3 次（延遲 1、2、4 秒，涵蓋冷啟動；等待期間不佔在途名額，等完若已被取代就不再送）。成功回 `{ok:true, value}`（value 是後端整個回應），失敗一律攤平成 `{ok:false, code, source, message, action, actionKind, retryable, superseded, attempts}`；參數的 `undefined` 成員在送出前移除（preload 會拒收）。
+- `api/errors.ts`：平台碼（`PLATFORM_CODES`）、plugin 碼（`PLUGIN_CODES`，含契約的 `UI_FAILURE_CODES` 與預留的 `CURSOR_STALE`、`MEMORY_SUPPRESSED`、整次呼叫失敗碼）、client 碼（`superseded`、`malformed_response`、`unknown`）各對應一句白話加一個建議動作（字串在 `i18n/zhTW.ts`）；`UI_FAILURE_CODES_COVERED` 讓契約新增碼而這裡沒補時 `tsc -p tsconfig.ui.json` 直接失敗。`codeFromThrown` 從 Electron 包過的 ipc 錯誤訊息裡找碼；`isCursorReset` 判斷要從第一頁重來的碼。
+- `dom/html.ts`：`html` 模板標籤與 `esc()`。插值在文字位置一律跳脫（巢狀 `html` 片段與陣列除外）、在有引號的屬性值位置跳脫；tag 名、屬性名、無引號屬性值、註解、`<script>`／`<style>` 內插值都直接 throw，`on*` 事件屬性連靜態寫也 throw；URL 屬性開頭的 `javascript:`／`data:`／`vbscript:` 換成 `#`；`style` 屬性只收數字或 `[A-Za-z0-9#%.- ]`。`SafeHtml` 只有 `html` 能產生（`new` 一個會 throw），`mount()` 是唯一寫 `innerHTML` 的地方。
+- `components/dialog.ts` 與 `dialogFocus.ts`：`openDialog`／`confirmDialog`。`role=dialog|alertdialog`、`aria-modal`、`aria-labelledby`／`aria-describedby`；Tab 與 Shift+Tab 在 dialog 內循環、焦點跑到外面就拉回；Esc 與點背景關閉（`dismissible:false` 時兩者都不關）；背景元素可傳入並設 `inert`；關閉後焦點回到開啟前的元素，該元素已不在時回 `returnFocusTo`。`initialFocus` 指定動作 id 或內文元素 id；沒指定或找不到時，落在第一個「非 danger」的可聚焦元素，全是 danger 就落在 dialog 本身，所以遺忘確認即使沒設定也不會預設在破壞性按鈕。同時只能開一個。
+- `i18n/`：`STRINGS`（繁體中文、台灣用語，不用「程序」與大陸用語）與 `t(key, params)`；`{name}` 佔位。
+- `styles/tokens.css` 與 `tokens.lock.json`：由 `npm run tokens:sync -- --core <TeamUQ 路徑>` 從 Core 的 `apps/desktop/src/renderer/styles/base.css` 產生（Core 該檔有未提交變更就拒絕），lock 記來源 commit、檔案雜湊、兩套值與輸出雜湊；`npm run tokens:verify`（在 `npm run check` 內）離線檢查 css 沒被手改；`tokens:sync -- --core <路徑> --check` 比對 Core 有沒有漂移。深淺色只有 `:root{color-scheme: light dark}` 加一個 `@media (prefers-color-scheme: dark)`，沒有 `data-theme`。plugin 自有的 token：`--link`、`--text-secondary-strong`（Core 的 `--text-secondary` 在 `--surface-muted` 上只有 4.33:1）、`--accent-fg`（Core 的 `--on-accent` 在 `--accent` 上只有 2.46:1）、`--danger-fg`、`--font-ui`。`--text-muted`、`--accent-hover`、`--accent`、`--on-accent` 不得當文字色；焦點外框用 `--link`（`--accent` 對白底不到 3:1）。`test/ui-contrast.test.mjs` 對兩套配色算對比並掃 `app.css` 的 `color:`。
+- `bundleUi` 用 esbuild 把 `styles/app.css`（`@import "./tokens.css"`）打成單一 `ui/app.css`，因為 view 只准連結 `app.css`。
+- 測試：`test/uiHarness.mjs` 以 esbuild 把 `src/ui` 的 TypeScript 打成暫存 ESM 供 node 測試載入（同一次載入的模組共用一份打包，否則 `SafeHtml` 的身分檢查會跨份失敗）；`test/fakeDom.mjs` 是 dialog 用的最小假 DOM。
+
 ## 契約 vendor
 
 `vendor/teamuq-contract/` 是 TeamUQ `packages/features/agent-memory/contract/v1/` 的副本，Core 是唯一權威，禁止手改。
@@ -118,7 +131,7 @@ build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock�
 | `backend.mjs`、`cairn-pin.json` | 同目錄（`resolvePinPath` 的規則）；pin 檔以 LF 寫入 |
 | `cairn/core/**` | 56 檔，排除 `core/test` 與 `core/testing`（沒有任何執行期 import；`verify-artifact` 會檢查每個 staged `.mjs` 的相對 import 與 `new URL` 資產都解得到） |
 | `cairn/plugins/cairn-memory/lib/redact.mjs`、`cairn/LICENSE` | 保留 `core/validation.mjs` 需要的相對路徑 |
-| `ui/index.html`、`ui/app.js`、`ui/app.css` | `bundleUi`：esbuild 把 `src/ui/main.ts` 打成 IIFE `app.js`（不得拉進 node_modules）；`index.html` 來自 `plugin/ui/`、`app.css` 來自 `src/ui/styles/`。`verify-artifact` 對這三檔做 CSP 安全掃描（無 inline script／事件屬性／`javascript:`、`eval`、`new Function`、`http(s)://`、`fetch(`、`WebSocket`） |
+| `ui/index.html`、`ui/app.js`、`ui/app.css` | `bundleUi`：esbuild 把 `src/ui/main.ts` 打成 IIFE `app.js`（不得拉進 node_modules）；`index.html` 來自 `plugin/ui/`、`app.css` 由 `src/ui/styles/app.css` 連同 `tokens.css` 一起打包。`verify-artifact` 對這三檔做 CSP 安全掃描（無 inline script／事件屬性／`javascript:`、`eval`、`new Function`、`http(s)://`、`fetch(`、`WebSocket`） |
 | `manifest.json`、`integrity.json`、`signature.json` | manifest 見下；後兩者由 devkit 產生 |
 
 - `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 58 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。

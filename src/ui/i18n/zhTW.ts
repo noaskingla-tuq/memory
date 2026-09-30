@@ -1,4 +1,5 @@
 import { SPACE_STRINGS } from "./zhTWSpace.js";
+import { TIMELINE_STRINGS } from "./timelineStrings.js";
 
 export const STRINGS = {
   ...SPACE_STRINGS,
@@ -116,6 +117,7 @@ export const STRINGS = {
   "error.malformed_response.action": "請按「重試」；若一直發生，請回報給開發團隊。",
   "error.unknown.message": "暫時無法完成這個操作。",
   "error.unknown.action": "請稍後再試一次。",
+  ...TIMELINE_STRINGS,
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

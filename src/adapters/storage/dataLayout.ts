@@ -8,6 +8,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
   type Stats,
 } from "node:fs";
@@ -343,33 +344,53 @@ export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
     return databasePath;
   }
 
+  // why: adding or removing an agent directory changes the mtime of agents/, so an unchanged value lets a caller reuse its directory list instead of walking every agent again
+  agentsFingerprint(): string {
+    try {
+      return String(statSync(this.agentsRoot).mtimeMs);
+    } catch {
+      return "gone";
+    }
+  }
+
+  private checkedAgentsReal: string | undefined;
+
   // why: listing must never create a directory or rewrite an identity, so it applies the same reparse-point checks as agentDbPath without its mkdir and upgrade steps
-  listAgentDirectories(): readonly AgentDirectory[] {
+  agentDirectoryNames(): readonly string[] {
     const agentsReal = join(realpathSync.native(this.root), "agents");
     assertDirectPath(this.agentsRoot, agentsReal);
     assertRealWithin(this.realRoot, this.agentsRoot);
-    const entries: AgentDirectory[] = [];
-    for (const agentHash of readdirSync(this.agentsRoot).filter((name) => /^[0-9a-f]{64}$/.test(name)).sort()) {
-      const agentRoot = join(this.agentsRoot, agentHash);
-      try {
-        if (!assertDirectPath(agentRoot, join(agentsReal, agentHash)).isDirectory()) {
-          entries.push({ agentHash, databasePath: null, state: "unsafe" });
-          continue;
-        }
-        assertRealWithin(this.realRoot, agentRoot);
-        const databasePath = join(agentRoot, "memory.sqlite");
-        for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
-          assertRegularFile(this.realRoot, path, "Memory database");
-        }
-        entries.push(
-          existsSync(databasePath)
-            ? { agentHash, databasePath, state: "ready" }
-            : { agentHash, databasePath: null, state: "no_database" },
-        );
-      } catch (error) {
-        const unsafe = error instanceof MemoryServiceError && error.code === "STORAGE_UNSAFE";
-        entries.push({ agentHash, databasePath: null, state: unsafe ? "unsafe" : "unreadable" });
+    this.checkedAgentsReal = agentsReal;
+    return readdirSync(this.agentsRoot).filter((name) => /^[0-9a-f]{64}$/.test(name)).sort();
+  }
+
+  inspectAgentDirectory(agentHash: string): AgentDirectory | undefined {
+    if (!/^[0-9a-f]{64}$/.test(agentHash)) return undefined;
+    if (this.checkedAgentsReal === undefined) this.agentDirectoryNames();
+    const agentsReal = this.checkedAgentsReal ?? "";
+    const agentRoot = join(this.agentsRoot, agentHash);
+    try {
+      if (lstatSync(agentRoot, { throwIfNoEntry: false }) === undefined) return undefined;
+      if (!assertDirectPath(agentRoot, join(agentsReal, agentHash)).isDirectory()) {
+        return { agentHash, databasePath: null, state: "unsafe" };
       }
+      assertRealWithin(this.realRoot, agentRoot);
+      const databasePath = join(agentRoot, "memory.sqlite");
+      for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+        assertRegularFile(this.realRoot, path, "Memory database");
+      }
+      return existsSync(databasePath) ? { agentHash, databasePath, state: "ready" } : { agentHash, databasePath: null, state: "no_database" };
+    } catch (error) {
+      const unsafe = error instanceof MemoryServiceError && error.code === "STORAGE_UNSAFE";
+      return { agentHash, databasePath: null, state: unsafe ? "unsafe" : "unreadable" };
+    }
+  }
+
+  listAgentDirectories(): readonly AgentDirectory[] {
+    const entries: AgentDirectory[] = [];
+    for (const agentHash of this.agentDirectoryNames()) {
+      const directory = this.inspectAgentDirectory(agentHash);
+      if (directory !== undefined) entries.push(directory);
     }
     return entries;
   }

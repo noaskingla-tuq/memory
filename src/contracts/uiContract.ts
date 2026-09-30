@@ -12,10 +12,10 @@ export const UI_METHOD_NAMES = [
 
 export type UiMethodName = (typeof UI_METHOD_NAMES)[number];
 
+/** 預期錯誤碼；CURSOR_STALE 表示游標已不能用（plugin 重啟、被改、篩選不同），畫面必須從第一頁重來，同一游標重送永遠失敗。 */
 export const UI_FAILURE_CODES = [
-  "NOT_IMPLEMENTED",
   "INVALID_PARAMS",
-  "INVALID_CURSOR",
+  "CURSOR_STALE",
   "NOT_FOUND",
   "REVISION_CONFLICT",
   "STORAGE_BUSY",
@@ -183,6 +183,7 @@ export const uiOverviewSuccess = z
       .strict(),
     agents: z.array(uiAgentCardSchema),
     nextCursor: cursorOrNull,
+    complete: z.boolean().optional(),
     profile: profileStamp,
     storage: z.object({ status: z.string(), unavailableAgents: count }).strict(),
   })
@@ -256,7 +257,6 @@ export const uiForgetSuccess = z.object({ ok: z.literal(true), forgotten: z.bool
 export const uiStatusSuccess = z
   .object({
     ok: z.literal(true),
-    stub: z.boolean().optional(),
     version: z.string(),
     cairnCommit: z.string(),
     storage: z.object({ status: z.string() }).strict(),
@@ -299,6 +299,9 @@ export type UiRef = z.infer<typeof uiRefSchema>;
 export type UiItem = z.infer<typeof uiItemSchema>;
 export type UiWork = z.infer<typeof uiWorkSchema>;
 export type UiOverviewRequest = z.infer<typeof uiOverviewRequest>;
+export type UiAgentStatsRequest = z.infer<typeof uiAgentStatsRequest>;
+export type UiGetRequest = z.infer<typeof uiGetRequest>;
+export type UiForgetRequest = z.infer<typeof uiForgetRequest>;
 export type UiListRequest = z.infer<typeof uiListRequest>;
 export type UiSearchRequest = z.infer<typeof uiSearchRequest>;
 

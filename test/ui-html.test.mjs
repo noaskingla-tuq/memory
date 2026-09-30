@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import test from "node:test";
-import { UI_ROOT, loadUiModule } from "./uiHarness.mjs";
+import { UI_ROOT, loadUiModule } from "./uiViewHarness.mjs";
 
 const { esc, html, isSafeHtml, SafeHtml, mount, EMPTY_HTML } = await loadUiModule("dom/html.ts");
 

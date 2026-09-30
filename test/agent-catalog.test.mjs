@@ -18,6 +18,8 @@ function treeOf(directory) {
   return found.sort();
 }
 
+const plain = (namespaces) => namespaces.map(({ scope, projectId, count }) => ({ scope, projectId, count }));
+
 async function remember(app, actor, scope, content, id) {
   const result = await app.execute("memory_remember", { scope, kind: "fact", content, operationId: id }, actor);
   assert.equal(result.ok, true);
@@ -53,14 +55,18 @@ test("the catalog lists every agent with its namespaces and counts, and leaves o
   );
   const byId = new Map(catalog.agents.map((agent) => [agent.agentId, agent]));
   for (const agent of catalog.agents) assert.equal(agent.agentHash, agentHashOf(agent.agentId));
-  assert.deepEqual(byId.get("sw/developer").namespaces, [
+  assert.deepEqual(plain(byId.get("sw/developer").namespaces), [
     { scope: "personal", projectId: null, count: (await cairnListAll(app, dev, "personal", 12)).length },
     { scope: "project", projectId: "proj-a", count: (await cairnListAll(app, dev, "project", 12)).length },
     { scope: "project", projectId: "proj-b", count: (await cairnListAll(app, devB, "project", 12)).length },
   ]);
+  const personal = await cairnListAll(app, dev, "personal", 12);
+  const developerPersonal = byId.get("sw/developer").namespaces[0];
+  assert.equal(developerPersonal.lastAt, personal[0].updatedAt, "lastAt is the newest updatedAt of the namespace");
+  assert.equal(developerPersonal.firstAt, personal[personal.length - 1].updatedAt, "firstAt is the oldest updatedAt of the namespace");
   assert.equal(byId.get("sw/developer").total, byId.get("sw/developer").namespaces.reduce((sum, row) => sum + row.count, 0));
-  assert.deepEqual(byId.get("sw/reviewer").namespaces, [{ scope: "personal", projectId: null, count: (await cairnListAll(app, reviewer, "personal", 12)).length }]);
-  assert.deepEqual(byId.get("ops/half").namespaces, [{ scope: "personal", projectId: null, count: 1 }], "a namespace with 0 memories is dropped from a live agent");
+  assert.deepEqual(plain(byId.get("sw/reviewer").namespaces), [{ scope: "personal", projectId: null, count: (await cairnListAll(app, reviewer, "personal", 12)).length }]);
+  assert.deepEqual(plain(byId.get("ops/half").namespaces), [{ scope: "personal", projectId: null, count: 1 }], "a namespace with 0 memories is dropped from a live agent");
 });
 
 test("directories that are not agent databases never appear and never break the listing", async (t) => {

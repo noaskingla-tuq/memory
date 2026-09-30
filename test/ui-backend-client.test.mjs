@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { REPO, loadUiModule } from "./uiHarness.mjs";
+import { REPO, loadUiModule } from "./uiViewHarness.mjs";
 
 const { createBackendClient, DEFAULT_RETRY_DELAYS_MS } = await loadUiModule("api/backendClient.ts");
 const errors = await loadUiModule("api/errors.ts");
@@ -291,15 +291,23 @@ it("the plugin failure codes declared by the UI contract are all covered", () =>
   const block = /UI_FAILURE_CODES\s*=\s*\[([\s\S]*?)\]\s*as const/u.exec(source);
   assert.ok(block !== null, "UI_FAILURE_CODES is declared");
   const declared = [...block[1].matchAll(/"([A-Za-z_]+)"/gu)].map((match) => match[1]);
-  assert.ok(declared.length >= 8);
+  assert.ok(declared.includes("CURSOR_STALE"), "CURSOR_STALE replaced INVALID_CURSOR");
+  assert.ok(!declared.includes("INVALID_CURSOR") && !declared.includes("NOT_IMPLEMENTED"), "the removed codes are gone from the contract");
+  assert.ok(declared.length >= 7);
   for (const code of declared) assert.equal(errors.describeError(code).known, true, `${code} has a plain-language entry`);
 });
 
-it("cursor failures ask for a restart from the first page and unknown codes fall back to a generic message", () => {
-  for (const code of ["INVALID_CURSOR", "CURSOR_STALE"]) {
-    assert.equal(errors.isCursorReset(code), true);
-    assert.equal(errors.describeError(code).actionKind, "restartList");
+it("CURSOR_STALE is the only cursor failure: it asks for a restart from the first page, and the codes S3 removed are unknown", () => {
+  assert.equal(errors.isCursorReset("CURSOR_STALE"), true);
+  assert.equal(errors.describeError("CURSOR_STALE").actionKind, "restartList");
+  assert.equal(errors.describeError("CURSOR_STALE").retryable, false);
+  for (const gone of ["INVALID_CURSOR", "NOT_IMPLEMENTED"]) {
+    assert.ok(![...errors.PLUGIN_CODES, ...errors.PLATFORM_CODES, ...errors.CLIENT_CODES].includes(gone), `${gone} is no longer listed`);
+    assert.equal(errors.describeError(gone).known, false, gone);
+    assert.equal(errors.isCursorReset(gone), false, gone);
+    assert.ok(!(`error.${gone}.message` in STRINGS), `${gone} has no string`);
   }
+  assert.equal(errors.describeError("STORAGE_BUSY").actionKind, "wait");
   assert.equal(errors.isCursorReset("NOT_FOUND"), false);
   const unknown = errors.describeError("SOMETHING_NEW");
   assert.equal(unknown.known, false);

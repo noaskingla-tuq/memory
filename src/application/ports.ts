@@ -71,6 +71,9 @@ export interface AgentDirectory {
 
 export interface AgentDirectoryPort {
   listAgentDirectories(): readonly AgentDirectory[];
+  agentDirectoryNames(): readonly string[];
+  inspectAgentDirectory(agentHash: string): AgentDirectory | undefined;
+  agentsFingerprint(): string;
 }
 
 export interface ObservabilityPort {

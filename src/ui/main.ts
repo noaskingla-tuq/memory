@@ -13,9 +13,17 @@ function element(id: string): HTMLElement {
   return found;
 }
 
+function lastWriteText(lastWriteAt: string | null): string {
+  if (lastWriteAt === null) return t("status.noWrite");
+  const at = new Date(lastWriteAt);
+  return t("status.lastWrite", { time: Number.isNaN(at.getTime()) ? lastWriteAt : at.toLocaleString("zh-TW", { hour12: false }) });
+}
+
+// why: the container carries the overall state too, because the real-Electron harness and any outside probe read #status[data-state] rather than its children
 function renderStatus(target: HTMLElement, result: BackendResult): void {
+  target.dataset.state = result.ok && isStatus(result.value) ? "ok" : "error";
   if (result.ok && isStatus(result.value)) {
-    mount(target, html`<p class="state" data-state="ok">${t("status.ok", { version: result.value.version, storage: result.value.storage.status })}</p>`);
+    mount(target, html`<p class="state" data-state="ok">${t("status.ok", { version: result.value.version, storage: result.value.storage.status })}</p><p>${lastWriteText(result.value.lastWriteAt)}</p>`);
     return;
   }
   if (result.ok) {
@@ -28,6 +36,7 @@ function renderStatus(target: HTMLElement, result: BackendResult): void {
 
 async function showStatus(): Promise<void> {
   const target = element("status");
+  target.dataset.state = "loading";
   mount(target, html`<p class="state" data-state="loading">${t("status.loading")}</p>`);
   renderStatus(target, await backendClient().call("ui.status", {}));
 }

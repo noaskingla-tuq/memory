@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FakeDocument } from "./fakeDom.mjs";
-import { loadUiModule } from "./uiHarness.mjs";
+import { loadUiModule } from "./uiViewHarness.mjs";
 
 const focus = await loadUiModule("components/dialogFocus.ts", "components/dialog.ts", "dom/html.ts");
 const { openDialog, confirmDialog, html } = focus;

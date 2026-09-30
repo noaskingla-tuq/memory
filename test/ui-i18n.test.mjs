@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadUiModule } from "./uiHarness.mjs";
+import { loadUiModule } from "./uiViewHarness.mjs";
 
 const { STRINGS, t } = await loadUiModule("i18n/zhTW.ts", "i18n/index.ts");
 

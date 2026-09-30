@@ -1,0 +1,49 @@
+{
+  "vendorLockVersion": 1,
+  "pluginId": "teamuq.memory",
+  "contractVersion": 1,
+  "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
+  "source": {
+    "repo": "teamuq-electron",
+    "coreCommit": "cad1c28dfb8dab58a9a0871df9036b8bb87329d5",
+    "contractCommit": "c1bf2d7b59dc58d67224a560e67a9c151a30854d",
+    "contractDir": "packages/features/agent-memory/contract/v1"
+  },
+  "coreLockSha256": "0f320d0beb2174c3e7cfb72e5d59f3a26b156e16083589d622c788c3782892ef",
+  "pluginOwnedFiles": [
+    "contract.d.mts"
+  ],
+  "files": {
+    "contract.d.mts": "07480618432fe5c5ed124b5809b7ed36d3d40a284e3ccb71cbd7d16de6c44605",
+    "contract.d.ts": "79f713361394c4709d1bcec44ec9711623f734a96deb46e8c1f0217e4a592dc1",
+    "contract.mjs": "f069215302b8d9234e91843a1e458f922f38f0c943c0ac070c54cebc41d960a0",
+    "fixtures/requests/diagnose.empty.json": "0cfd283a5ab5a2f5a311e30c7e0be1ec428d8679276c00f7c863422b29e67938",
+    "fixtures/requests/diagnose.unknown-field.json": "d63382492d59e765f1ad11ed4eeb043305b0f455d072ab5e5b9578640873235f",
+    "fixtures/requests/inspect.get-with-cursor.json": "44acbb4e6459e4febac942832da2513d5b7356e4186305c7bbfee867bc2b3817",
+    "fixtures/requests/inspect.limit-out-of-range.json": "a6ff087d8a38bee8ed3571adc56aa53d2a12e823765138f527c1c71e207bde61",
+    "fixtures/requests/inspect.list.json": "74afea331f82a57eefa98ba28bbb27ea411724a228d217974ffdacf7add5e4cc",
+    "fixtures/requests/inspect.missing-input.json": "d1e9fa9bb2462d15be1856a64d99d4a909b3eabfffd1d57f67ab370bf2d9e33c",
+    "fixtures/requests/remember.bad-kind.json": "85ed85fa40cf3310bb09d0fb38585710cb9c834f3d721efc2ffd1a8ea18b4efe",
+    "fixtures/requests/remember.empty-ops.json": "ce0ec43951c94ad2d001d024eff8b08a3d6ac1fdc531b4c28f072508b9078c10",
+    "fixtures/requests/remember.personal-batch.json": "5d68998c227a7ce5ef8129a8d6338ed38e9a7811bb7a66b0a4921eb47a1e8b22",
+    "fixtures/requests/remember.single.json": "17ddf9ee84a1328657f6fdfa9f5264b278eed9c46d16a0ad5029fb49228f8167",
+    "fixtures/requests/remember.unknown-actor-field.json": "139c1cf2e1d2a13d9d9bfd0f8badd6d91aa45707bbc0663be04d63daeae801e8",
+    "fixtures/requests/remember.unknown-field.json": "72c94124b046d7b7052962ccf6f32754b9813a377d38db8efd04c0b350c9c00f",
+    "fixtures/responses/diagnose.bad-lock-sha.json": "022fdd5e8097985ca0328b89b327818e6b08c30a65df57a42b3599799808ac8b",
+    "fixtures/responses/diagnose.no-versions.json": "3d19ff49b01a85d6832cd8d55a8455937c1c235a67b6395908818c1879796973",
+    "fixtures/responses/diagnose.ok.json": "d8d3b61e75b819e4fdcce65c380218c6b138425af65bd272e62d9d660c9c84ee",
+    "fixtures/responses/inspect.empty-cursor.json": "7571094d47c6a1e5f3b68e1b20651c51b5a283d5365fce6ed371c51ccc96b09d",
+    "fixtures/responses/inspect.error-cursor-stale.json": "40c20e150ec9fa30d05ed0c86a37399f21c398685fc4eb3d2d033729e813fedd",
+    "fixtures/responses/inspect.exhausted.json": "ae76b8ab59664e5270c794bf7692b3f44c7789bbb9f27dc8a9bb21630068709b",
+    "fixtures/responses/inspect.list-page.json": "64f6d1bdcd9b3a452a6ae493e62285b26df85ad7d5cb1e5adce12ac7dfafee60",
+    "fixtures/responses/inspect.missing-result.json": "a03cc0b7b59f467425e2d0409e1174833eefd035419a9342d23d821a5b6057fd",
+    "fixtures/responses/remember.empty-memory-id.json": "6db22e7c626c932c05fef5a5dd57d98d4d7d882673ef0d430e9e9c340e399a82",
+    "fixtures/responses/remember.extra-fields-tolerated.json": "566ae8058ee5a75430f355dafad9b0cca6307d1c6f4fe4b8fe073da442ad7d04",
+    "fixtures/responses/remember.missing-memory-id.json": "ebaf3fcfc8cc6040a3882e844f6f28a1aedc4628a14c051b005e45f2162c235e",
+    "fixtures/responses/remember.results-mixed-error.json": "6f3291c5ac6d567ec106180634d177cb075f2db9b3ecc32a617cdd180c093952",
+    "fixtures/responses/remember.results-not-array.json": "250cf0198cd8817ac37d3b66ad45a97d77a5906759a76899786348c4d051cfe3",
+    "fixtures/responses/remember.results-ok.json": "f5d9853b055a0c1ce3432fa9920e4f690e7aef13281fdc22239497b63ac36c66",
+    "fixtures/responses/remember.unknown-error-code.json": "635810001d95031834c1cb43fc56cb89261aad8acef32f4c714ab0626799b209",
+    "lock.json": "0f320d0beb2174c3e7cfb72e5d59f3a26b156e16083589d622c788c3782892ef"
+  }
+}

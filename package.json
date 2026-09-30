@@ -2,7 +2,7 @@
   "name": "teamuq-plugin-memory",
   "version": "0.1.0",
   "private": true,
-  "description": "TeamUQ full-trust memory plugin (Cairn adapter, memory application and domain) - P1",
+  "description": "TeamUQ full-trust memory plugin (backend entry, Cairn adapter, memory application and domain)",
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
@@ -10,8 +10,10 @@
     "build:ts": "tsc -p .",
     "test": "npm run build:ts && node --test test/*.test.mjs",
     "verify:source": "node tools/verify-source-untouched.mjs",
+    "contract:verify": "node tools/verify-contract.mjs",
+    "contract:sync": "node tools/sync-vendor.mjs",
     "check:secrets": "node tools/check-no-secrets.mjs",
-    "check": "npm run test && npm run verify:source && npm run check:secrets"
+    "check": "npm run test && npm run contract:verify && npm run verify:source && npm run check:secrets"
   },
   "dependencies": {
     "cairn-memory": "git+https://github.com/Cairn-ink/cairn-memory.git#83a10c3b7664b1f67485a19e7d84d24dcb3041a5",

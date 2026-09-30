@@ -1,0 +1,18 @@
+{
+  "case": "remember.unknown-error-code",
+  "method": "memory.remember@1",
+  "accept": false,
+  "response": {
+    "results": [
+      {
+        "ok": false,
+        "error": {
+          "code": "NOT_A_CODE",
+          "message": "Memory operation failed: NOT_A_CODE",
+          "retryable": false,
+          "requestId": "req-8"
+        }
+      }
+    ]
+  }
+}

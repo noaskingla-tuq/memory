@@ -1,0 +1,21 @@
+{
+  "case": "remember.single",
+  "method": "memory.remember@1",
+  "valid": true,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex"
+    },
+    "ops": [
+      {
+        "scope": "project",
+        "content": "任務完成：修正登入頁的表單驗證。",
+        "kind": "context",
+        "operationId": "punch:00000000000000000000000000000001"
+      }
+    ]
+  }
+}

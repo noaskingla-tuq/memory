@@ -1,0 +1,27 @@
+{
+  "case": "inspect.exhausted",
+  "method": "memory.inspect@1",
+  "accept": true,
+  "response": {
+    "result": {
+      "ok": true,
+      "value": {
+        "memories": [],
+        "nextCursor": null,
+        "exhausted": true
+      },
+      "requestId": "req-10"
+    }
+  },
+  "parsed": {
+    "result": {
+      "ok": true,
+      "value": {
+        "memories": [],
+        "nextCursor": null,
+        "exhausted": true
+      },
+      "requestId": "req-10"
+    }
+  }
+}

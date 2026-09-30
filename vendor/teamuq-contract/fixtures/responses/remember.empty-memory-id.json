@@ -1,0 +1,19 @@
+{
+  "case": "remember.empty-memory-id",
+  "method": "memory.remember@1",
+  "accept": false,
+  "response": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": ""
+          },
+          "deduplicated": false
+        },
+        "requestId": "req-7"
+      }
+    ]
+  }
+}

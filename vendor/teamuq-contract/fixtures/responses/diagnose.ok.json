@@ -1,0 +1,59 @@
+{
+  "case": "diagnose.ok",
+  "method": "diagnose",
+  "accept": true,
+  "response": {
+    "plugin": {
+      "id": "teamuq.memory",
+      "version": "1.0.0"
+    },
+    "contract": {
+      "versions": [
+        1
+      ]
+    },
+    "cairn": {
+      "commit": "83a10c3b7664b1f67485a19e7d84d24dcb3041a5"
+    },
+    "node": {
+      "version": "24.20.0",
+      "sqlite": "3.53.4"
+    },
+    "storage": {
+      "status": "ready"
+    },
+    "limits": {
+      "resultMaxBytes": 65536,
+      "inspectBudgetBytes": 60000,
+      "maxOps": 16
+    },
+    "contractLockSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "parsed": {
+    "plugin": {
+      "id": "teamuq.memory",
+      "version": "1.0.0"
+    },
+    "contract": {
+      "versions": [
+        1
+      ]
+    },
+    "cairn": {
+      "commit": "83a10c3b7664b1f67485a19e7d84d24dcb3041a5"
+    },
+    "node": {
+      "version": "24.20.0",
+      "sqlite": "3.53.4"
+    },
+    "storage": {
+      "status": "ready"
+    },
+    "limits": {
+      "resultMaxBytes": 65536,
+      "inspectBudgetBytes": 60000,
+      "maxOps": 16
+    },
+    "contractLockSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

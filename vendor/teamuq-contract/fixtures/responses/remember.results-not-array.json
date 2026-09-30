@@ -1,0 +1,8 @@
+{
+  "case": "remember.results-not-array",
+  "method": "memory.remember@1",
+  "accept": false,
+  "response": {
+    "results": "none"
+  }
+}

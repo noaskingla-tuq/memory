@@ -1,0 +1,69 @@
+{
+  "case": "remember.results-mixed-error",
+  "method": "memory.remember@1",
+  "accept": true,
+  "response": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-2"
+          },
+          "deduplicated": false
+        },
+        "requestId": "req-3"
+      },
+      {
+        "ok": false,
+        "error": {
+          "code": "INVALID_INPUT",
+          "message": "Memory operation failed: INVALID_INPUT",
+          "retryable": false,
+          "requestId": "req-4"
+        }
+      },
+      {
+        "ok": false,
+        "error": {
+          "code": "STORAGE_BUSY",
+          "message": "Memory operation failed: STORAGE_BUSY",
+          "retryable": true,
+          "requestId": "req-5"
+        }
+      }
+    ]
+  },
+  "parsed": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-2"
+          },
+          "deduplicated": false
+        },
+        "requestId": "req-3"
+      },
+      {
+        "ok": false,
+        "error": {
+          "code": "INVALID_INPUT",
+          "message": "Memory operation failed: INVALID_INPUT",
+          "retryable": false,
+          "requestId": "req-4"
+        }
+      },
+      {
+        "ok": false,
+        "error": {
+          "code": "STORAGE_BUSY",
+          "message": "Memory operation failed: STORAGE_BUSY",
+          "retryable": true,
+          "requestId": "req-5"
+        }
+      }
+    ]
+  }
+}

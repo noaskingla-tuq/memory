@@ -7,6 +7,8 @@
 - 唯一可 import `cairn-memory` 的檔是 `src/adapters/cairn/cairnCoreAdapter.ts`，且只走 `cairn-memory/core/index.mjs`；由 `tools/verify-source-untouched.mjs` 把關。
 - Cairn 由 `cairn-pin.json` 釘死：升 commit 前先讀 diff，更新 `commit`、`coreTree`、`redactSha256`，並把相容的 commit 放進 `accepted[]`；`package.json` 與 lock 必須同步。
 - 每個 `accepted[]` 項目都必須有 `test/fixtures/legacy-db/<commit>/` 真實舊庫 fixture（`tools/make-legacy-fixture.mjs` 產生）；備份失敗一律回 `STORAGE_BUSY`、不得回 `INTERNAL`。
+- `vendor/teamuq-contract/` 是 TeamUQ Core 契約的副本，禁止手改；只用 `tools/sync-vendor.mjs --core <TeamUQ 路徑>` 更新，`npm run contract:verify` 必須 exit 0。
+- `src/backend/` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose`；整次呼叫失敗的碼只能是 `unknown_method`、`invalid_params`、`result_too_large`、`internal`，個別操作的錯誤碼只能取自契約 `MEMORY_ERROR_CODES`。
 - 私鑰、`*.pem`、`*.key`、`keys/` 永不進 repo，也不進 agent context；`tools/check-no-secrets.mjs` 必須 exit 0。
 - 測試檔（`test/*.test.mjs`）在測試執行期間不得寫 stdout（`console.log`／`process.stdout.write`／子行程 inherit stdout）；附註走 `console.error` 或 `t.diagnostic()`。
 - 新程式檔 ≤500 行；不新增 `utils`、`helpers`、`common`、`misc`。

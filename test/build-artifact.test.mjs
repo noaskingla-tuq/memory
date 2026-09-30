@@ -99,6 +99,7 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.doesNotMatch(backend, /from "zod"/u);
   const manifest = JSON.parse(readFileSync(join(dist, "stage", "manifest.json"), "utf8"));
   assert.equal(manifest.version, packageJson.version);
+  assert.equal(manifest.minCoreVersion, ">=1.6.3");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
     { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { backend: "backend.mjs" }, permissions: [], data: { uninstall: "keep" } },
@@ -142,6 +143,15 @@ test("verify-artifact rejects a missing Cairn file, a smuggled test directory an
   assert.ok(failedChecks(smuggled).includes("no Cairn test or testing directory"));
   const unlicensed = await tamperedArtifact(t, (stageDir) => rmSync(join(stageDir, "cairn", "LICENSE")));
   assert.ok(failedChecks(unlicensed).includes("cairn/LICENSE is present"));
+});
+
+test("verify-artifact rejects a manifest that lets Core 1.6.0 to 1.6.2 install the plugin", async (t) => {
+  const report = await tamperedArtifact(t, (stageDir) => {
+    const file = join(stageDir, "manifest.json");
+    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.6.3", ">=1.6.0"));
+  });
+  assert.equal(report.ok, false);
+  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.6.3"));
 });
 
 test("verify-artifact rejects a backend that imports Cairn or a package by a bare name", async (t) => {

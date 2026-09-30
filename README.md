@@ -2,7 +2,7 @@
 
 TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust）的外部 plugin（id `teamuq.memory`，版本 1.0.0）。記憶 domain／application 與 Cairn adapter 自 TeamUQ `packages/platform/memory-server` 原樣搬來（P1）；`src/backend/` 是 TeamUQ 外部 full-trust 後端的入口（P2）；`tools/build.mjs` 一鍵產出 `.tuqplugin`（P3）。
 
-> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（TeamUQ V1 `8693475e6`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
+> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-c6` 的 `f5bf50cbf`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
 
 ## 目錄
 
@@ -97,9 +97,9 @@ build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock�
 | `manifest.json`、`integrity.json`、`signature.json` | manifest 見下；後兩者由 devkit 產生 |
 
 - `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 58 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。
-- manifest：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.backend: backend.mjs`、`permissions: []`、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.6.0`（Core 現為 1.6.2，C6 合併時再決定是否提高）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 2`、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
+- manifest：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.backend: backend.mjs`、`permissions: []`、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.6.3`（1.6.3 是第一個含白名單 `invokeBackend`、接受 `@` 的 methodName 與走 invoke 的記憶 sink 的 Core；1.6.0～1.6.2 會通過 manifest 檢查但不會有人呼叫本 plugin，`verify-artifact` 斷言此值）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 2`、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
 - devkit：`vendor/teamuq-devkit/tuq-plugin-tool.mjs` 是 TeamUQ `npm run build:plugin-devkit -- --out <路徑>` 的產物，禁止手改；`devkit.lock.json` 記 Core commit、Core 版本與 sha256（CRLF 正規化為 LF 再雜湊）。更新：`npm run devkit:sync -- --core <TeamUQ 路徑>`（Core 內嵌來源有未提交變更時拒絕）。`release`、`build`、`verify-artifact` 執行前都會比對 lock。
-- devkit 內嵌當下 Core 的 `TEAMUQ_TRUST_ANCHORS`：現為 `teamuq-root-2026a`、`teamuq-root-2026b` 兩把公鑰（Core 1.6.2，V1 `8693475e6`）。Core 的 anchors 再變動就必須重跑 `devkit:sync`。
+- devkit 內嵌當下 Core 的 `TEAMUQ_TRUST_ANCHORS`：現為 `teamuq-root-2026a`、`teamuq-root-2026b` 兩把公鑰（Core 1.6.3，`f5bf50cbf`）。Core 的 anchors 再變動就必須重跑 `devkit:sync`。
 
 ### 簽章與金鑰
 

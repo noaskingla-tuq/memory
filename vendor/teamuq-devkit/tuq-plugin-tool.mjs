@@ -36,9 +36,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// node_modules/pend/index.js
+// ../../../node_modules/pend/index.js
 var require_pend = __commonJS({
-  "node_modules/pend/index.js"(exports, module) {
+  "../../../node_modules/pend/index.js"(exports, module) {
     "use strict";
     module.exports = Pend;
     function Pend() {
@@ -92,9 +92,9 @@ var require_pend = __commonJS({
   }
 });
 
-// node_modules/yauzl/fd-slicer.js
+// ../../../node_modules/yauzl/fd-slicer.js
 var require_fd_slicer = __commonJS({
-  "node_modules/yauzl/fd-slicer.js"(exports) {
+  "../../../node_modules/yauzl/fd-slicer.js"(exports) {
     "use strict";
     var fs9 = __require("fs");
     var util2 = __require("util");
@@ -250,9 +250,9 @@ var require_fd_slicer = __commonJS({
   }
 });
 
-// node_modules/yauzl/crc32.js
+// ../../../node_modules/yauzl/crc32.js
 var require_crc32 = __commonJS({
-  "node_modules/yauzl/crc32.js"(exports, module) {
+  "../../../node_modules/yauzl/crc32.js"(exports, module) {
     "use strict";
     var CRC_TABLE = new Int32Array([
       0,
@@ -523,9 +523,9 @@ var require_crc32 = __commonJS({
   }
 });
 
-// node_modules/yauzl/index.js
+// ../../../node_modules/yauzl/index.js
 var require_yauzl = __commonJS({
-  "node_modules/yauzl/index.js"(exports) {
+  "../../../node_modules/yauzl/index.js"(exports) {
     "use strict";
     var fs9 = __require("fs");
     var zlib = __require("zlib");
@@ -1384,12 +1384,12 @@ var require_yauzl = __commonJS({
 });
 
 // .teamuq/scripts/plugin-tools/tuq-plugin-tool.entry.ts
-import { createPublicKey as createPublicKey4 } from "node:crypto";
+import { createHash as createHash8, createPublicKey as createPublicKey4 } from "node:crypto";
 import { promises as fs8, readFileSync } from "node:fs";
 import os3 from "node:os";
 import path8 from "node:path";
 
-// node_modules/zod/v3/external.js
+// ../../../node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -1501,7 +1501,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// node_modules/zod/v3/helpers/util.js
+// ../../../node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -1635,7 +1635,7 @@ var getParsedType = (data) => {
   }
 };
 
-// node_modules/zod/v3/ZodError.js
+// ../../../node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -1753,7 +1753,7 @@ ZodError.create = (issues) => {
   return error;
 };
 
-// node_modules/zod/v3/locales/en.js
+// ../../../node_modules/zod/v3/locales/en.js
 var errorMap = (issue, _ctx) => {
   let message;
   switch (issue.code) {
@@ -1856,7 +1856,7 @@ var errorMap = (issue, _ctx) => {
 };
 var en_default = errorMap;
 
-// node_modules/zod/v3/errors.js
+// ../../../node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -1865,7 +1865,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// node_modules/zod/v3/helpers/parseUtil.js
+// ../../../node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
   const { data, path: path9, errorMaps, issueData } = params;
   const fullPath = [...path9, ...issueData.path || []];
@@ -1975,14 +1975,14 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
-// node_modules/zod/v3/helpers/errorUtil.js
+// ../../../node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// node_modules/zod/v3/types.js
+// ../../../node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
   constructor(parent, value, path9, key) {
     this._cachedPath = [];
@@ -5921,11 +5921,12 @@ var KNOWN_PLUGIN_PERMISSIONS = Object.freeze([
   "asset:pack",
   "secrets:plugin",
   "settings:plugin",
-  "process:spawn"
+  "process:spawn",
+  "backend:invoke"
 ]);
-var CORE_SUPPORTED_PLUGIN_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data", "assets:plugin-data", "settings:plugin", "secrets:plugin", "asset:pack", "media:microphone", "media:camera", "network:fetch", "ai:chat", "speech:transcribe", "speech:synthesize", "input:text", "native:addons"]);
+var CORE_SUPPORTED_PLUGIN_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data", "assets:plugin-data", "settings:plugin", "secrets:plugin", "asset:pack", "media:microphone", "media:camera", "network:fetch", "ai:chat", "speech:transcribe", "speech:synthesize", "input:text", "native:addons", "backend:invoke"]);
 var BACKEND_UI_ONLY_PERMISSION_PREFIXES = Object.freeze(["ui:", "media:", "assets:"]);
-var REVOCABLE_PLUGIN_PERMISSION_PREFIXES = Object.freeze(["media:", "network:", "ai:", "input:"]);
+var REVOCABLE_PLUGIN_PERMISSION_PREFIXES = Object.freeze(["media:", "network:", "ai:", "input:", "backend:"]);
 var CORE_SUPPORTED_PRESENTATIONS = Object.freeze(["tab", "fullpage"]);
 var CORE_IMPLEMENTED_PLATFORM_IDS = Object.freeze(["win32-x64", "darwin-arm64", "darwin-x64", "linux-x64"]);
 var PLATFORM_ID_PATTERN = /^[a-z0-9]+-[a-z0-9]+$/;
@@ -6014,6 +6015,7 @@ var PluginManifestV2Schema = external_exports.object({
   platforms: external_exports.array(PlatformSchema).max(8).default([]),
   trustTier: external_exports.enum(["sandboxed", "full-trust"]).default("sandboxed"),
   entry: external_exports.object({ ui: relativePath.optional(), backend: relativePath.optional() }).strict().default({}),
+  backendMethods: external_exports.array(external_exports.string().min(1).max(64).regex(/^[A-Za-z0-9._@-]+$/)).min(1).max(32).optional(),
   native: NativeSchema.optional(),
   resources: ResourcesSchema.optional(),
   provides: external_exports.array(ProvidesSchema).max(16).default([]),
@@ -6045,6 +6047,7 @@ var PluginManifestV2Schema = external_exports.object({
   if (!unique2(capabilities)) fail("provides", "a capability may appear only once across provides, requiredCapabilities and optionalCapabilities");
   const fullTrust = manifest.trustTier === "full-trust";
   if (manifest.kind === "asset-pack") {
+    if (manifest.backendMethods !== void 0) fail("backendMethods", "asset-pack cannot declare backendMethods");
     if (fullTrust) fail("trustTier", "asset-pack cannot be full-trust");
     if (manifest.entry.ui !== void 0 || manifest.entry.backend !== void 0) fail("entry", "asset-pack cannot declare entry");
     if (manifest.native !== void 0 || manifest.resources !== void 0) fail("native", "asset-pack cannot declare native or resources");
@@ -6056,10 +6059,15 @@ var PluginManifestV2Schema = external_exports.object({
   if (manifest.entry.ui === void 0 && manifest.entry.backend === void 0) fail("entry", "plugin must declare entry.ui or entry.backend");
   if (!fullTrust && manifest.entry.backend !== void 0) fail("entry", "entry.backend requires full-trust");
   if (fullTrust && manifest.entry.backend === void 0) fail("entry", "full-trust plugin must declare entry.backend");
-  if (fullTrust && manifest.entry.ui !== void 0) fail("entry", "full-trust plugin cannot declare entry.ui");
+  const composed = fullTrust && manifest.entry.ui !== void 0 && manifest.entry.backend !== void 0;
+  if (manifest.backendMethods !== void 0 && !composed) fail("backendMethods", "backendMethods requires a full-trust plugin with both entry.ui and entry.backend");
+  if (composed && manifest.backendMethods === void 0) fail("backendMethods", "a composed plugin must declare backendMethods");
+  if (manifest.backendMethods !== void 0 && !unique2(manifest.backendMethods)) fail("backendMethods", "backendMethods must not contain duplicates");
+  if (composed && !manifest.permissions.includes("backend:invoke")) fail("permissions", "a composed plugin requires backend:invoke");
+  if (!composed && manifest.permissions.includes("backend:invoke")) fail("permissions", "backend:invoke requires a composed plugin");
   if (manifest.entry.backend !== void 0 && !BACKEND_ENTRY_PATTERN.test(manifest.entry.backend)) fail("entry", "entry.backend must be an .mjs or .cjs file");
   if (fullTrust) {
-    if (manifest.permissions.some((permission) => BACKEND_UI_ONLY_PERMISSION_PREFIXES.some((prefix) => permission.startsWith(prefix)))) fail("permissions", "full-trust plugins have no view and cannot request ui, media or assets permissions");
+    if (!composed && manifest.permissions.some((permission) => BACKEND_UI_ONLY_PERMISSION_PREFIXES.some((prefix) => permission.startsWith(prefix)))) fail("permissions", "backend-only plugins have no view and cannot request ui, media or assets permissions");
     if (manifest.native !== void 0 && manifest.platforms.length === 0) fail("platforms", "native files require an explicit platforms list");
     if (manifest.native !== void 0 && !unique2(manifest.native.files.map((file) => `${file.platform}:${file.path}`))) fail("native", "native files must not contain duplicates");
     if (manifest.native?.allowAddons === true !== manifest.permissions.includes("native:addons")) fail("permissions", "native.allowAddons and the native:addons permission must be declared together");
@@ -6356,6 +6364,97 @@ var PluginCoreEnvelopeSchema = external_exports.discriminatedUnion("ok", [
   external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(PLUGIN_CORE_ERROR_CODES) }).strict()
 ]);
 
+// packages/plugin-sdk/src/surfaceContracts.ts
+var PLUGIN_SURFACE_CHANNELS = Object.freeze({
+  SYNC: "plugin-runtime:surface-sync",
+  PRESENTATION_SET: "plugin-runtime:presentation-set",
+  CLOSE: "plugin-runtime:surface-close",
+  RELOAD: "plugin-runtime:surface-reload",
+  STATE: "plugin-runtime:surface-state"
+});
+var PLUGIN_VIEW_CHANNELS = Object.freeze({
+  PRESENTATION_GET: "plugin-view:presentation-get",
+  PRESENTATION_REQUEST: "plugin-view:presentation-request",
+  PRESENTATION_CHANGED: "plugin-view:presentation-changed",
+  VISIBILITY: "plugin-view:visibility",
+  MEDIA_REPORT: "plugin-view:media-report",
+  MEDIA_COMMAND: "plugin-view:media-command"
+});
+var PRESENTATION_ERROR_CODES = Object.freeze([
+  "presentation_not_declared",
+  "presentation_not_granted",
+  "presentation_requires_focus",
+  "presentation_rate_limited",
+  "presentation_requires_fullpage",
+  "presentation_not_visible",
+  "presentation_view_unavailable"
+]);
+var protocolVersion4 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var pluginId4 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
+var viewId = external_exports.string().min(1).max(32).regex(IDENTIFIER_PATTERN);
+var coordinate = external_exports.number().finite().min(-1e5).max(1e5);
+var extent = external_exports.number().finite().min(0).max(1e5);
+var PluginPresentationModeSchema = external_exports.enum(["tab", "fullpage"]);
+var PluginRequestedModeSchema = external_exports.enum(["tab", "window", "fullpage", "overlay"]);
+var PluginSurfaceRectV1Schema = external_exports.object({ x: coordinate, y: coordinate, width: extent, height: extent }).strict();
+var PluginSurfaceSyncRequestV1Schema = external_exports.object({
+  protocolVersion: protocolVersion4,
+  pluginId: pluginId4,
+  viewId,
+  active: external_exports.boolean(),
+  rect: PluginSurfaceRectV1Schema.nullable(),
+  coreOverlay: external_exports.boolean()
+}).strict();
+var PluginPresentationSetRequestV1Schema = external_exports.object({
+  protocolVersion: protocolVersion4,
+  pluginId: pluginId4,
+  viewId,
+  mode: PluginPresentationModeSchema,
+  fullscreen: external_exports.boolean()
+}).strict();
+var PluginSurfaceTargetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginId4, viewId }).strict();
+var PluginCaptureStateSchema = external_exports.object({ microphone: external_exports.boolean(), camera: external_exports.boolean() }).strict();
+var PluginSurfaceStateV1Schema = external_exports.object({
+  pluginId: pluginId4,
+  viewId,
+  mode: PluginPresentationModeSchema,
+  fullscreen: external_exports.boolean(),
+  status: external_exports.enum(["idle", "loading", "ready", "covered", "hidden", "crashed", "closed"]),
+  errorCode: external_exports.string().min(1).max(96).nullable(),
+  capture: PluginCaptureStateSchema.default({ microphone: false, camera: false })
+}).strict();
+var PluginSurfaceStateEventV1Schema = external_exports.object({ protocolVersion: protocolVersion4, state: PluginSurfaceStateV1Schema }).strict();
+var errorEnvelope = external_exports.object({ code: external_exports.string().min(1).max(96).regex(/^[a-z0-9_]+$/), message: external_exports.string().min(1).max(512) }).strict();
+var PluginSurfaceResultEnvelopeV1Schema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(true), value: PluginSurfaceStateV1Schema }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(false), error: errorEnvelope }).strict()
+]);
+var PluginViewPresentationStateSchema = external_exports.object({
+  mode: PluginPresentationModeSchema,
+  fullscreen: external_exports.boolean(),
+  visible: external_exports.boolean()
+}).strict();
+var PluginViewPresentationRequestSchema = external_exports.object({
+  mode: PluginRequestedModeSchema,
+  fullscreen: external_exports.boolean().optional()
+}).strict();
+var PluginViewPresentationResultSchema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ ok: external_exports.literal(true), state: PluginViewPresentationStateSchema }).strict(),
+  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(PRESENTATION_ERROR_CODES) }).strict()
+]);
+var PluginViewPresentationChangeSchema = external_exports.object({
+  phase: external_exports.enum(["before", "after"]),
+  from: PluginPresentationModeSchema,
+  to: PluginPresentationModeSchema,
+  fullscreen: external_exports.boolean(),
+  visible: external_exports.boolean(),
+  reason: external_exports.enum(["user", "plugin", "core", "escape", "window"])
+}).strict();
+var PluginViewVisibilityReportSchema = external_exports.object({ state: external_exports.enum(["visible", "hidden"]) }).strict();
+var counter = external_exports.number().int().min(0).max(1e6);
+var PluginViewMediaReportSchema = external_exports.object({ requestId: counter.nullable(), live: counter, calls: counter, successes: counter }).strict();
+var PluginViewMediaCommandSchema = external_exports.object({ requestId: counter, action: external_exports.enum(["stop", "resume"]) }).strict();
+
 // packages/plugin-sdk/src/installContracts.ts
 var PLUGIN_INSTALL_CHANNELS = Object.freeze({
   LIST: "plugin-install:list",
@@ -6372,25 +6471,25 @@ var PLUGIN_INSTALL_CHANNELS = Object.freeze({
   BUNDLED_DECIDE: "plugin-install:bundled-decide",
   BUNDLED_RESTORE: "plugin-install:bundled-restore"
 });
-var protocolVersion4 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var protocolVersion5 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
 var installId = external_exports.string().regex(/^[0-9a-f]{32}$/);
 var keyId = external_exports.string().regex(/^dev-[0-9a-f]{16}$/);
-var PluginInstallListRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4 }).strict();
-var PluginInstallBeginRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4 }).strict();
-var PluginInstallDecisionRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, installId }).strict();
-var PluginUninstallRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), deleteData: external_exports.boolean() }).strict();
-var PluginDevKeyImportRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, publicKey: external_exports.string().min(1).max(4096), label: external_exports.string().min(1).max(48) }).strict();
-var PluginAssetPackRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, packId: external_exports.string().regex(IDENTIFIER_PATTERN) }).strict();
-var PluginPermissionSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), permission: external_exports.string().min(3).max(64), revoked: external_exports.boolean() }).strict();
-var PluginDevKeyRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, keyId }).strict();
+var PluginInstallListRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5 }).strict();
+var PluginInstallBeginRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5 }).strict();
+var PluginInstallDecisionRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, installId }).strict();
+var PluginUninstallRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), deleteData: external_exports.boolean() }).strict();
+var PluginDevKeyImportRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, publicKey: external_exports.string().min(1).max(4096), label: external_exports.string().min(1).max(48) }).strict();
+var PluginAssetPackRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, packId: external_exports.string().regex(IDENTIFIER_PATTERN) }).strict();
+var PluginPermissionSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), permission: external_exports.string().min(3).max(64), revoked: external_exports.boolean() }).strict();
+var PluginDevKeyRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, keyId }).strict();
 var pluginIdField = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
 var BUNDLED_DECISIONS = ["consent", "decline"];
 var BUNDLED_INSTALLED_STATUSES = ["awaiting_consent", "consented", "declined"];
 var BUNDLED_LISTED_STATES = ["removed", "verification_failed", "update_pending"];
-var PluginBundledReviewRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginIdField }).strict();
-var PluginBundledDecideRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginIdField, version: external_exports.string().regex(VERSION_PATTERN), decision: external_exports.enum(BUNDLED_DECISIONS) }).strict();
-var PluginBundledRestoreRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginIdField }).strict();
-var PluginProviderSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, capability: external_exports.string().regex(CAPABILITY_PATTERN).max(96), providerId: external_exports.string().regex(IDENTIFIER_PATTERN).max(96).nullable() }).strict();
+var PluginBundledReviewRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField }).strict();
+var PluginBundledDecideRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField, version: external_exports.string().regex(VERSION_PATTERN), decision: external_exports.enum(BUNDLED_DECISIONS) }).strict();
+var PluginBundledRestoreRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField }).strict();
+var PluginProviderSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, capability: external_exports.string().regex(CAPABILITY_PATTERN).max(96), providerId: external_exports.string().regex(IDENTIFIER_PATTERN).max(96).nullable() }).strict();
 var PLUGIN_RISK_NOTICES = ["full_trust", "native_code", "network_unrestricted", "dev_key_local_only", "file_sandbox_bypassable"];
 var RiskNoticeSchema = external_exports.enum(PLUGIN_RISK_NOTICES);
 var BackendViewSchema = external_exports.object({
@@ -6473,8 +6572,10 @@ var BundledPluginEntryViewV1Schema = external_exports.object({
   failureCode: external_exports.string().max(96).nullable()
 }).strict();
 var PluginInstallListV1Schema = external_exports.object({
-  protocolVersion: protocolVersion4,
+  protocolVersion: protocolVersion5,
   plugins: external_exports.array(InstalledPluginViewV1Schema),
+  developerPanelEnabled: external_exports.boolean().default(false),
+  developerViews: external_exports.array(PluginSurfaceStateV1Schema).max(1024).default([]),
   assetPacks: external_exports.array(InstalledAssetPackViewV1Schema).default([]),
   bundledPlugins: external_exports.array(BundledPluginEntryViewV1Schema).max(16).default([]),
   devKeys: external_exports.array(DevKeyViewV1Schema)
@@ -6511,105 +6612,14 @@ var PluginBundledReviewV1Schema = PluginInstallReviewV1Schema.omit({ installId: 
 var PluginBundledDecideResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.enum(["consented", "declined"]) }).strict();
 var PluginBundledRestoreResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.literal("awaiting_consent") }).strict();
 var envelope = (value) => external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(true), value }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
+  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(true), value }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
 ]);
 var PluginInstallListEnvelopeV1Schema = envelope(PluginInstallListV1Schema);
 var PluginInstallBeginEnvelopeV1Schema = envelope(PluginInstallBeginResultV1Schema);
 var PluginBundledReviewEnvelopeV1Schema = envelope(PluginBundledReviewV1Schema);
 var PluginBundledDecideEnvelopeV1Schema = envelope(PluginBundledDecideResultV1Schema);
 var PluginBundledRestoreEnvelopeV1Schema = envelope(PluginBundledRestoreResultV1Schema);
-
-// packages/plugin-sdk/src/surfaceContracts.ts
-var PLUGIN_SURFACE_CHANNELS = Object.freeze({
-  SYNC: "plugin-runtime:surface-sync",
-  PRESENTATION_SET: "plugin-runtime:presentation-set",
-  CLOSE: "plugin-runtime:surface-close",
-  RELOAD: "plugin-runtime:surface-reload",
-  STATE: "plugin-runtime:surface-state"
-});
-var PLUGIN_VIEW_CHANNELS = Object.freeze({
-  PRESENTATION_GET: "plugin-view:presentation-get",
-  PRESENTATION_REQUEST: "plugin-view:presentation-request",
-  PRESENTATION_CHANGED: "plugin-view:presentation-changed",
-  VISIBILITY: "plugin-view:visibility",
-  MEDIA_REPORT: "plugin-view:media-report",
-  MEDIA_COMMAND: "plugin-view:media-command"
-});
-var PRESENTATION_ERROR_CODES = Object.freeze([
-  "presentation_not_declared",
-  "presentation_not_granted",
-  "presentation_requires_focus",
-  "presentation_rate_limited",
-  "presentation_requires_fullpage",
-  "presentation_not_visible",
-  "presentation_view_unavailable"
-]);
-var protocolVersion5 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
-var pluginId4 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
-var viewId = external_exports.string().min(1).max(32).regex(IDENTIFIER_PATTERN);
-var coordinate = external_exports.number().finite().min(-1e5).max(1e5);
-var extent = external_exports.number().finite().min(0).max(1e5);
-var PluginPresentationModeSchema = external_exports.enum(["tab", "fullpage"]);
-var PluginRequestedModeSchema = external_exports.enum(["tab", "window", "fullpage", "overlay"]);
-var PluginSurfaceRectV1Schema = external_exports.object({ x: coordinate, y: coordinate, width: extent, height: extent }).strict();
-var PluginSurfaceSyncRequestV1Schema = external_exports.object({
-  protocolVersion: protocolVersion5,
-  pluginId: pluginId4,
-  viewId,
-  active: external_exports.boolean(),
-  rect: PluginSurfaceRectV1Schema.nullable(),
-  coreOverlay: external_exports.boolean()
-}).strict();
-var PluginPresentationSetRequestV1Schema = external_exports.object({
-  protocolVersion: protocolVersion5,
-  pluginId: pluginId4,
-  viewId,
-  mode: PluginPresentationModeSchema,
-  fullscreen: external_exports.boolean()
-}).strict();
-var PluginSurfaceTargetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginId4, viewId }).strict();
-var PluginCaptureStateSchema = external_exports.object({ microphone: external_exports.boolean(), camera: external_exports.boolean() }).strict();
-var PluginSurfaceStateV1Schema = external_exports.object({
-  pluginId: pluginId4,
-  viewId,
-  mode: PluginPresentationModeSchema,
-  fullscreen: external_exports.boolean(),
-  status: external_exports.enum(["idle", "loading", "ready", "covered", "hidden", "crashed", "closed"]),
-  errorCode: external_exports.string().min(1).max(96).nullable(),
-  capture: PluginCaptureStateSchema.default({ microphone: false, camera: false })
-}).strict();
-var PluginSurfaceStateEventV1Schema = external_exports.object({ protocolVersion: protocolVersion5, state: PluginSurfaceStateV1Schema }).strict();
-var errorEnvelope = external_exports.object({ code: external_exports.string().min(1).max(96).regex(/^[a-z0-9_]+$/), message: external_exports.string().min(1).max(512) }).strict();
-var PluginSurfaceResultEnvelopeV1Schema = external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(true), value: PluginSurfaceStateV1Schema }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(false), error: errorEnvelope }).strict()
-]);
-var PluginViewPresentationStateSchema = external_exports.object({
-  mode: PluginPresentationModeSchema,
-  fullscreen: external_exports.boolean(),
-  visible: external_exports.boolean()
-}).strict();
-var PluginViewPresentationRequestSchema = external_exports.object({
-  mode: PluginRequestedModeSchema,
-  fullscreen: external_exports.boolean().optional()
-}).strict();
-var PluginViewPresentationResultSchema = external_exports.discriminatedUnion("ok", [
-  external_exports.object({ ok: external_exports.literal(true), state: PluginViewPresentationStateSchema }).strict(),
-  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(PRESENTATION_ERROR_CODES) }).strict()
-]);
-var PluginViewPresentationChangeSchema = external_exports.object({
-  phase: external_exports.enum(["before", "after"]),
-  from: PluginPresentationModeSchema,
-  to: PluginPresentationModeSchema,
-  fullscreen: external_exports.boolean(),
-  visible: external_exports.boolean(),
-  reason: external_exports.enum(["user", "plugin", "core", "escape", "window"])
-}).strict();
-var PluginViewVisibilityReportSchema = external_exports.object({ state: external_exports.enum(["visible", "hidden"]) }).strict();
-var counter = external_exports.number().int().min(0).max(1e6);
-var PluginViewMediaReportSchema = external_exports.object({ requestId: counter.nullable(), live: counter, calls: counter, successes: counter }).strict();
-var PluginViewMediaCommandSchema = external_exports.object({ requestId: counter, action: external_exports.enum(["stop", "resume"]) }).strict();
 
 // packages/plugin-sdk/src/backendContracts.ts
 var PLUGIN_BACKEND_CHANNELS = Object.freeze({
@@ -6706,6 +6716,34 @@ var envelope2 = (value) => external_exports.discriminatedUnion("ok", [
 ]);
 var PluginBackendStatusEnvelopeV1Schema = envelope2(PluginBackendStatusListV1Schema);
 var PluginBackendProbeEnvelopeV1Schema = envelope2(PluginBackendProbeResultV1Schema);
+
+// packages/plugin-sdk/src/backendInvokeContracts.ts
+var PLUGIN_BACKEND_INVOKE_LIMITS = Object.freeze({ methods: 32, methodLength: 64, payloadBytes: 64 * 1024, inFlight: 8, timeoutMs: 3e4 });
+var PLUGIN_BACKEND_INVOKE_ERROR_CODES = Object.freeze([
+  "plugin_not_installed",
+  "plugin_disabled",
+  "plugin_permission_denied",
+  "backend_method_not_allowed",
+  "backend_invoke_invalid",
+  "backend_invoke_too_large",
+  "backend_invoke_timeout",
+  "plugin_backend_crashed",
+  "plugin_backend_unavailable"
+]);
+var method = external_exports.string().min(1).max(PLUGIN_BACKEND_INVOKE_LIMITS.methodLength).regex(/^[A-Za-z0-9._@-]+$/);
+var jsonValue = external_exports.lazy(() => external_exports.union([
+  external_exports.null(),
+  external_exports.boolean(),
+  external_exports.number().finite(),
+  external_exports.string(),
+  external_exports.array(jsonValue).max(4096),
+  external_exports.record(external_exports.string(), jsonValue)
+]));
+var PluginBackendInvokeRequestV1Schema = external_exports.object({ method, params: jsonValue }).strict();
+var PluginBackendInvokeResultV1Schema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ ok: external_exports.literal(true), value: jsonValue }).strict(),
+  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(PLUGIN_BACKEND_INVOKE_ERROR_CODES) }).strict()
+]);
 
 // packages/platform/plugin-artifact/src/errors.ts
 var ArtifactError = class extends Error {
@@ -7721,7 +7759,7 @@ function writeZip(entries) {
     const name = Buffer.from(entry.name, "utf8");
     const deflated = deflateRawSync(entry.data, { level: DEFLATE_LEVEL });
     const stored = deflated.length >= entry.data.length;
-    const method = stored ? METHOD_STORED : METHOD_DEFLATE;
+    const method2 = stored ? METHOD_STORED : METHOD_DEFLATE;
     const payload = stored ? entry.data : deflated;
     if (payload.length >= ZIP32_LIMIT || entry.data.length >= ZIP32_LIMIT || offset >= ZIP32_LIMIT) throw new ArtifactError("zip_size_exceeded", entry.name);
     const crc = crc32(entry.data);
@@ -7730,7 +7768,7 @@ function writeZip(entries) {
       u16(VERSION_MADE_BY),
       u16(VERSION_NEEDED),
       u16(UTF8_NAME_FLAG),
-      u16(method),
+      u16(method2),
       u16(DOS_TIME_MIDNIGHT),
       u16(DOS_DATE_1980_01_01),
       u32(crc),
@@ -7749,7 +7787,7 @@ function writeZip(entries) {
       u32(LOCAL_HEADER_SIGNATURE),
       u16(VERSION_NEEDED),
       u16(UTF8_NAME_FLAG),
-      u16(method),
+      u16(method2),
       u16(DOS_TIME_MIDNIGHT),
       u16(DOS_DATE_1980_01_01),
       u32(crc),
@@ -7895,11 +7933,12 @@ async function packArtifact(options2) {
 }
 
 // .teamuq/scripts/plugin-tools/keyTools.mjs
-import { createHash as createHash7, createPrivateKey as createPrivateKey2, createPublicKey as createPublicKey3, randomBytes as randomBytes4, sign as sign2, verify as verify3 } from "node:crypto";
+import { createHash as createHash7, createPrivateKey as createPrivateKey2, createPublicKey as createPublicKey3, generateKeyPairSync, randomBytes as randomBytes4, sign as sign2, verify as verify3 } from "node:crypto";
 import fs7 from "node:fs";
 import path7 from "node:path";
 var KEY_ID_PATTERN2 = /^[a-z0-9][a-z0-9-]{2,62}$/;
 var PASSPHRASE_ENV_FOR_TESTS = "TEAMUQ_KEY_PASSPHRASE_FOR_TESTS";
+var MIN_PASSPHRASE_LENGTH = 16;
 var ENCRYPTED_PEM_HEADER = ["-----BEGIN", "ENCRYPTED", "PRIVATE KEY-----"].join(" ");
 var SPKI_ED25519_PREFIX2 = Buffer.from("302a300506032b6570032100", "hex");
 var RAW_KEY_BYTES2 = 32;
@@ -7907,6 +7946,23 @@ var MAX_KEY_FILE_BYTES = 16 * 1024;
 function assertReleaseKeyId(keyId2) {
   if (typeof keyId2 !== "string" || !KEY_ID_PATTERN2.test(keyId2)) throw new Error(`keyId must match ${KEY_ID_PATTERN2}`);
   if (keyId2.startsWith("dev-")) throw new Error('keyId must not start with "dev-": that prefix is reserved for local development keys');
+}
+function devKeyIdOf2(raw) {
+  if (!Buffer.isBuffer(raw) || raw.length !== RAW_KEY_BYTES2) throw new Error("public key must be 32 raw bytes");
+  return `dev-${createHash7("sha256").update(raw).digest("hex").slice(0, 16)}`;
+}
+function assertDevKeyId(keyId2, raw) {
+  const expected = devKeyIdOf2(raw);
+  if (keyId2 !== expected) throw new Error(`development keyId mismatch: expected ${expected}`);
+  return expected;
+}
+function generateEncryptedDevKeyPair(passphrase) {
+  const pair = generateKeyPairSync("ed25519", {
+    privateKeyEncoding: { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase },
+    publicKeyEncoding: { type: "spki", format: "der" }
+  });
+  const raw = Buffer.from(pair.publicKey.subarray(pair.publicKey.length - RAW_KEY_BYTES2));
+  return { privatePem: pair.privateKey, raw, keyId: devKeyIdOf2(raw) };
 }
 function findGitWorkTree(target) {
   let current = path7.resolve(target);
@@ -7962,6 +8018,15 @@ async function readPassphrase(question) {
   if (!canPrompt()) throw new Error("an interactive terminal is required to type the passphrase (it is never accepted on the command line)");
   return promptHidden(question);
 }
+async function readNewPassphrase() {
+  const first = await readPassphrase(`New passphrase (at least ${MIN_PASSPHRASE_LENGTH} characters): `);
+  if (first.length < MIN_PASSPHRASE_LENGTH) throw new Error(`passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters`);
+  if (process.env[PASSPHRASE_ENV_FOR_TESTS] === void 0 || process.env[PASSPHRASE_ENV_FOR_TESTS] === "") {
+    const again = await readPassphrase("Repeat passphrase: ");
+    if (again !== first) throw new Error("passphrases do not match");
+  }
+  return first;
+}
 function rawToPublicKey(raw) {
   if (!Buffer.isBuffer(raw) || raw.length !== RAW_KEY_BYTES2) throw new Error("public key must be 32 raw bytes");
   return createPublicKey3({ key: Buffer.concat([SPKI_ED25519_PREFIX2, raw]), format: "der", type: "spki" });
@@ -8001,7 +8066,7 @@ function selfCheck(privateKey, raw) {
 }
 
 // .teamuq/scripts/plugin-tools/tuq-plugin-tool.entry.ts
-var CORE_VERSION = "1.6.2";
+var CORE_VERSION = "1.6.3";
 var MAX_MANIFEST_BYTES2 = 256 * 1024;
 var MAX_OVERRIDE_BYTES = 256 * 1024;
 var KEY_FILE_SUFFIX = ".key.pem";
@@ -8012,13 +8077,16 @@ var USAGE = [
   "  validate <stageDir> [--core-version v] [--platform id] [--os-version v]",
   "  pack <stageDir> --key <file> [--key-id id] [--out file] [--anchors core|self] [--overrides file.json] [--core-version v] [--platform id] [--os-version v]",
   "  verify <file.tuqplugin> [--anchors core|self] [--pub-file file.pub.json | --key-id id --public-key base64] [--core-version v] [--platform id] [--os-version v]",
+  "  dev-keygen --out-dir <directory outside git work trees>",
+  "  dev-pack <stageDir> --key <encrypted-dev-key.pem> --out <file.tuqplugin> --bump-patch",
+  "  types --out <plugin-repo/types>",
   "  selftest-key --key <file> [--key-id id]",
   "anchors core (default) trusts only the TEAMUQ_TRUST_ANCHORS embedded in this tool; anchors self trusts only your own key and is for development.",
   "The key passphrase is typed at an interactive prompt and is never accepted as an argument."
 ].join("\n");
 var UsageError = class extends Error {
 };
-function parse(argv, allowed) {
+function parse(argv, allowed, booleanFlags = []) {
   const positional = [];
   const flags = /* @__PURE__ */ new Map();
   for (let index = 0; index < argv.length; index += 1) {
@@ -8029,6 +8097,11 @@ function parse(argv, allowed) {
     }
     if (/pass/iu.test(token)) throw new UsageError("the passphrase is never accepted on the command line");
     if (!allowed.includes(token)) throw new UsageError(`unknown option ${token}`);
+    if (booleanFlags.includes(token)) {
+      if (flags.has(token)) throw new UsageError(`${token} was given twice`);
+      flags.set(token, "true");
+      continue;
+    }
     const value = argv[index + 1];
     if (value === void 0 || value.startsWith("--")) throw new UsageError(`${token} needs a value`);
     if (flags.has(token)) throw new UsageError(`${token} was given twice`);
@@ -8130,6 +8203,120 @@ function keyIdFrom(flags, keyFile) {
 function selfAnchors(keyId2, publicKey) {
   return { rootKeys: [{ keyId: keyId2, publicKey }], revokedKeyIds: [] };
 }
+async function withSelfDevKey(publicKey, run) {
+  const root = await fs8.mkdtemp(path8.join(os3.tmpdir(), "tuq-plugin-self-trust-"));
+  const store = createDevKeyStore({ pluginsRoot: root });
+  try {
+    await store.add({ publicKey, label: "Local self verification" });
+    return await run(store);
+  } finally {
+    await fs8.rm(root, { recursive: true, force: true });
+  }
+}
+async function commandDevKeygen(argv) {
+  const { positional, flags } = parse(argv, ["--out-dir"]);
+  const output = flags.get("--out-dir");
+  if (positional.length !== 0 || output === void 0) throw new UsageError("dev-keygen needs --out-dir <directory>");
+  const directory = path8.resolve(output);
+  assertOutsideGitWorkTree(directory, "development key directory");
+  await fs8.mkdir(directory, { recursive: true });
+  const passphrase = await readNewPassphrase();
+  const pair = generateEncryptedDevKeyPair(passphrase);
+  const publicKey = describePublicKey(createPublicKey4({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), pair.raw]), format: "der", type: "spki" })).publicKey;
+  const keyFile = path8.join(directory, `${pair.keyId}.key.pem`);
+  const publicFile = path8.join(directory, `${pair.keyId}.pub.json`);
+  let privateCreated = false;
+  try {
+    const privateHandle = await fs8.open(keyFile, "wx", 384);
+    privateCreated = true;
+    await privateHandle.writeFile(pair.privatePem, "utf8");
+    await privateHandle.close();
+    const publicHandle = await fs8.open(publicFile, "wx", 384);
+    await publicHandle.writeFile(`${JSON.stringify({ keyId: pair.keyId, publicKey }, null, 2)}
+`, "utf8");
+    await publicHandle.close();
+  } catch (error) {
+    if (privateCreated) await fs8.rm(keyFile, { force: true }).catch(() => void 0);
+    throw error;
+  }
+  selfCheck(loadEncryptedPrivateKey(pair.privatePem, passphrase), pair.raw);
+  show({ keyId: pair.keyId, privateKey: keyFile, publicKey: publicFile, passphrase: "interactive only" });
+  return 0;
+}
+function bumpedPatch(version) {
+  const match = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})$/u.exec(version);
+  if (match === null) throw new UsageError(`cannot bump non-semver version ${version}`);
+  const patch = Number(match[3]) + 1;
+  if (patch > 999999) throw new UsageError(`patch version is at its maximum: ${version}`);
+  return `${match[1]}.${match[2]}.${patch}`;
+}
+async function commandDevPack(argv) {
+  const { positional, flags } = parse(argv, ["--key", "--out", "--core-version", "--platform", "--os-version", "--bump-patch"], ["--bump-patch"]);
+  if (positional.length !== 1 || flags.get("--bump-patch") !== "true") throw new UsageError("dev-pack needs <stageDir> --key <encrypted-dev-key.pem> --out <file.tuqplugin> --bump-patch");
+  const keyFile = flags.get("--key");
+  const outArg = flags.get("--out");
+  if (keyFile === void 0 || outArg === void 0) throw new UsageError("dev-pack needs --key and --out");
+  const stageDir = path8.resolve(positional[0]);
+  const outFile = path8.resolve(outArg);
+  assertOutsideGitWorkTree(keyFile, "development signing key");
+  await assertOutsideStage(stageDir, outFile);
+  const support = supportContext(flags);
+  const staged = await validateStage(stageDir, support);
+  if (staged.manifest === void 0 || staged.problems.length > 0) {
+    for (const problem of staged.problems) console.error(`invalid: ${problem}`);
+    return 1;
+  }
+  const key = loadEncryptedPrivateKey(readKeyFile(keyFile), await readPassphrase("Passphrase for local development key: "));
+  const description = describePublicKey(createPublicKey4(key));
+  const keyId2 = assertDevKeyId(`dev-${createHash8("sha256").update(description.raw).digest("hex").slice(0, 16)}`, description.raw);
+  selfCheck(key, description.raw);
+  const identity = path8.basename(keyFile);
+  if (identity !== `${keyId2}.key.pem`) throw new UsageError(`development key id mismatch: file name must be ${keyId2}.key.pem`);
+  let version = bumpedPatch(staged.manifest.version);
+  if (await isRegularFile(outFile)) {
+    await withSelfDevKey(description.publicKey, async (devKeys) => {
+      const previous = await verifyArtifactFile(outFile, { anchors: { rootKeys: [], revokedKeyIds: [] }, devKeys, support });
+      if (previous.manifest.id !== staged.manifest?.id) throw new UsageError("existing output artifact belongs to a different plugin id");
+      version = bumpedPatch(previous.manifest.version);
+    });
+  }
+  const scratch = await fs8.mkdtemp(path8.join(os3.tmpdir(), "tuq-plugin-dev-pack-"));
+  const copiedStage = path8.join(scratch, "stage");
+  try {
+    await fs8.cp(stageDir, copiedStage, { recursive: true, errorOnExist: true, force: false });
+    const manifestFile = path8.join(copiedStage, "manifest.json");
+    const manifest = JSON.parse(await fs8.readFile(manifestFile, "utf8"));
+    manifest.version = version;
+    await fs8.writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}
+`, "utf8");
+    const packed = await withSelfDevKey(description.publicKey, (devKeys) => packArtifact({
+      stageDir: copiedStage,
+      outFile,
+      signer: { keyId: keyId2, key },
+      review: { anchors: { rootKeys: [], revokedKeyIds: [] }, devKeys, support }
+    }));
+    show({ file: packed.file, id: packed.verified.manifest.id, version: packed.verified.manifest.version, signer: packed.verified.signer, anchors: "self", sha256: packed.sha256, integritySha256: packed.verified.integritySha256, stageChanged: false });
+  } finally {
+    await fs8.rm(scratch, { recursive: true, force: true });
+  }
+  return 0;
+}
+var SDK_TYPES = "declare module '@teamuq/plugin-sdk' {\nexport type JsonValue = null | boolean | number | string | JsonValue[] | {\n    [key: string]: JsonValue;\n};\nexport interface PluginBackendApiV1 {\n    call(method: string, params: JsonValue): Promise<JsonValue>;\n}\n}\ninterface Window { tuqPlugin: { backend: import('@teamuq/plugin-sdk').PluginBackendApiV1 } }\ndeclare module '@teamuq/plugin-sdk/external' {\nexport type PluginBackendContextV1 = Readonly<{\n    readonly pluginId: string;\n    readonly dataDir: string;\n    readonly assetPacks: Readonly<Record<string, string>>;\n    readonly allowAddons: boolean;\n}>;\n}\n";
+async function commandTypes(argv) {
+  const { positional, flags } = parse(argv, ["--out"]);
+  const output = flags.get("--out");
+  if (positional.length !== 0 || output === void 0) throw new UsageError("types needs --out <plugin-repo/types>");
+  const directory = path8.resolve(output);
+  const declaration = SDK_TYPES.replace(/\r\n/gu, "\n");
+  const sha2562 = createHash8("sha256").update(declaration).digest("hex");
+  await fs8.mkdir(directory, { recursive: true });
+  await fs8.writeFile(path8.join(directory, "tuq-plugin-sdk.d.ts"), declaration, "utf8");
+  const metadata = { contractVersion: "1", coreVersion: CORE_VERSION, file: "tuq-plugin-sdk.d.ts", sha256: sha2562 };
+  await fs8.writeFile(path8.join(directory, "tuq-plugin-sdk.version.json"), `${JSON.stringify(metadata, null, 2)}
+`, "utf8");
+  show(metadata);
+  return 0;
+}
 function anchorMode(flags) {
   const mode = flags.get("--anchors") ?? "core";
   if (mode !== "core" && mode !== "self") throw new UsageError("--anchors must be core or self");
@@ -8185,11 +8372,21 @@ function publicKeyAnchors(flags) {
   if (pubFile !== void 0) {
     const stored = JSON.parse(readFileSync(pubFile, "utf8"));
     if (typeof stored.keyId !== "string" || typeof stored.publicKey !== "string") throw new UsageError(`${pubFile} must contain { keyId, publicKey }`);
+    if (keyId2 !== void 0 && keyId2 !== stored.keyId) throw new UsageError("--key-id does not match the public key file");
+    if (publicKey !== void 0 && publicKey !== stored.publicKey) throw new UsageError("--public-key does not match the public key file");
     keyId2 ??= stored.keyId;
     publicKey ??= stored.publicKey;
   }
   if (keyId2 === void 0 || publicKey === void 0) throw new UsageError("--anchors self needs --pub-file, or --key-id together with --public-key");
-  if (Buffer.from(publicKey, "base64").length !== 32) throw new UsageError("--public-key must be 32 raw bytes in base64");
+  const raw = Buffer.from(publicKey, "base64");
+  if (raw.length !== 32) throw new UsageError("--public-key must be 32 raw bytes in base64");
+  if (keyId2.startsWith("dev-")) {
+    try {
+      assertDevKeyId(keyId2, raw);
+    } catch (error) {
+      throw new UsageError(error.message);
+    }
+  }
   return selfAnchors(keyId2, publicKey);
 }
 async function commandVerify(argv) {
@@ -8198,8 +8395,12 @@ async function commandVerify(argv) {
   const mode = anchorMode(flags);
   const anchors = mode === "self" ? publicKeyAnchors(flags) : TEAMUQ_TRUST_ANCHORS;
   const file = path8.resolve(positional[0]);
-  const verified = await verifyArtifactFile(file, { anchors, support: supportContext(flags) });
-  show({ file, id: verified.manifest.id, version: verified.manifest.version, signer: verified.signer, anchors: mode, fileCount: verified.fileCount, totalBytes: verified.totalBytes, integritySha256: verified.integritySha256 });
+  const support = supportContext(flags);
+  const publicKey = mode === "self" ? anchors.rootKeys[0]?.publicKey : void 0;
+  const verified = mode === "self" && anchors.rootKeys[0]?.keyId.startsWith("dev-") && publicKey !== void 0 ? await withSelfDevKey(publicKey, (devKeys) => verifyArtifactFile(file, { anchors, devKeys, support })) : await verifyArtifactFile(file, { anchors, support });
+  const { manifest } = verified;
+  const pinned = manifest.kind === "plugin" ? { trustTier: manifest.trustTier, permissions: manifest.permissions, allowAddons: manifest.native?.allowAddons === true } : {};
+  show({ file, id: manifest.id, version: manifest.version, kind: manifest.kind, ...pinned, signer: verified.signer, anchors: mode, fileCount: verified.fileCount, totalBytes: verified.totalBytes, integritySha256: verified.integritySha256 });
   return 0;
 }
 async function commandSelftestKey(argv) {
@@ -8226,6 +8427,9 @@ async function main(argv) {
     }
     if (command === "validate") return await commandValidate(rest);
     if (command === "pack") return await commandPack(rest);
+    if (command === "dev-keygen") return await commandDevKeygen(rest);
+    if (command === "dev-pack") return await commandDevPack(rest);
+    if (command === "types") return await commandTypes(rest);
     if (command === "verify") return await commandVerify(rest);
     if (command === "selftest-key") return await commandSelftestKey(rest);
     if (command === void 0 || command === "--help" || command === "-h") {

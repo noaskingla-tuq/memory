@@ -13,6 +13,8 @@ const SIDE_EFFECT_IMPORT = /^[ \t]*import\s*(['"])([^'"]+)\1/gmu
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu
 const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
+// 1.6.3 is the first Core release with the whitelisted invokeBackend, the methodName regex that accepts '@' and the memory sink on invoke; older Cores accept the manifest but never call it.
+const MIN_CORE_VERSION = '>=1.6.3'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 
 function specifiersOf(text) {
@@ -84,7 +86,7 @@ export function verifyArtifact(file, { anchors = 'self', pubFile } = {}) {
   const resources = manifest.resources ?? {}
   check('manifest resources follow the S0 recommendation', resources.cpuThreads === 1 && resources.maxSessions === 2 && resources.idleUnloadSec === 180 && Object.entries(RESOURCE_RANGES).every(([field, [low, high]]) => resources[field] >= low && resources[field] <= high), JSON.stringify(resources))
   check(`manifest version equals package.json version ${packageJson.version}`, manifest.version === packageJson.version)
-  check('manifest pluginApi and minCoreVersion are set', typeof manifest.pluginApi === 'string' && typeof manifest.minCoreVersion === 'string', `${manifest.pluginApi} ${manifest.minCoreVersion}`)
+  check(`manifest pluginApi is set and minCoreVersion is ${MIN_CORE_VERSION}`, typeof manifest.pluginApi === 'string' && manifest.minCoreVersion === MIN_CORE_VERSION, `${manifest.pluginApi} ${manifest.minCoreVersion}`)
 
   const backend = text('backend.mjs')
   const backendSpecifiers = specifiersOf(backend)

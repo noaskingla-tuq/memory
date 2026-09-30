@@ -3,6 +3,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -20,7 +21,11 @@ import {
   resolve,
   sep,
 } from "node:path";
-import type { DataLayoutPort } from "../../application/ports.js";
+import type {
+  AgentDirectory,
+  AgentDirectoryPort,
+  DataLayoutPort,
+} from "../../application/ports.js";
 import { MemoryServiceError } from "../../domain/errors.js";
 import { openCairnCore } from "../cairn/cairnCoreAdapter.js";
 import { DEFAULT_PIN_PATH, readCairnPin } from "./cairnPin.js";
@@ -267,7 +272,7 @@ export interface CairnDataLayoutOptions {
   readonly trustedBase?: string;
 }
 
-export class CairnDataLayout implements DataLayoutPort {
+export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
   private readonly root: string;
   private readonly realRoot: string;
   private readonly agentsRoot: string;
@@ -336,6 +341,37 @@ export class CairnDataLayout implements DataLayoutPort {
       });
     }
     return databasePath;
+  }
+
+  // why: listing must never create a directory or rewrite an identity, so it applies the same reparse-point checks as agentDbPath without its mkdir and upgrade steps
+  listAgentDirectories(): readonly AgentDirectory[] {
+    const agentsReal = join(realpathSync.native(this.root), "agents");
+    assertDirectPath(this.agentsRoot, agentsReal);
+    assertRealWithin(this.realRoot, this.agentsRoot);
+    const entries: AgentDirectory[] = [];
+    for (const agentHash of readdirSync(this.agentsRoot).filter((name) => /^[0-9a-f]{64}$/.test(name)).sort()) {
+      const agentRoot = join(this.agentsRoot, agentHash);
+      try {
+        if (!assertDirectPath(agentRoot, join(agentsReal, agentHash)).isDirectory()) {
+          entries.push({ agentHash, databasePath: null, state: "unsafe" });
+          continue;
+        }
+        assertRealWithin(this.realRoot, agentRoot);
+        const databasePath = join(agentRoot, "memory.sqlite");
+        for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+          assertRegularFile(this.realRoot, path, "Memory database");
+        }
+        entries.push(
+          existsSync(databasePath)
+            ? { agentHash, databasePath, state: "ready" }
+            : { agentHash, databasePath: null, state: "no_database" },
+        );
+      } catch (error) {
+        const unsafe = error instanceof MemoryServiceError && error.code === "STORAGE_UNSAFE";
+        entries.push({ agentHash, databasePath: null, state: unsafe ? "unsafe" : "unreadable" });
+      }
+    }
+    return entries;
   }
 
   private upgradeAgent(input: {

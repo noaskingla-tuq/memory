@@ -61,6 +61,18 @@ export interface DataLayoutPort {
   preflight(): void;
 }
 
+export type AgentDirectoryState = "ready" | "no_database" | "unsafe" | "unreadable";
+
+export interface AgentDirectory {
+  readonly agentHash: string;
+  readonly databasePath: string | null;
+  readonly state: AgentDirectoryState;
+}
+
+export interface AgentDirectoryPort {
+  listAgentDirectories(): readonly AgentDirectory[];
+}
+
 export interface ObservabilityPort {
   emit(event: Readonly<Record<string, unknown>>): void;
 }

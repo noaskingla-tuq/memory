@@ -5,6 +5,7 @@
 - 本 repo 是 TeamUQ 記憶系統的獨立外部 plugin（id `teamuq.memory`，full-trust）；只建本機 repo，不建遠端、不 push，除非使用者明確要求。
 - `src/{application,domain,adapters}` 自 TeamUQ `packages/platform/memory-server` 原樣搬出；來源 commit 與 tree hash 記在首個 commit 訊息。改動只限本 repo 需要的 import 路徑，不順手重構。
 - 唯一可 import `cairn-memory` 的檔是 `src/adapters/cairn/cairnCoreAdapter.ts`，且只走 `cairn-memory/core/index.mjs`；由 `tools/verify-source-untouched.mjs` 把關。
+- 只有 `src/adapters/ui/cairnReader.ts` 可以對 Cairn 庫檔下 SQL，且只讀：開檔一律讀寫模式加 `PRAGMA query_only = ON`（不用 `readOnly`，否則 hot journal 無法回復）、先確認檔案存在並拒 symlink／junction、`application_id` 必須 `0x43414952` 且 `user_version` 必須 13（否則 `unsupported_schema`）、每次開查關且不佔 `CoreHandlePool`。`upgradeBackup.ts`（G7 備份的 `VACUUM INTO` 與備份檔 `integrity_check`）與 `diagnose.ts`（只開 `:memory:` 查 sqlite 版本）是既有例外，不得擴大；`tools/verify-source-untouched.mjs` 強制這份名單、reader 的只讀條件，並有負向測試（`test/sql-boundary.test.mjs`）。升 Cairn pin 時 `test/cairn-reader.test.mjs` 的 parity 不過就擋下。
 - Cairn 由 `cairn-pin.json` 釘死：升 commit 前先讀 diff，更新 `commit`、`coreTree`、`redactSha256`，並把相容的 commit 放進 `accepted[]`；`package.json` 與 lock 必須同步。
 - 每個 `accepted[]` 項目都必須有 `test/fixtures/legacy-db/<commit>/` 真實舊庫 fixture（`tools/make-legacy-fixture.mjs` 產生）；備份失敗一律回 `STORAGE_BUSY`、不得回 `INTERNAL`。
 - `vendor/teamuq-contract/` 是 TeamUQ Core 契約的副本，禁止手改；只用 `tools/sync-vendor.mjs --core <TeamUQ 路徑>` 更新，`npm run contract:verify` 必須 exit 0。

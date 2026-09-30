@@ -5635,13 +5635,106 @@ var HostIdentityTaskChangedV1Schema = external_exports.object({
   }).strict()
 }).strict();
 
+// packages/plugin-sdk/src/textInputContracts.ts
+var TEXT_INPUT_CAPABILITY = "teamuq.text-input@1";
+var TEXT_INPUT_PERMISSION = "input:text";
+var CORE_CALLER_ID = "core";
+var TEXT_INPUT_CHANNELS = Object.freeze({
+  STATE: "plugin-text-input:state",
+  SUBMIT: "plugin-text-input:submit"
+});
+var TEXT_INPUT_LIMITS = Object.freeze({
+  textBytes: 4096,
+  inputsPerSecond: 5,
+  pendingInputs: 64,
+  pendingTtlMs: 3e4,
+  ackTimeoutMs: 5e3
+});
+var CORE_INPUT_SOURCES = Object.freeze(["voice", "typed", "schedule"]);
+var TEXT_INPUT_ACK_RESULTS = Object.freeze(["accepted", "dropped", "busy"]);
+var TEXT_INPUT_SUBMIT_ERRORS = Object.freeze([
+  "no_input_target",
+  "input_invalid",
+  "ack_timeout",
+  "provider_not_ready",
+  "provider_not_allowed",
+  "provider_selection_required",
+  "capability_unresolved",
+  "capability_busy",
+  "consumer_limit",
+  "rate_limited",
+  "message_too_large",
+  "open_timeout",
+  "provider_error",
+  "session_closed",
+  "plugin_text_input_forbidden",
+  "plugin_text_input_validation",
+  "plugin_text_input_failed"
+]);
+var protocolVersion2 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var pluginId2 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
+var inputId = external_exports.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+var reason = external_exports.string().regex(/^[a-z0-9_]{1,32}$/);
+var utterance = external_exports.object({ startMs: external_exports.number().int().min(0), endMs: external_exports.number().int().min(0) }).strict().refine((value) => value.endMs >= value.startMs, { message: "endMs must not precede startMs" });
+var utf8Bytes = (value) => new TextEncoder().encode(value).length;
+var textInputText = external_exports.string().min(1).refine((value) => utf8Bytes(value) <= TEXT_INPUT_LIMITS.textBytes, { message: "text too large" });
+var TextInputSourceSchema = external_exports.union([external_exports.enum(CORE_INPUT_SOURCES), external_exports.string().max(104).regex(/^plugin:[a-z0-9]+(?:[.-][a-z0-9]+)*$/)]);
+var TextInputCallerMessageSchema = external_exports.object({ type: external_exports.literal("input"), inputId, text: textInputText }).strict();
+var TextInputDeliveredSchema = external_exports.object({
+  type: external_exports.literal("input"),
+  inputId,
+  text: textInputText,
+  source: TextInputSourceSchema,
+  callerId: external_exports.union([external_exports.literal(CORE_CALLER_ID), pluginId2]),
+  receivedAtMs: external_exports.number().int().min(0),
+  arrivedWhileSpeaking: external_exports.boolean(),
+  utterance: utterance.optional()
+}).strict();
+var TextInputAckSchema = external_exports.object({ type: external_exports.literal("ack"), inputId, result: external_exports.enum(TEXT_INPUT_ACK_RESULTS), reason: reason.optional() }).strict();
+var TextInputStateSchema = external_exports.object({ type: external_exports.literal("state"), speaking: external_exports.boolean() }).strict();
+var TextInputStateRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion2 }).strict();
+var TextInputSubmitRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion2, text: textInputText }).strict();
+var ProviderRowSchema = external_exports.object({
+  id: pluginId2,
+  name: external_exports.string().max(96),
+  version: external_exports.string().max(32),
+  signer: external_exports.enum(["teamuq", "dev"]),
+  state: external_exports.enum(PLUGIN_LIFECYCLE_STATES),
+  ready: external_exports.boolean(),
+  live: external_exports.boolean(),
+  selected: external_exports.boolean()
+}).strict();
+var TextInputStateV1Schema = external_exports.object({
+  protocolVersion: protocolVersion2,
+  status: external_exports.enum(CAPABILITY_DEPENDENCY_STATUSES),
+  target: external_exports.object({ id: pluginId2, name: external_exports.string().max(96), version: external_exports.string().max(32), signer: external_exports.enum(["teamuq", "dev"]), live: external_exports.boolean() }).strict().nullable(),
+  explicitTargetId: pluginId2.nullable(),
+  providers: external_exports.array(ProviderRowSchema).max(16)
+}).strict();
+var TextInputSubmitValueV1Schema = external_exports.object({
+  result: external_exports.enum(TEXT_INPUT_ACK_RESULTS),
+  reason: reason.optional(),
+  target: external_exports.object({ id: pluginId2, name: external_exports.string().max(96) }).strict()
+}).strict();
+var errorBody = external_exports.object({ code: external_exports.string().min(1).max(96).regex(/^[a-z0-9_]+$/), message: external_exports.string().min(1).max(512) }).strict();
+var TextInputStateEnvelopeV1Schema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ protocolVersion: protocolVersion2, ok: external_exports.literal(true), value: TextInputStateV1Schema }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion2, ok: external_exports.literal(false), error: errorBody }).strict()
+]);
+var TextInputSubmitEnvelopeV1Schema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ protocolVersion: protocolVersion2, ok: external_exports.literal(true), value: TextInputSubmitValueV1Schema }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion2, ok: external_exports.literal(false), error: errorBody }).strict()
+]);
+
 // packages/plugin-sdk/src/capabilityContracts.ts
 var PLUGIN_CAPABILITY_CHANNELS = Object.freeze({
   REQUEST: "plugin-view:capability",
   SEND: "plugin-view:capability-send",
-  EVENT: "plugin-view:capability-event"
+  EVENT: "plugin-view:capability-event",
+  PROVIDE: "plugin-view:capability-provide",
+  PROVIDER_EVENT: "plugin-view:capability-provider-event"
 });
-var CAPABILITY_GATE_PERMISSIONS = Object.freeze(["speech:transcribe", "speech:synthesize"]);
+var CAPABILITY_GATE_PERMISSIONS = Object.freeze(["speech:transcribe", "speech:synthesize", TEXT_INPUT_PERMISSION]);
 var CAPABILITY_LIMITS = Object.freeze({
   messageBytes: 16 * 1024,
   dataBytes: 64 * 1024,
@@ -5688,6 +5781,8 @@ var CAPABILITY_CLOSE_REASONS = Object.freeze([
   "consumer_gone",
   "rate_limited",
   "idle_timeout",
+  "target_changed",
+  "permission_revoked",
   "protocol_error",
   "shutdown"
 ]);
@@ -5696,7 +5791,7 @@ var capabilityId = external_exports.string().regex(CAPABILITY_PATTERN).max(96);
 var sessionId = external_exports.string().regex(/^[0-9a-f]{32}$/);
 var closeReason = external_exports.enum(CAPABILITY_CLOSE_REASONS);
 var viewStatus = external_exports.enum(CAPABILITY_VIEW_STATUSES);
-var pluginId2 = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
+var pluginId3 = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
 var jsonBytes = (value) => {
   try {
     return JSON.stringify(value)?.length ?? 0;
@@ -5714,7 +5809,7 @@ var CapabilityRequestSchema = external_exports.discriminatedUnion("op", [
 ]);
 var CapabilitySendSchema = external_exports.object({ sessionId, message: CapabilityMessageSchema, data: CapabilityBytesSchema.optional() }).strict();
 var CapabilityProviderViewSchema = external_exports.object({
-  id: pluginId2,
+  id: pluginId3,
   version: external_exports.string().max(32),
   name: external_exports.string().max(96),
   signer: external_exports.enum(["teamuq", "dev"])
@@ -5738,30 +5833,41 @@ var CapabilityEventSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({ kind: external_exports.literal("closed"), sessionId, reason: closeReason }).strict(),
   external_exports.object({ kind: external_exports.literal("change"), capability: capabilityId, status: viewStatus, provider: CapabilityProviderViewSchema.nullable(), reason: external_exports.string().max(48).optional() }).strict()
 ]);
-var protocolVersion2 = external_exports.literal(1);
+var CapabilityProvideRequestSchema = external_exports.discriminatedUnion("op", [
+  external_exports.object({ op: external_exports.literal("register"), capability: capabilityId }).strict(),
+  external_exports.object({ op: external_exports.literal("unregister"), capability: capabilityId }).strict(),
+  external_exports.object({ op: external_exports.literal("send"), sessionId, message: CapabilityMessageSchema }).strict(),
+  external_exports.object({ op: external_exports.literal("close"), sessionId }).strict()
+]);
+var CapabilityProviderEventSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("open"), sessionId, capability: capabilityId, callerId: external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN), options: CapabilityOptionsSchema }).strict(),
+  external_exports.object({ kind: external_exports.literal("message"), sessionId, message: CapabilityMessageSchema }).strict(),
+  external_exports.object({ kind: external_exports.literal("closed"), sessionId, reason: closeReason }).strict()
+]);
+var protocolVersion3 = external_exports.literal(1);
 var externalErrorCode = external_exports.string().min(3).max(96).regex(/^[a-z0-9_]+$/);
 var base64Data = external_exports.string().max(Math.ceil(CAPABILITY_LIMITS.dataBytes * 4 / 3) + 8).regex(/^[A-Za-z0-9+/]*={0,2}$/);
 var ExternalSessionOpenSchema = external_exports.object({
-  protocolVersion: protocolVersion2,
+  protocolVersion: protocolVersion3,
   kind: external_exports.literal("ext-session-open"),
   sessionId,
   capability: capabilityId,
-  callerPluginId: pluginId2,
+  callerPluginId: pluginId3,
   options: CapabilityOptionsSchema
 }).strict();
 var ExternalSessionOpenedSchema = external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion2, kind: external_exports.literal("ext-session-opened"), sessionId, ok: external_exports.literal(true) }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion2, kind: external_exports.literal("ext-session-opened"), sessionId, ok: external_exports.literal(false), error: external_exports.object({ code: externalErrorCode, message: external_exports.string().max(240) }).strict() }).strict()
+  external_exports.object({ protocolVersion: protocolVersion3, kind: external_exports.literal("ext-session-opened"), sessionId, ok: external_exports.literal(true) }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion3, kind: external_exports.literal("ext-session-opened"), sessionId, ok: external_exports.literal(false), error: external_exports.object({ code: externalErrorCode, message: external_exports.string().max(240) }).strict() }).strict()
 ]);
 var ExternalSessionMessageSchema = external_exports.object({
-  protocolVersion: protocolVersion2,
+  protocolVersion: protocolVersion3,
   kind: external_exports.literal("ext-session-message"),
   sessionId,
   message: CapabilityMessageSchema,
   data: base64Data.optional()
 }).strict();
 var ExternalSessionCloseSchema = external_exports.object({
-  protocolVersion: protocolVersion2,
+  protocolVersion: protocolVersion3,
   kind: external_exports.literal("ext-session-close"),
   sessionId,
   reason: external_exports.string().min(3).max(48).regex(/^[a-z0-9_]+$/)
@@ -5810,15 +5916,16 @@ var KNOWN_PLUGIN_PERMISSIONS = Object.freeze([
   "ai:chat",
   "speech:transcribe",
   "speech:synthesize",
+  "input:text",
   "native:addons",
   "asset:pack",
   "secrets:plugin",
   "settings:plugin",
   "process:spawn"
 ]);
-var CORE_SUPPORTED_PLUGIN_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data", "assets:plugin-data", "settings:plugin", "secrets:plugin", "asset:pack", "media:microphone", "media:camera", "network:fetch", "speech:transcribe", "speech:synthesize", "native:addons"]);
+var CORE_SUPPORTED_PLUGIN_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data", "assets:plugin-data", "settings:plugin", "secrets:plugin", "asset:pack", "media:microphone", "media:camera", "network:fetch", "ai:chat", "speech:transcribe", "speech:synthesize", "input:text", "native:addons"]);
 var BACKEND_UI_ONLY_PERMISSION_PREFIXES = Object.freeze(["ui:", "media:", "assets:"]);
-var REVOCABLE_PLUGIN_PERMISSION_PREFIXES = Object.freeze(["media:", "network:"]);
+var REVOCABLE_PLUGIN_PERMISSION_PREFIXES = Object.freeze(["media:", "network:", "ai:", "input:"]);
 var CORE_SUPPORTED_PRESENTATIONS = Object.freeze(["tab", "fullpage"]);
 var CORE_IMPLEMENTED_PLATFORM_IDS = Object.freeze(["win32-x64", "darwin-arm64", "darwin-x64", "linux-x64"]);
 var PLATFORM_ID_PATTERN = /^[a-z0-9]+-[a-z0-9]+$/;
@@ -5958,7 +6065,13 @@ var PluginManifestV2Schema = external_exports.object({
     if (manifest.native?.allowAddons === true !== manifest.permissions.includes("native:addons")) fail("permissions", "native.allowAddons and the native:addons permission must be declared together");
     if (manifest.native?.files.some((file) => file.path === manifest.entry.backend)) fail("native", "the backend entry cannot be a native file");
   } else if (manifest.permissions.includes("native:addons")) fail("permissions", "native:addons requires full-trust");
-  if (!fullTrust && (manifest.native !== void 0 || manifest.resources !== void 0 || manifest.provides.length > 0)) fail("trustTier", "native, resources and provides require full-trust");
+  if (!fullTrust && (manifest.native !== void 0 || manifest.resources !== void 0)) fail("trustTier", "native and resources require full-trust");
+  if (!fullTrust && manifest.provides.some((entry) => entry.capability !== TEXT_INPUT_CAPABILITY)) fail("provides", `a sandboxed plugin may provide only ${TEXT_INPUT_CAPABILITY}`);
+  if (!fullTrust && manifest.provides.length > 0 && manifest.contributes.views.length === 0) fail("provides", "a sandboxed provider receives its input in a view, so it must contribute one");
+  for (const entry of manifest.provides) {
+    if (entry.capability === TEXT_INPUT_CAPABILITY && entry.permission !== TEXT_INPUT_PERMISSION) fail("provides", `${TEXT_INPUT_CAPABILITY} is gated by ${TEXT_INPUT_PERMISSION}`);
+    if (entry.capability === TEXT_INPUT_CAPABILITY && !manifest.permissions.includes(TEXT_INPUT_PERMISSION)) fail("permissions", `providing ${TEXT_INPUT_CAPABILITY} requires the ${TEXT_INPUT_PERMISSION} permission`);
+  }
   if (manifest.contributes.views.length > 0 && manifest.entry.ui === void 0) fail("contributes", "views require entry.ui");
   if (manifest.assetPacks.length > 0 && !manifest.permissions.includes("asset:pack")) fail("permissions", "assetPacks require the asset:pack permission");
   if (manifest.network.allow.length > 0 && !manifest.permissions.includes("network:fetch") && !manifest.permissions.includes("network:loopback")) fail("permissions", "network.allow requires the network:fetch permission");
@@ -6023,6 +6136,138 @@ function evaluateManifestSupport(manifest, context) {
   }
   return issues;
 }
+
+// packages/plugin-sdk/src/aiChatContracts.ts
+var PLUGIN_AI_CHANNELS = Object.freeze({
+  REQUEST: "plugin-view:ai",
+  EVENT: "plugin-view:ai-event"
+});
+var AI_CHAT_LIMITS = Object.freeze({
+  systemChars: 16e3,
+  transcriptLines: 40,
+  transcriptLineChars: 8e3,
+  transcriptChars: 6e4,
+  inputChars: 8e3,
+  imageBytes: 2 * 1024 * 1024,
+  replyChars: 32e3,
+  sessionsPerPlugin: 1,
+  sessionsTotal: 8,
+  concurrentTurnsTotal: 4,
+  turnsPerMinute: 20,
+  turnsPerHour: 400,
+  turnTimeoutMs: 3e5,
+  attachGraceMs: 6e4,
+  quotaCooldownMs: 5 * 6e4
+});
+var AI_CHAT_EFFORTS = Object.freeze(["minimal", "low", "medium", "high", "xhigh"]);
+var AI_CHAT_ERROR_CODES = Object.freeze([
+  "plugin_not_active",
+  "not_granted",
+  "request_invalid",
+  "input_too_large",
+  "provider_not_found",
+  "provider_not_ready",
+  "model_unavailable",
+  "unsupported_image",
+  "session_limit",
+  "session_not_found",
+  "turn_in_progress",
+  "rate_limited",
+  "quota_exhausted",
+  "busy",
+  "view_not_visible",
+  "unavailable"
+]);
+var sessionId2 = external_exports.string().regex(/^[0-9a-f]{32}$/);
+var providerId = external_exports.string().regex(/^[a-z][a-z0-9_-]{0,31}$/);
+var modelId = external_exports.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$/);
+var effort = external_exports.enum(AI_CHAT_EFFORTS);
+var line = external_exports.object({ role: external_exports.enum(["user", "assistant"]), text: external_exports.string().max(AI_CHAT_LIMITS.transcriptLineChars) }).strict();
+var AiChatImageSchema = external_exports.object({
+  mime: external_exports.enum(["image/jpeg", "image/png"]),
+  data: external_exports.custom((value) => value instanceof Uint8Array && value.byteLength > 0 && value.byteLength <= AI_CHAT_LIMITS.imageBytes)
+}).strict();
+var AiChatRequestVariants = external_exports.discriminatedUnion("op", [
+  external_exports.object({ op: external_exports.literal("getOptions") }).strict(),
+  external_exports.object({
+    op: external_exports.literal("openSession"),
+    providerId: providerId.optional(),
+    modelId: modelId.optional(),
+    effort: effort.optional(),
+    system: external_exports.string().min(1).max(AI_CHAT_LIMITS.systemChars),
+    transcript: external_exports.array(line).max(AI_CHAT_LIMITS.transcriptLines).optional()
+  }).strict(),
+  external_exports.object({ op: external_exports.literal("send"), sessionId: sessionId2, text: external_exports.string().max(AI_CHAT_LIMITS.inputChars), image: AiChatImageSchema.optional() }).strict(),
+  external_exports.object({ op: external_exports.literal("interrupt"), sessionId: sessionId2 }).strict(),
+  external_exports.object({ op: external_exports.literal("close"), sessionId: sessionId2 }).strict(),
+  external_exports.object({ op: external_exports.literal("attachSession"), sessionId: sessionId2 }).strict()
+]);
+var AiChatRequestSchema = AiChatRequestVariants.refine((value) => value.op !== "send" || value.text.trim() !== "" || value.image !== void 0, { message: "a turn needs text or an image" });
+var modelView = external_exports.object({
+  id: external_exports.string().max(96),
+  label: external_exports.string().max(96),
+  efforts: external_exports.array(external_exports.string().max(16)).max(8),
+  defaultEffort: external_exports.string().max(16).nullable(),
+  supportsImages: external_exports.boolean(),
+  isDefault: external_exports.boolean()
+}).strict();
+var AiChatProviderViewSchema = external_exports.object({
+  id: providerId,
+  label: external_exports.string().max(48),
+  state: external_exports.enum(["ready", "not_installed", "not_logged_in", "unsupported_version", "unavailable", "not_supported_yet"]),
+  models: external_exports.array(modelView).max(32)
+}).strict();
+var AiChatOptionsSchema = external_exports.object({
+  providers: external_exports.array(AiChatProviderViewSchema).max(8),
+  defaultProviderId: providerId.nullable(),
+  limits: external_exports.object({
+    systemChars: external_exports.number().int(),
+    transcriptLines: external_exports.number().int(),
+    transcriptChars: external_exports.number().int(),
+    inputChars: external_exports.number().int(),
+    imageBytes: external_exports.number().int(),
+    turnsPerMinute: external_exports.number().int()
+  }).strict(),
+  quota: external_exports.object({ state: external_exports.enum(["ok", "exhausted"]), retryAfterMs: external_exports.number().int().nonnegative().nullable() }).strict()
+}).strict();
+var effective = external_exports.object({ providerId, modelId: external_exports.string().max(96), effort: external_exports.string().max(16).nullable() }).strict();
+var AiChatOpenedSchema = external_exports.object({ sessionId: sessionId2, effective }).strict();
+var AiChatSentSchema = external_exports.object({ turnId: external_exports.string().regex(/^[0-9a-f]{16}$/) }).strict();
+var AiChatFailureSchema = external_exports.object({
+  kind: external_exports.literal("failed"),
+  code: external_exports.enum(["provider_unavailable", "unsupported_version", "quota_exhausted", "stalled", "provider_error", "empty_reply", "session_closed", "reply_too_long", "turn_timeout", "access_revoked"]),
+  retryable: external_exports.boolean(),
+  fallbackUsed: external_exports.boolean(),
+  partialDelivered: external_exports.boolean()
+}).strict();
+var AiChatTurnEventSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("started") }).strict(),
+  external_exports.object({ kind: external_exports.literal("textDelta"), text: external_exports.string().max(AI_CHAT_LIMITS.replyChars) }).strict(),
+  external_exports.object({ kind: external_exports.literal("completed") }).strict(),
+  external_exports.object({ kind: external_exports.literal("interrupted") }).strict(),
+  AiChatFailureSchema
+]);
+var AiChatAttachedSchema = external_exports.object({
+  sessionId: sessionId2,
+  effective,
+  turn: external_exports.object({ turnId: external_exports.string().regex(/^[0-9a-f]{16}$/), text: external_exports.string().max(AI_CHAT_LIMITS.replyChars), terminal: AiChatTurnEventSchema.nullable() }).strict().nullable()
+}).strict();
+var AiChatEnvelopeSchema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ ok: external_exports.literal(true), value: external_exports.unknown() }).strict(),
+  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(AI_CHAT_ERROR_CODES) }).strict()
+]);
+var AiChatViewEventSchema = external_exports.object({ sessionId: sessionId2, turnId: external_exports.string().regex(/^[0-9a-f]{16}$/), event: AiChatTurnEventSchema }).strict();
+var AiChatUsageSchema = external_exports.object({
+  activeSessions: external_exports.number().int().nonnegative(),
+  sessionsOpened: external_exports.number().int().nonnegative(),
+  turns: external_exports.number().int().nonnegative(),
+  imageTurns: external_exports.number().int().nonnegative(),
+  failedTurns: external_exports.number().int().nonnegative(),
+  rateLimited: external_exports.number().int().nonnegative(),
+  inputChars: external_exports.number().int().nonnegative(),
+  outputChars: external_exports.number().int().nonnegative(),
+  lastTurnAt: external_exports.string().max(40).nullable()
+}).strict();
 
 // packages/plugin-sdk/src/coreApiContracts.ts
 var PLUGIN_CORE_CHANNELS = Object.freeze({
@@ -6122,21 +6367,31 @@ var PLUGIN_INSTALL_CHANNELS = Object.freeze({
   REMOVE_DEV_KEY: "plugin-install:remove-dev-key",
   REMOVE_ASSET_PACK: "plugin-install:remove-asset-pack",
   SET_PERMISSION: "plugin-install:set-permission",
-  SET_PROVIDER: "plugin-install:set-provider"
+  SET_PROVIDER: "plugin-install:set-provider",
+  BUNDLED_REVIEW: "plugin-install:bundled-review",
+  BUNDLED_DECIDE: "plugin-install:bundled-decide",
+  BUNDLED_RESTORE: "plugin-install:bundled-restore"
 });
-var protocolVersion3 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var protocolVersion4 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
 var installId = external_exports.string().regex(/^[0-9a-f]{32}$/);
 var keyId = external_exports.string().regex(/^dev-[0-9a-f]{16}$/);
-var PluginInstallListRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3 }).strict();
-var PluginInstallBeginRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3 }).strict();
-var PluginInstallDecisionRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, installId }).strict();
-var PluginUninstallRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), deleteData: external_exports.boolean() }).strict();
-var PluginDevKeyImportRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, publicKey: external_exports.string().min(1).max(4096), label: external_exports.string().min(1).max(48) }).strict();
-var PluginAssetPackRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, packId: external_exports.string().regex(IDENTIFIER_PATTERN) }).strict();
-var PluginPermissionSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), permission: external_exports.string().min(3).max(64), revoked: external_exports.boolean() }).strict();
-var PluginDevKeyRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, keyId }).strict();
-var PluginProviderSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion3, capability: external_exports.string().regex(CAPABILITY_PATTERN).max(96), providerId: external_exports.string().regex(IDENTIFIER_PATTERN).max(96).nullable() }).strict();
-var PLUGIN_RISK_NOTICES = ["full_trust", "native_code", "network_unrestricted", "dev_key_local_only"];
+var PluginInstallListRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4 }).strict();
+var PluginInstallBeginRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4 }).strict();
+var PluginInstallDecisionRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, installId }).strict();
+var PluginUninstallRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), deleteData: external_exports.boolean() }).strict();
+var PluginDevKeyImportRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, publicKey: external_exports.string().min(1).max(4096), label: external_exports.string().min(1).max(48) }).strict();
+var PluginAssetPackRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, packId: external_exports.string().regex(IDENTIFIER_PATTERN) }).strict();
+var PluginPermissionSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), permission: external_exports.string().min(3).max(64), revoked: external_exports.boolean() }).strict();
+var PluginDevKeyRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, keyId }).strict();
+var pluginIdField = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
+var BUNDLED_DECISIONS = ["consent", "decline"];
+var BUNDLED_INSTALLED_STATUSES = ["awaiting_consent", "consented", "declined"];
+var BUNDLED_LISTED_STATES = ["removed", "verification_failed", "update_pending"];
+var PluginBundledReviewRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginIdField }).strict();
+var PluginBundledDecideRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginIdField, version: external_exports.string().regex(VERSION_PATTERN), decision: external_exports.enum(BUNDLED_DECISIONS) }).strict();
+var PluginBundledRestoreRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginIdField }).strict();
+var PluginProviderSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, capability: external_exports.string().regex(CAPABILITY_PATTERN).max(96), providerId: external_exports.string().regex(IDENTIFIER_PATTERN).max(96).nullable() }).strict();
+var PLUGIN_RISK_NOTICES = ["full_trust", "native_code", "network_unrestricted", "dev_key_local_only", "file_sandbox_bypassable"];
 var RiskNoticeSchema = external_exports.enum(PLUGIN_RISK_NOTICES);
 var BackendViewSchema = external_exports.object({
   resources: external_exports.object({
@@ -6167,6 +6422,11 @@ var CapabilityConsentViewSchema = external_exports.object({
   providerVersion: external_exports.string().max(32),
   grantedAt: external_exports.string().max(40)
 }).strict();
+var BundledViewSchema = external_exports.object({
+  status: external_exports.enum(BUNDLED_INSTALLED_STATUSES),
+  pendingUpdateVersion: external_exports.string().regex(VERSION_PATTERN).nullable(),
+  failureCode: external_exports.string().max(96).nullable()
+}).strict();
 var InstalledPluginViewV1Schema = external_exports.object({
   id: external_exports.string().regex(IDENTIFIER_PATTERN),
   name: external_exports.string().max(96),
@@ -6182,7 +6442,9 @@ var InstalledPluginViewV1Schema = external_exports.object({
   trustTier: external_exports.enum(["sandboxed", "full-trust"]).default("sandboxed"),
   backend: BackendViewSchema.nullable().default(null),
   riskNotices: external_exports.array(RiskNoticeSchema).max(8).default([]),
-  capabilityConsents: external_exports.array(CapabilityConsentViewSchema).max(64).default([])
+  capabilityConsents: external_exports.array(CapabilityConsentViewSchema).max(64).default([]),
+  aiUsage: AiChatUsageSchema.nullable().default(null),
+  bundled: BundledViewSchema.nullable().default(null)
 }).strict();
 var InstalledAssetPackViewV1Schema = external_exports.object({
   id: external_exports.string().regex(IDENTIFIER_PATTERN),
@@ -6202,10 +6464,19 @@ var DevKeyViewV1Schema = external_exports.object({
   importedAt: external_exports.string().max(40),
   trustedHere: external_exports.boolean()
 }).strict();
+var BundledPluginEntryViewV1Schema = external_exports.object({
+  id: pluginIdField,
+  name: external_exports.string().max(96),
+  state: external_exports.enum(BUNDLED_LISTED_STATES),
+  offeredVersion: external_exports.string().regex(VERSION_PATTERN),
+  installedVersion: external_exports.string().regex(VERSION_PATTERN).nullable(),
+  failureCode: external_exports.string().max(96).nullable()
+}).strict();
 var PluginInstallListV1Schema = external_exports.object({
-  protocolVersion: protocolVersion3,
+  protocolVersion: protocolVersion4,
   plugins: external_exports.array(InstalledPluginViewV1Schema),
   assetPacks: external_exports.array(InstalledAssetPackViewV1Schema).default([]),
+  bundledPlugins: external_exports.array(BundledPluginEntryViewV1Schema).max(16).default([]),
   devKeys: external_exports.array(DevKeyViewV1Schema)
 }).strict();
 var ReviewPermissionSchema = external_exports.object({ permission: external_exports.string().max(64), description: external_exports.string().max(200) }).strict();
@@ -6236,12 +6507,18 @@ var PluginInstallBeginResultV1Schema = external_exports.discriminatedUnion("stat
   external_exports.object({ status: external_exports.literal("cancelled") }).strict(),
   external_exports.object({ status: external_exports.literal("review"), review: PluginInstallReviewV1Schema }).strict()
 ]);
+var PluginBundledReviewV1Schema = PluginInstallReviewV1Schema.omit({ installId: true, fileName: true, kind: true }).extend({ bundled: BundledViewSchema }).strict();
+var PluginBundledDecideResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.enum(["consented", "declined"]) }).strict();
+var PluginBundledRestoreResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.literal("awaiting_consent") }).strict();
 var envelope = (value) => external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion3, ok: external_exports.literal(true), value }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion3, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
+  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(true), value }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
 ]);
 var PluginInstallListEnvelopeV1Schema = envelope(PluginInstallListV1Schema);
 var PluginInstallBeginEnvelopeV1Schema = envelope(PluginInstallBeginResultV1Schema);
+var PluginBundledReviewEnvelopeV1Schema = envelope(PluginBundledReviewV1Schema);
+var PluginBundledDecideEnvelopeV1Schema = envelope(PluginBundledDecideResultV1Schema);
+var PluginBundledRestoreEnvelopeV1Schema = envelope(PluginBundledRestoreResultV1Schema);
 
 // packages/plugin-sdk/src/surfaceContracts.ts
 var PLUGIN_SURFACE_CHANNELS = Object.freeze({
@@ -6268,8 +6545,8 @@ var PRESENTATION_ERROR_CODES = Object.freeze([
   "presentation_not_visible",
   "presentation_view_unavailable"
 ]);
-var protocolVersion4 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
-var pluginId3 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
+var protocolVersion5 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var pluginId4 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
 var viewId = external_exports.string().min(1).max(32).regex(IDENTIFIER_PATTERN);
 var coordinate = external_exports.number().finite().min(-1e5).max(1e5);
 var extent = external_exports.number().finite().min(0).max(1e5);
@@ -6277,24 +6554,24 @@ var PluginPresentationModeSchema = external_exports.enum(["tab", "fullpage"]);
 var PluginRequestedModeSchema = external_exports.enum(["tab", "window", "fullpage", "overlay"]);
 var PluginSurfaceRectV1Schema = external_exports.object({ x: coordinate, y: coordinate, width: extent, height: extent }).strict();
 var PluginSurfaceSyncRequestV1Schema = external_exports.object({
-  protocolVersion: protocolVersion4,
-  pluginId: pluginId3,
+  protocolVersion: protocolVersion5,
+  pluginId: pluginId4,
   viewId,
   active: external_exports.boolean(),
   rect: PluginSurfaceRectV1Schema.nullable(),
   coreOverlay: external_exports.boolean()
 }).strict();
 var PluginPresentationSetRequestV1Schema = external_exports.object({
-  protocolVersion: protocolVersion4,
-  pluginId: pluginId3,
+  protocolVersion: protocolVersion5,
+  pluginId: pluginId4,
   viewId,
   mode: PluginPresentationModeSchema,
   fullscreen: external_exports.boolean()
 }).strict();
-var PluginSurfaceTargetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginId3, viewId }).strict();
+var PluginSurfaceTargetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginId4, viewId }).strict();
 var PluginCaptureStateSchema = external_exports.object({ microphone: external_exports.boolean(), camera: external_exports.boolean() }).strict();
 var PluginSurfaceStateV1Schema = external_exports.object({
-  pluginId: pluginId3,
+  pluginId: pluginId4,
   viewId,
   mode: PluginPresentationModeSchema,
   fullscreen: external_exports.boolean(),
@@ -6302,11 +6579,11 @@ var PluginSurfaceStateV1Schema = external_exports.object({
   errorCode: external_exports.string().min(1).max(96).nullable(),
   capture: PluginCaptureStateSchema.default({ microphone: false, camera: false })
 }).strict();
-var PluginSurfaceStateEventV1Schema = external_exports.object({ protocolVersion: protocolVersion4, state: PluginSurfaceStateV1Schema }).strict();
+var PluginSurfaceStateEventV1Schema = external_exports.object({ protocolVersion: protocolVersion5, state: PluginSurfaceStateV1Schema }).strict();
 var errorEnvelope = external_exports.object({ code: external_exports.string().min(1).max(96).regex(/^[a-z0-9_]+$/), message: external_exports.string().min(1).max(512) }).strict();
 var PluginSurfaceResultEnvelopeV1Schema = external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(true), value: PluginSurfaceStateV1Schema }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion4, ok: external_exports.literal(false), error: errorEnvelope }).strict()
+  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(true), value: PluginSurfaceStateV1Schema }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(false), error: errorEnvelope }).strict()
 ]);
 var PluginViewPresentationStateSchema = external_exports.object({
   mode: PluginPresentationModeSchema,
@@ -6341,14 +6618,14 @@ var PLUGIN_BACKEND_CHANNELS = Object.freeze({
 });
 var EXTERNAL_HOST_PROTOCOL_VERSION = 1;
 var EXTERNAL_HOST_MAX_RESULT_BYTES = 64 * 1024;
-var protocolVersion5 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var protocolVersion6 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
 var hostVersion = external_exports.literal(EXTERNAL_HOST_PROTOCOL_VERSION);
-var pluginId4 = external_exports.string().regex(IDENTIFIER_PATTERN);
+var pluginId5 = external_exports.string().regex(IDENTIFIER_PATTERN);
 var methodName = external_exports.string().min(1).max(64).regex(/^[A-Za-z0-9._@-]+$/);
 var errorCode = external_exports.string().min(3).max(96).regex(/^[a-z0-9_]+$/);
 var ExternalHostInitSchema = external_exports.object({
   version: hostVersion,
-  pluginId: pluginId4,
+  pluginId: pluginId5,
   installDir: external_exports.string().min(1).max(1024),
   dataDir: external_exports.string().min(1).max(1024),
   entry: external_exports.string().min(1).max(1024),
@@ -6387,7 +6664,7 @@ var ExternalResultMessageSchema = external_exports.discriminatedUnion("ok", [
 var BACKEND_STATES = ["idle", "starting", "running", "stopping", "failed"];
 var BACKEND_STOP_REASONS = ["idle", "memory_exceeded", "disabled", "crashed", "shutdown", "uninstalled", "hung"];
 var PluginBackendStatusV1Schema = external_exports.object({
-  pluginId: pluginId4,
+  pluginId: pluginId5,
   state: external_exports.enum(BACKEND_STATES),
   pid: external_exports.number().int().nonnegative().nullable(),
   startedAt: external_exports.string().max(40).nullable(),
@@ -6407,11 +6684,11 @@ var PluginBackendStatusV1Schema = external_exports.object({
   selfCheck: ExternalSelfCheckReportSchema.nullable()
 }).strict();
 var PluginBackendStatusListV1Schema = external_exports.object({
-  protocolVersion: protocolVersion5,
+  protocolVersion: protocolVersion6,
   backends: external_exports.array(PluginBackendStatusV1Schema).max(256)
 }).strict();
 var PluginBackendProbeResultV1Schema = external_exports.object({
-  pluginId: pluginId4,
+  pluginId: pluginId5,
   coldStart: external_exports.boolean(),
   totalMs: external_exports.number().nonnegative(),
   core: external_exports.unknown(),
@@ -6421,11 +6698,11 @@ var PluginBackendProbeResultV1Schema = external_exports.object({
   ]),
   status: PluginBackendStatusV1Schema
 }).strict();
-var PluginBackendStatusRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5 }).strict();
-var PluginBackendProbeRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginId4 }).strict();
+var PluginBackendStatusRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion6 }).strict();
+var PluginBackendProbeRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion6, pluginId: pluginId5 }).strict();
 var envelope2 = (value) => external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(true), value }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
+  external_exports.object({ protocolVersion: protocolVersion6, ok: external_exports.literal(true), value }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion6, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
 ]);
 var PluginBackendStatusEnvelopeV1Schema = envelope2(PluginBackendStatusListV1Schema);
 var PluginBackendProbeEnvelopeV1Schema = envelope2(PluginBackendProbeResultV1Schema);
@@ -6482,8 +6759,8 @@ var SCRIPT_OR_EXECUTABLE_EXTENSIONS = /* @__PURE__ */ new Set([
   ".hta",
   ".wsf"
 ]);
-var invalid = (name, reason) => {
-  throw new ArtifactError("entry_name_invalid", `${reason}: ${JSON.stringify(name.slice(0, 80))}`);
+var invalid = (name, reason2) => {
+  throw new ArtifactError("entry_name_invalid", `${reason2}: ${JSON.stringify(name.slice(0, 80))}`);
 };
 function auditEntryName(rawName) {
   const isDirectory = rawName.endsWith("/");
@@ -6707,7 +6984,13 @@ async function updateStateFile(file, parse2, empty, mutate) {
 
 // packages/platform/plugin-artifact/src/trust/signature.ts
 import { createHash, createPublicKey, verify } from "node:crypto";
-var TEAMUQ_TRUST_ANCHORS = Object.freeze({ rootKeys: Object.freeze([]), revokedKeyIds: Object.freeze([]) });
+var TEAMUQ_TRUST_ANCHORS = Object.freeze({
+  rootKeys: Object.freeze([
+    Object.freeze({ keyId: "teamuq-root-2026a", publicKey: "uw/H7oqXWeNFGbN60pr8SRWr2T1Eo8/suCokKWH3kd0=" }),
+    Object.freeze({ keyId: "teamuq-root-2026b", publicKey: "WNhfR7OaRj1WuNcy2bNC2k8NLHGmjUNdxJiBR+6wk9E=" })
+  ]),
+  revokedKeyIds: Object.freeze([])
+});
 var DEV_KEY_PREFIX = "dev-";
 var SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 var RAW_KEY_BYTES = 32;
@@ -7083,6 +7366,7 @@ function parseManifest(bytes2) {
   }
 }
 function assertSignerMayInstall(manifest, signer) {
+  if (manifest.id === CORE_CALLER_ID) throw new ArtifactError("id_reserved", manifest.id);
   const reservedId = manifest.id.startsWith("teamuq.");
   if (signer.kind === "dev") {
     if (reservedId || manifest.publisher === "teamuq") throw new ArtifactError("id_reserved", manifest.id);
@@ -7301,6 +7585,53 @@ var StateFileSchema = external_exports.object({
   consents: external_exports.array(ConsentSchema).max(512),
   preferences: external_exports.record(external_exports.string().regex(CAPABILITY).max(96), external_exports.string().regex(ID).max(96))
 }).strict();
+
+// packages/platform/plugin-artifact/src/bundled/bundledLedger.ts
+var ID2 = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+var SHA256 = /^[0-9a-f]{64}$/;
+var Id = external_exports.string().regex(ID2).max(96);
+var Sha256 = external_exports.string().regex(SHA256);
+var Time = external_exports.string().min(1).max(40);
+var Version = external_exports.string().min(5).max(32);
+var Code = external_exports.string().min(1).max(64);
+var OfferedSchema = external_exports.object({ version: Version, artifactSha256: Sha256 }).strict();
+var ConsentSchema2 = external_exports.object({
+  version: Version,
+  integritySha256: Sha256,
+  riskNotices: external_exports.array(Code).max(32),
+  grants: external_exports.array(external_exports.string().min(1).max(96)).max(64),
+  at: Time
+}).strict();
+var PendingUpdateSchema = external_exports.object({ version: Version, artifactSha256: Sha256, loosened: external_exports.array(Code).max(32), at: Time }).strict();
+var LastFailureSchema = external_exports.object({ code: Code, artifactSha256: Sha256, coreVersion: external_exports.string().min(1).max(32) }).strict();
+var BUNDLED_STATUSES = ["awaiting_consent", "consented", "declined", "removed"];
+var StatusSchema = external_exports.enum(BUNDLED_STATUSES);
+var EntrySchema = external_exports.object({
+  id: Id,
+  name: external_exports.string().min(1).max(128),
+  status: StatusSchema,
+  offered: OfferedSchema,
+  installedArtifactSha256: Sha256.nullable(),
+  plantedAt: Time,
+  decidedAt: Time.nullable(),
+  consent: ConsentSchema2.nullable(),
+  pendingUpdate: PendingUpdateSchema.nullable(),
+  lastFailure: LastFailureSchema.nullable()
+}).strict().superRefine((entry, context) => {
+  const problem = (message) => context.addIssue({ code: "custom", message });
+  if (entry.status === "consented" !== (entry.consent !== null)) problem("consent iff consented");
+  if (entry.status === "removed" !== (entry.installedArtifactSha256 === null)) problem("installedArtifactSha256 null iff removed");
+  if (entry.status === "awaiting_consent" !== (entry.decidedAt === null)) problem("decidedAt null iff awaiting_consent");
+  if (entry.pendingUpdate !== null && entry.status !== "consented") problem("pendingUpdate only when consented");
+});
+var LedgerFileSchema = external_exports.object({
+  version: external_exports.literal(1),
+  entries: external_exports.array(EntrySchema).max(64),
+  failures: external_exports.record(Id, LastFailureSchema)
+}).strict().superRefine((file, context) => {
+  if (new Set(file.entries.map((entry) => entry.id)).size !== file.entries.length) context.addIssue({ code: "custom", message: "duplicate id" });
+  if (Object.keys(file.failures).length > 64) context.addIssue({ code: "custom", message: "too many failures" });
+});
 
 // packages/platform/plugin-artifact/src/authoring/packArtifact.ts
 import { createHash as createHash6, randomBytes as randomBytes3 } from "node:crypto";

@@ -6,7 +6,8 @@ import { UI_ROOT } from "./uiViewHarness.mjs";
 
 const STYLES = join(UI_ROOT, "styles");
 const tokensCss = readFileSync(join(STYLES, "tokens.css"), "utf8");
-const appCss = readFileSync(join(STYLES, "app.css"), "utf8");
+// why: app.css imports the other style sheets, so every rule in every non-token sheet is held to the same colour rules
+const appCss = readdirSync(STYLES).filter((name) => name.endsWith(".css") && name !== "tokens.css").sort().map((name) => readFileSync(join(STYLES, name), "utf8")).join("\n");
 
 function declarations(block) {
   const found = new Map();
@@ -97,6 +98,10 @@ function textColorUses(css) {
   return uses;
 }
 
+// why: the avatar swatch hue (--h) and size (--s) are set per element from the id hash, so they are not theme tokens
+const ELEMENT_PROPERTIES = new Set(["h", "s"]);
+const AVATAR_BACKGROUND = "hsl(var(--h) 55% 75%)";
+
 const TEXT_TOKENS = new Set(["text-primary", "text-secondary", "text-secondary-strong", "link", "error-strong", "warning-strong", "success-strong", "accent-fg", "danger-fg", "hit-fg"]);
 
 test("no rule sets a text colour from a token that fails as text, and every text token used is one the contrast matrix covers", () => {
@@ -110,14 +115,37 @@ test("no rule sets a text colour from a token that fails as text, and every text
   }
   for (const banned of ["text-muted", "accent-hover", "accent", "on-accent"]) assert.ok(!uses.includes(`var(--${banned})`), `--${banned} is never a text colour`);
   const tokenSet = new Set([...appCss.matchAll(/var\(--([a-z0-9-]+)\)/gu)].map((match) => match[1]));
-  for (const name of tokenSet) assert.ok(THEMES.light.has(name), `app.css uses --${name} which tokens.css defines`);
+  for (const name of tokenSet) assert.ok(THEMES.light.has(name) || ELEMENT_PROPERTIES.has(name), `app.css uses --${name} which tokens.css defines`);
 });
 
-test("app.css writes no colour of its own outside the two overlay shadows", () => {
+test("the style sheets write no colour of their own outside the black overlay and hover shadows and the one hash-coloured avatar", () => {
   const hex = appCss.match(/#[0-9a-fA-F]{3,8}\b/gu) ?? [];
   assert.deepEqual(hex, []);
-  const functions = appCss.match(/\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/gu) ?? [];
+  const functions = appCss.replace(AVATAR_BACKGROUND, "").match(/\b(?:rgb|rgba|hsl|hsla)\([^)]*\)/gu) ?? [];
   assert.ok(functions.every((entry) => entry.startsWith("rgba(0, 0, 0,")), functions.join(", "));
+});
+
+function hslToRgb(hue, saturation, lightness) {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const sector = hue / 60;
+  const second = chroma * (1 - Math.abs((sector % 2) - 1));
+  const base = [[chroma, second, 0], [second, chroma, 0], [0, chroma, second], [0, second, chroma], [second, 0, chroma], [chroma, 0, second]][Math.floor(sector) % 6];
+  const shift = lightness - chroma / 2;
+  return base.map((channel) => Math.round((channel + shift) * 255));
+}
+
+test("the avatar swatch is painted by exactly one rule, and the dark navy text on it reaches 4.5:1 for every hue in both schemes", () => {
+  assert.equal(appCss.split(AVATAR_BACKGROUND).length, 2);
+  assert.match(appCss, /\.av \{[^}]*color: var\(--accent-fg\);/u);
+  for (const theme of ["light", "dark"]) {
+    const foreground = luminance(rgb(resolve(theme, "accent-fg")));
+    let worst = Number.POSITIVE_INFINITY;
+    for (let hue = 0; hue < 360; hue += 1) {
+      const background = luminance(hslToRgb(hue, 0.55, 0.75));
+      worst = Math.min(worst, (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05));
+    }
+    assert.ok(worst >= 4.5, `${theme}: worst avatar contrast is ${worst.toFixed(2)}`);
+  }
 });
 
 function walk(directory) {

@@ -181,6 +181,10 @@ export function html(strings: TemplateStringsArray, ...values: readonly unknown[
 
 export const EMPTY_HTML: SafeHtml = new SafeHtml(MINT, "");
 
-export function mount(target: { innerHTML: string }, content: SafeHtml): void {
+export interface MountTarget {
+  innerHTML: string;
+}
+
+export function mount(target: MountTarget, content: SafeHtml): void {
   target.innerHTML = content.value;
 }

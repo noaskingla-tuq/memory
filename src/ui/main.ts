@@ -1,11 +1,14 @@
-import type { UiStatus } from "../contracts/uiContract.js";
-import { backendClient, type BackendResult } from "./api/backendClient.js";
-import { html, mount } from "./dom/html.js";
+import { backendClient } from "./api/backendClient.js";
+import { mount } from "./dom/html.js";
 import { t } from "./i18n/index.js";
+import { parseRoute, type Route } from "./router.js";
+import { bindHomeEvents } from "./views/homeEvents.js";
+import { renderMemorySpaceShell, SPACE_TITLE_ID } from "./views/memorySpaceShell.js";
+import { createStatusLine } from "./views/statusLine.js";
+import { createTeamHome, type HomeTargets, type Preferences } from "./views/teamHomeController.js";
+import { homeShell } from "./views/teamHomeView.js";
 
-function isStatus(value: unknown): value is UiStatus {
-  return typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === true && typeof (value as { version?: unknown }).version === "string" && typeof (value as { storage?: { status?: unknown } }).storage?.status === "string";
-}
+const HOME_STALE_MS = 60_000;
 
 function element(id: string): HTMLElement {
   const found = document.getElementById(id);
@@ -13,36 +16,110 @@ function element(id: string): HTMLElement {
   return found;
 }
 
-function lastWriteText(lastWriteAt: string | null): string {
-  if (lastWriteAt === null) return t("status.noWrite");
-  const at = new Date(lastWriteAt);
-  return t("status.lastWrite", { time: Number.isNaN(at.getTime()) ? lastWriteAt : at.toLocaleString("zh-TW", { hour12: false }) });
+const preferences: Preferences = {
+  get(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      return;
+    }
+  },
+};
+
+const client = backendClient();
+const now = (): number => Date.now();
+const view = element("view");
+
+const status = createStatusLine({
+  client,
+  target: element("status"),
+  now,
+  scheduler: { set: (callback, ms) => window.setTimeout(callback, ms), clear: (handle) => window.clearTimeout(handle as number) },
+  visibility: {
+    isVisible: () => document.visibilityState === "visible",
+    subscribe(listener) {
+      document.addEventListener("visibilitychange", listener);
+      return () => document.removeEventListener("visibilitychange", listener);
+    },
+  },
+});
+
+const home = createTeamHome({ client, now, preferences });
+
+function homeTargets(): HomeTargets {
+  return {
+    help: element("home-help"),
+    banner: element("home-banner"),
+    tiles: element("home-tiles"),
+    tools: element("home-tools"),
+    count: element("home-count"),
+    note: element("home-note"),
+    wall: element("home-wall"),
+  };
 }
 
-// why: the container carries the overall state too, because the real-Electron harness and any outside probe read #status[data-state] rather than its children
-function renderStatus(target: HTMLElement, result: BackendResult): void {
-  target.dataset.state = result.ok && isStatus(result.value) ? "ok" : "error";
-  if (result.ok && isStatus(result.value)) {
-    mount(target, html`<p class="state" data-state="ok">${t("status.ok", { version: result.value.version, storage: result.value.storage.status })}</p><p>${lastWriteText(result.value.lastWriteAt)}</p>`);
-    return;
-  }
-  if (result.ok) {
-    mount(target, html`<p class="state" data-state="error">${t("status.malformed")}</p>`);
-    return;
-  }
-  const retry = result.retryable ? html` <button type="button" class="btn" data-retry>${t("common.retry")}</button>` : "";
-  mount(target, html`<p class="state" data-state="error"><strong>${result.message}</strong> <span>${result.action}</span>${retry}</p>`);
+function cardOf(agentId: string | undefined): HTMLElement | null {
+  if (agentId === undefined) return null;
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-agent-id]")).find((card) => card.dataset.agentId === agentId) ?? null;
 }
 
-async function showStatus(): Promise<void> {
-  const target = element("status");
-  target.dataset.state = "loading";
-  mount(target, html`<p class="state" data-state="loading">${t("status.loading")}</p>`);
-  renderStatus(target, await backendClient().call("ui.status", {}));
+let current: Route | null = null;
+let homeScroll = 0;
+
+function showHome(returnedFrom: string | undefined): void {
+  mount(view, homeShell());
+  home.attach(homeTargets());
+  void home.refreshIfStale(HOME_STALE_MS);
+  window.scrollTo(0, homeScroll);
+  cardOf(returnedFrom)?.focus({ preventScroll: true });
 }
+
+function showAgent(agentId: string): void {
+  home.attach(null);
+  mount(view, renderMemorySpaceShell(agentId, home.agent(agentId), now()));
+  window.scrollTo(0, 0);
+  document.getElementById(SPACE_TITLE_ID)?.focus();
+}
+
+function route(): void {
+  const next = parseRoute(window.location.hash);
+  const previous = current;
+  if (previous?.name === next.name && (next.name === "home" || (previous.name === "agent" && previous.agentId === next.agentId))) return;
+  if (previous?.name === "home") homeScroll = window.scrollY;
+  current = next;
+  if (next.name === "agent") showAgent(next.agentId);
+  else showHome(previous?.name === "agent" ? previous.agentId : undefined);
+}
+
+bindHomeEvents(view, {
+  reload: () => void home.reload(),
+  loadMore: () =>
+    void home.loadMore().then((added) => {
+      cardOf(added[0])?.focus();
+    }),
+  dismissHelp() {
+    home.dismissHelp();
+    document.querySelector<HTMLElement>("[data-act='showHelp']")?.focus();
+  },
+  showHelp() {
+    home.showHelp();
+    document.getElementById("help-title")?.focus();
+  },
+  setTeam: (value) => home.setTeam(value),
+  setSort: (value) => home.setSort(value),
+});
 
 element("title").textContent = t("app.title");
 element("status").addEventListener("click", (event) => {
-  if (event.target instanceof Element && event.target.closest("[data-retry]") !== null) void showStatus();
+  if (event.target instanceof Element && event.target.closest("[data-retry]") !== null) void status.refresh();
 });
-void showStatus();
+window.addEventListener("hashchange", route);
+status.start();
+route();

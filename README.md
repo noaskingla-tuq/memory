@@ -11,7 +11,7 @@ src/backend/            外部後端入口：entry（activate）、service（派
 vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
-src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/dialog.ts、i18n/、styles/{app.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
+src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{backendClient,errors}.ts、dom/html.ts、components/{dialog,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間空殼）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
 src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
 src/application/ui/     七個方法的本體（overview、agentStats、listing、detail、forget、status）與零件：agentIndex（agent 索引與快取）、collect（跨 namespace 掃描）、timeSlice（時間片）、budget（UTF-8 bytes 預算）、paging、cursor（無狀態 keyset 游標）、punchContent（工作紀錄前綴解析）、textQuery、workItem、dayBins、profilePort（名稱表介面）、profileTable（生效中的名稱表）、profileGeneration、names（名稱合併與降級）、jsonSafe（出口）
 types/                  devkit `types` 指令產生的 tuq-plugin-sdk.d.ts（`npm run types:sync`）
@@ -109,7 +109,7 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 
 ## UI 基礎（S5）
 
-畫面（S6a～S6d）共用的零件；`main.ts` 只用它們顯示標題與 `ui.status`（版本、儲存狀態、最近一次寫入）。
+畫面（S6a～S6d）共用的零件。
 
 - `api/backendClient.ts`：`createBackendClient({call})` 是唯一呼叫 `window.tuqPlugin.backend.call` 的地方（`backendClient()` 綁定真的 bridge）。同時在途最多 2 個、其餘照順序排隊；同一個 key（預設是方法名，可用 `{key}` 分開，例如抽屜與同工作清單）的舊請求在新請求送出時以 epoch 丟棄，結果是 `{ok:false, superseded:true}`，排隊中的舊請求根本不送出；`ui.forget` 是寫入，永不丟棄、也不自動重試。只有平台碼 `plugin_backend_unavailable` 自動重試最多 3 次（延遲 1、2、4 秒，涵蓋冷啟動；等待期間不佔在途名額，等完若已被取代就不再送）。成功回 `{ok:true, value}`（value 是後端整個回應），失敗一律攤平成 `{ok:false, code, source, message, action, actionKind, retryable, superseded, attempts}`；參數的 `undefined` 成員在送出前移除（preload 會拒收）。
 - `api/errors.ts`：平台碼（`PLATFORM_CODES`）、plugin 碼（`PLUGIN_CODES`，含契約的 `UI_FAILURE_CODES`（`CURSOR_STALE` 是游標不能用、畫面要從第一頁重來的唯一碼；`INVALID_CURSOR`、`NOT_IMPLEMENTED` 已不存在）與預留的 `MEMORY_SUPPRESSED`、`STORAGE_UNSAFE`、整次呼叫失敗碼）、client 碼（`superseded`、`malformed_response`、`unknown`）各對應一句白話加一個建議動作（字串在 `i18n/zhTW.ts`）；`UI_FAILURE_CODES_COVERED` 讓契約新增碼而這裡沒補時 `tsc -p tsconfig.ui.json` 直接失敗。`codeFromThrown` 從 Electron 包過的 ipc 錯誤訊息裡找碼；`isCursorReset` 判斷要從第一頁重來的碼。
@@ -119,6 +119,19 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 - `styles/tokens.css` 與 `tokens.lock.json`：由 `npm run tokens:sync -- --core <TeamUQ 路徑>` 從 Core 的 `apps/desktop/src/renderer/styles/base.css` 產生（Core 該檔有未提交變更就拒絕），lock 記來源 commit、檔案雜湊、兩套值與輸出雜湊；`npm run tokens:verify`（在 `npm run check` 內）離線檢查 css 沒被手改；`tokens:sync -- --core <路徑> --check` 比對 Core 有沒有漂移。深淺色只有 `:root{color-scheme: light dark}` 加一個 `@media (prefers-color-scheme: dark)`，沒有 `data-theme`。plugin 自有的 token：`--link`、`--text-secondary-strong`（Core 的 `--text-secondary` 在 `--surface-muted` 上只有 4.33:1）、`--accent-fg`（Core 的 `--on-accent` 在 `--accent` 上只有 2.46:1）、`--danger-fg`、`--font-ui`。`--text-muted`、`--accent-hover`、`--accent`、`--on-accent` 不得當文字色；焦點外框用 `--link`（`--accent` 對白底不到 3:1）。`test/ui-contrast.test.mjs` 對兩套配色算對比並掃 `app.css` 的 `color:`。
 - `bundleUi` 用 esbuild 把 `styles/app.css`（`@import "./tokens.css"`）打成單一 `ui/app.css`，因為 view 只准連結 `app.css`。
 - 測試：`test/uiViewHarness.mjs` 以 esbuild 把 `src/ui` 的 TypeScript 打成暫存 ESM 供 node 測試載入（同一次載入的模組共用一份打包，否則 `SafeHtml` 的身分檢查會跨份失敗）；`test/fakeDom.mjs` 是 dialog 用的最小假 DOM。後端 `ui.*` 測試的假資料與播種工具是另一支 `test/uiHarness.mjs`（`startStore`、`seed` 等），兩支用途不同、不共用。
+
+## 團隊首頁（S6a）
+
+`main.ts` 是唯一碰 `document`／`window` 的組裝處；畫面邏輯都是可用假目標測試的純函式或小型控制器。
+
+- `router.ts`：hash 路由，`#/` 是團隊首頁，`#/agent/<encodeURIComponent(id)>` 是「記憶空間」（目前是空殼 `views/memorySpaceShell.ts`，S6b 填內容）；解不開的 hash 一律回首頁。卡片是真的 `<a href>`，所以鍵盤 Tab 可達、Enter 可開；切換路由後焦點落在記憶空間標題，回首頁時回到原卡片。
+- `state/teamHome.ts`：`parseOverview`（UI 不能跑 zod，手寫的回應檢查；型別斷言 `OVERVIEW_CONTRACT_MATCHES` 讓契約的 overview 形狀漂移時 `tsc -p tsconfig.ui.json` 失敗）、名稱降級（`displayName`：沒有 `name` 時取 id 最後一段，全 id 仍顯示在卡片上；project 沒名字顯示「專案＋id 前 8 碼」；部門沒名字顯示 key，key 為空顯示「未分組」）、依部門分組與三種排序（最近寫入、累積筆數、名稱，都只作用在已載入的 agent）、`mergeAgents`（續頁依 id 去重）。
+- `views/teamHomeController.ts`：載入狀態機（loading／ready／error）。第一頁 `ui.overview({tzOffsetMin, dayStartIso, limit: 60})`（`dayStartIso` 是本地當天 0 點的 ISO、`tzOffsetMin` 是 UTC 以東的分鐘數，與後端 `agentStats` 一致），有 `nextCursor` 就出現「載入更多」；重新整理與載入更多用不同的 backendClient key，重新整理會讓在途的載入更多失效；`CURSOR_STALE` 顯示「從第一頁重新載入」；重新整理失敗但畫面已有資料時保留資料、在橫幅顯示錯誤。第一次說明「記憶是怎麼來的」以 `localStorage` 記住已讀（讀寫失敗當作沒有）。
+- `views/teamHomeView.ts`：只產生 `SafeHtml`，所有動態字串（名稱、id、摘要、部門、project）都經 `html`／`esc`。`overview.complete === false` 時顯示「資料不完整」與重新整理；`storage.unavailableAgents > 0` 時說明有幾位 agent 讀不到。專案記憶只在任務有掛專案時才出現，這句說明（D9）在有卡片時常駐、在空狀態裡也有。
+- `views/statusLine.ts`：標題列的狀態點與「最近寫入 N 分鐘前」。`ui.status` 只在 `document.visibilityState === "visible"` 時每 30 秒輪詢一次，隱藏就取消計時器、轉為可見時立刻讀一次並重新計時；儲存狀態不是 `ready` 顯示警示而不是「運作中」。`#status[data-state]`（loading／ok／warn／error）是外部探針（真 Electron harness）讀的介面。
+- `views/homeEvents.ts`：以 `closest("[data-act]")`／`[data-role]` 的事件委派，不用事件屬性（CSP）。
+- 樣式：`styles/home.css` 由 `app.css` 匯入；頭像色由 id 的雜湊決定（`--h` 色相，唯一一條 `hsl(var(--h) 55% 75%)` 的規則，深藍字 `--accent-fg` 對 360 個色相在兩套配色都 ≥4.5:1，由 `test/ui-contrast.test.mjs` 驗）。
+- 測試：`test/ui-team-home-{state,view,contract}.test.mjs`、`ui-status-line`、`ui-home-events`；`test/homeFixtures.mjs` 是假 overview 與假 backend（依 (teamKey, id) 分頁）；`ui-team-home-contract` 以真的 `ui.overview` 回應（100 個 agent）驗證 UI 解析與續頁。注入測試用 `tokenize` 檢查輸出裡每個標籤與屬性都在白名單內、沒有殘留角括號。
 
 ## 契約 vendor
 

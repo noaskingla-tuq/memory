@@ -14,6 +14,7 @@ import {
   TEAM_OPTION_PREFIX,
   type OverviewAgent,
   type OverviewTiles,
+  type ProfileHealth,
   type ProjectCount,
   type SortKey,
   type TeamGroup,
@@ -33,6 +34,7 @@ export interface HomeView {
   readonly loadingMore: boolean;
   readonly complete: boolean;
   readonly unavailableAgents: number;
+  readonly profile: ProfileHealth;
   readonly team: string | null;
   readonly sort: SortKey;
   readonly helpOpen: boolean;
@@ -61,12 +63,24 @@ export function renderHelp(view: HomeView): SafeHtml {
   return html`<section class="notice help" aria-labelledby="help-title"><h2 id="help-title" tabindex="-1">${t("home.help.title")}</h2><p>${t("home.help.body")}</p><button type="button" class="btn" data-act="dismissHelp">${t("home.help.dismiss")}</button></section>`;
 }
 
+const OMITTED_KEYS = ["agents", "teams", "projects"] as const;
+
+// why: a name table with holes is a display matter only, so the notice says what falls back to ids and that the memories themselves are intact
+export function profileNotice(profile: ProfileHealth): string {
+  if (profile.corrupt) return t("home.profile.corrupt");
+  if (!profile.incomplete) return "";
+  const detail = OMITTED_KEYS.filter((key) => profile.omitted[key] > 0).map((key) => t(`home.profile.omitted.${key}`, { n: number(profile.omitted[key]) }));
+  return detail.length === 0 ? t("home.profile.incompleteUnknown") : t("home.profile.incomplete", { detail: detail.join(t("home.profile.separator")) });
+}
+
 export function renderBanner(view: HomeView): SafeHtml {
   if (view.phase !== "ready") return EMPTY_HTML;
   const parts: SafeHtml[] = [];
   if (view.notice !== null) parts.push(renderError(view.notice, "reload"));
   if (!view.complete) parts.push(html`<div class="notice" role="status"><span>${t("overview.incomplete")}</span> <button type="button" class="btn" data-act="reload">${t("common.refresh")}</button></div>`);
   if (view.unavailableAgents > 0) parts.push(html`<div class="notice" role="status">${t("home.unavailable", { n: view.unavailableAgents })}</div>`);
+  const profile = profileNotice(view.profile);
+  if (profile !== "") parts.push(html`<div class="notice" role="status" data-notice="profile">${profile}</div>`);
   return html`${parts}`;
 }
 

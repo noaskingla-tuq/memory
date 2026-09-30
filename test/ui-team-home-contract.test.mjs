@@ -54,6 +54,6 @@ test("the view parses the real ui.overview pages: 100 agents over two pages, eve
   const sample = home.agent("team3/agent003");
   assert.ok(sample.counts.total >= 1 && sample.spark14.length === 14 && sample.latest.snippet.startsWith("第 3 位的請求"));
   assert.ok(targets.wall.innerHTML.includes("<b>team3</b>"), "no name table yet: the department shows its key");
-  assert.ok(targets.wall.innerHTML.includes('<span class="acard-name">agent003</span><span class="acard-id">team3/agent003</span>'));
+  assert.ok(targets.wall.innerHTML.includes('<span class="acard-name">agent003（team3）</span><span class="acard-id">team3/agent003</span>'));
   assert.ok(ui.parseOverview(await client.call("ui.overview", { tzOffsetMin: 0, dayStartIso: DAY_START }).then((result) => result.value)) !== null);
 });

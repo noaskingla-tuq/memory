@@ -3,7 +3,9 @@ import { mount } from "./dom/html.js";
 import { t } from "./i18n/index.js";
 import { parseRoute, type Route } from "./router.js";
 import { bindHomeEvents } from "./views/homeEvents.js";
-import { renderMemorySpaceShell, SPACE_TITLE_ID } from "./views/memorySpaceShell.js";
+import { createMemorySpace, type SpaceTargets } from "./views/memorySpaceController.js";
+import { SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
+import { bindSpaceEvents } from "./views/spaceEvents.js";
 import { createStatusLine } from "./views/statusLine.js";
 import { createTeamHome, type HomeTargets, type Preferences } from "./views/teamHomeController.js";
 import { homeShell } from "./views/teamHomeView.js";
@@ -52,6 +54,7 @@ const status = createStatusLine({
 });
 
 const home = createTeamHome({ client, now, preferences });
+const space = createMemorySpace({ client, now });
 
 function homeTargets(): HomeTargets {
   return {
@@ -63,6 +66,10 @@ function homeTargets(): HomeTargets {
     note: element("home-note"),
     wall: element("home-wall"),
   };
+}
+
+function spaceTargets(): SpaceTargets {
+  return { avatar: element("space-avatar"), title: element("space-title"), id: element("space-id"), meta: element("space-meta"), body: element("space-body") };
 }
 
 function cardOf(agentId: string | undefined): HTMLElement | null {
@@ -83,7 +90,8 @@ function showHome(returnedFrom: string | undefined): void {
 
 function showAgent(agentId: string): void {
   home.attach(null);
-  mount(view, renderMemorySpaceShell(agentId, home.agent(agentId), now()));
+  mount(view, spaceShell());
+  void space.open(agentId, home.agent(agentId), spaceTargets());
   window.scrollTo(0, 0);
   document.getElementById(SPACE_TITLE_ID)?.focus();
 }
@@ -93,6 +101,7 @@ function route(): void {
   const previous = current;
   if (previous?.name === next.name && (next.name === "home" || (previous.name === "agent" && previous.agentId === next.agentId))) return;
   if (previous?.name === "home") homeScroll = window.scrollY;
+  if (previous?.name === "agent") space.close();
   current = next;
   if (next.name === "agent") showAgent(next.agentId);
   else showHome(previous?.name === "agent" ? previous.agentId : undefined);
@@ -114,6 +123,13 @@ bindHomeEvents(view, {
   },
   setTeam: (value) => home.setTeam(value),
   setSort: (value) => home.setSort(value),
+});
+
+bindSpaceEvents(view, {
+  retry() {
+    void space.retry();
+    document.getElementById(SPACE_TITLE_ID)?.focus();
+  },
 });
 
 element("title").textContent = t("app.title");

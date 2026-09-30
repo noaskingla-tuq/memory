@@ -128,7 +128,7 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.anchors, "self");
   assert.equal(info.signer.kind, "teamuq");
   assert.match(info.signer.keyId, /^teamuq-tmp-[0-9a-f]{8}$/u);
-  assert.equal(info.file, join(dist, "teamuq.memory-1.0.0.tuqplugin"));
+  assert.equal(info.file, join(dist, "teamuq.memory-1.1.0.tuqplugin"));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
   assert.equal(report.fileCount, 8 + 58);

@@ -14,6 +14,7 @@
     "contract:sync": "node tools/sync-vendor.mjs --only contract",
     "devkit:sync": "node tools/sync-vendor.mjs --only devkit",
     "build": "node tools/build.mjs",
+    "dev:pack": "node tools/dev-pack.mjs",
     "verify:artifact": "node tools/verify-artifact.mjs",
     "release": "node tools/release.mjs",
     "check:secrets": "node tools/check-no-secrets.mjs",

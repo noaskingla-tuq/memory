@@ -2,7 +2,7 @@
 
 TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust）的外部 plugin（id `teamuq.memory`，版本 1.0.0）。記憶 domain／application 與 Cairn adapter 自 TeamUQ `packages/platform/memory-server` 原樣搬來（P1）；`src/backend/` 是 TeamUQ 外部 full-trust 後端的入口（P2）；`tools/build.mjs` 一鍵產出 `.tuqplugin`（P3）。
 
-> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-c6` 的 `f5bf50cbf`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
+> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-devtrust` 的 `36c83e134`，含 `dev-pack --preplanted-id`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
 
 ## 目錄
 
@@ -99,7 +99,7 @@ build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock�
 - `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 58 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。
 - manifest：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.backend: backend.mjs`、`permissions: []`、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.6.3`（1.6.3 是第一個含白名單 `invokeBackend`、接受 `@` 的 methodName 與走 invoke 的記憶 sink 的 Core；1.6.0～1.6.2 會通過 manifest 檢查但不會有人呼叫本 plugin，`verify-artifact` 斷言此值）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 2`、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
 - devkit：`vendor/teamuq-devkit/tuq-plugin-tool.mjs` 是 TeamUQ `npm run build:plugin-devkit -- --out <路徑>` 的產物，禁止手改；`devkit.lock.json` 記 Core commit、Core 版本與 sha256（CRLF 正規化為 LF 再雜湊）。更新：`npm run devkit:sync -- --core <TeamUQ 路徑>`（Core 內嵌來源有未提交變更時拒絕）。`release`、`build`、`verify-artifact` 執行前都會比對 lock。
-- devkit 內嵌當下 Core 的 `TEAMUQ_TRUST_ANCHORS`：現為 `teamuq-root-2026a`、`teamuq-root-2026b` 兩把公鑰（Core 1.6.3，`f5bf50cbf`）。Core 的 anchors 再變動就必須重跑 `devkit:sync`。
+- devkit 內嵌當下 Core 的 `TEAMUQ_TRUST_ANCHORS`：現為 `teamuq-root-2026a`、`teamuq-root-2026b` 兩把公鑰（Core 1.6.3，含 `--preplanted-id` 的 commit 記在 `devkit.lock.json`）。Core 的 anchors 再變動就必須重跑 `devkit:sync`。
 
 ### 簽章與金鑰
 
@@ -122,6 +122,25 @@ node tools/build.mjs --key C:\Users\david\.teamuq-keys\teamuq-root-2026a.key.pem
 - 驗證：`node vendor/teamuq-devkit/tuq-plugin-tool.mjs verify dist/teamuq.memory-1.0.0.tuqplugin --anchors core`，必須 exit 0 且 `signer.keyId` 為 `teamuq-root-2026a`；也可用 `node tools/verify-artifact.mjs dist/teamuq.memory-1.0.0.tuqplugin --anchors core`。
 - 錯誤：`is inside this repository` 表示金鑰路徑在 git 工作樹內（搬到 repo 外）；`could not be decrypted` 是 passphrase 錯；`signature_invalid` 表示該檔不是 Core 內嵌的那把私鑰；`interactive terminal is required` 表示不在真實終端機。環境變數 `TEAMUQ_KEY_PASSPHRASE_FOR_TESTS` 對真金鑰無效（`release.mjs` 一律移除）。
 
+### 開發迭代：`npm run dev:pack`（開發金鑰，隔離 Core dev profile）
+
+改 plugin 時不必每輪用 TeamUQ 根金鑰簽章。Core 在**未封裝的 dev build 且 `TEAMUQ_DEV_ISOLATION_ROOT` 通過驗證**時，接受「該隔離 profile 已匯入的開發金鑰」簽的 `teamuq.memory`：可安裝、可取代預植的官方版、可通過記憶 invoke gate；打包版與沒設隔離的 dev 照舊拒絕（細節與限制見 Core 的 `docs/plugin-developer-guide.md` 3.1）。
+
+```powershell
+# 一次：產生開發金鑰（私鑰放 repo 外，互動輸入至少 16 字元的 passphrase）
+node vendor/teamuq-devkit/tuq-plugin-tool.mjs dev-keygen --out-dir $env:LOCALAPPDATA\TeamUQ\plugin-dev-keys
+
+# 每輪：stage、devkit dev-pack --bump-patch --preplanted-id teamuq.memory、自我 verify
+npm run dev:pack -- --key $env:LOCALAPPDATA\TeamUQ\plugin-dev-keys\<dev-keyId>.key.pem
+```
+
+- 輸出固定在 `dist/dev/teamuq.memory.tuqplugin`（`--out` 可改，但要沿用同一個路徑）：第一次版本是 `package.json` 版本加一個 patch（1.0.1），之後每次依既有檔遞增；stage 在同層 `stage/`。`dist/` 不進版控。
+- 金鑰檔必須叫 `dev-<16 碼 hex>.key.pem`，旁邊要有 `.pub.json`；release 金鑰（`teamuq-…`）、repo 內的金鑰路徑都會被拒。passphrase 只在互動提示輸入，不接受參數。
+- 到 Core：以隔離 profile 啟動 dev build，設定 → 外掛 → 開發者匯入 `.pub.json` 的公鑰，再選取 `dist/dev/teamuq.memory.tuqplugin` 安裝。第一次是取代預植的官方版（走更新流程，版本要較新），之後是同一把金鑰的原地更新；換金鑰或想回官方版要先移除再從「預植外掛」還原。
+- 只有 `dev:pack` 帶 `--preplanted-id teamuq.memory`；`build` 與 `release` 的行為不變，正式簽章仍照上面的 H2。`dev:pack` 的產物帶開發簽章，Core 的打包版一律拒絕。
+- 開發版 manifest 的版本是 1.0.x 遞增，`diagnose` 回報的 `plugin.version` 仍是 `src/backend/diagnose.ts` 的常數，兩者在開發版本不一致是預期的。
+- devkit 必須是含 `--preplanted-id` 的 Core 版本：目前 vendor 的是 Core worktree `task/ext-mem-devtrust` 的 commit（見 `devkit.lock.json`）；合回 V1 後 commit 雜湊改變，重跑 `npm run devkit:sync -- --core <TeamUQ 路徑>`。
+
 ## 需求與指令
 
 - Node.js ≥ 24；`npm` 只在本 repo 目錄內執行，一律 `--ignore-scripts`。
@@ -143,6 +162,7 @@ npm run check          # tsc → node --test → contract:verify → verify-sour
 | `npm run verify:source` | 驗證 lock／package 的 Cairn pin、`core/` tree hash、`redact.mjs` sha256、唯一 import 位置 |
 | `npm run check:secrets` | 找私鑰區塊、`*.pem`／`*.key`／`keys/`，並確認 `.gitignore` 仍排除它們 |
 | `npm run build` | 見「打包與簽章」，輸出到 `dist/`（gitignored） |
+| `npm run dev:pack -- --key <dev key>` | 見「開發迭代」：以開發金鑰打出 `dist/dev/teamuq.memory.tuqplugin`（版本逐次遞增），只給隔離 Core dev profile |
 | `npm run devkit:sync -- --core <路徑>` | 重建並 vendor devkit（`contract:sync` 只同步契約） |
 
 ## 金鑰

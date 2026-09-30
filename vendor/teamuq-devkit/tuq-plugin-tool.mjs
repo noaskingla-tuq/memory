@@ -1681,31 +1681,31 @@ var ZodError = class _ZodError extends Error {
     this.issues = issues;
   }
   format(_mapper) {
-    const mapper = _mapper || function(issue) {
-      return issue.message;
+    const mapper = _mapper || function(issue2) {
+      return issue2.message;
     };
     const fieldErrors = { _errors: [] };
     const processError = (error) => {
-      for (const issue of error.issues) {
-        if (issue.code === "invalid_union") {
-          issue.unionErrors.map(processError);
-        } else if (issue.code === "invalid_return_type") {
-          processError(issue.returnTypeError);
-        } else if (issue.code === "invalid_arguments") {
-          processError(issue.argumentsError);
-        } else if (issue.path.length === 0) {
-          fieldErrors._errors.push(mapper(issue));
+      for (const issue2 of error.issues) {
+        if (issue2.code === "invalid_union") {
+          issue2.unionErrors.map(processError);
+        } else if (issue2.code === "invalid_return_type") {
+          processError(issue2.returnTypeError);
+        } else if (issue2.code === "invalid_arguments") {
+          processError(issue2.argumentsError);
+        } else if (issue2.path.length === 0) {
+          fieldErrors._errors.push(mapper(issue2));
         } else {
           let curr = fieldErrors;
           let i = 0;
-          while (i < issue.path.length) {
-            const el = issue.path[i];
-            const terminal = i === issue.path.length - 1;
+          while (i < issue2.path.length) {
+            const el = issue2.path[i];
+            const terminal = i === issue2.path.length - 1;
             if (!terminal) {
               curr[el] = curr[el] || { _errors: [] };
             } else {
               curr[el] = curr[el] || { _errors: [] };
-              curr[el]._errors.push(mapper(issue));
+              curr[el]._errors.push(mapper(issue2));
             }
             curr = curr[el];
             i++;
@@ -1730,7 +1730,7 @@ var ZodError = class _ZodError extends Error {
   get isEmpty() {
     return this.issues.length === 0;
   }
-  flatten(mapper = (issue) => issue.message) {
+  flatten(mapper = (issue2) => issue2.message) {
     const fieldErrors = {};
     const formErrors = [];
     for (const sub of this.issues) {
@@ -1754,30 +1754,30 @@ ZodError.create = (issues) => {
 };
 
 // ../../../node_modules/zod/v3/locales/en.js
-var errorMap = (issue, _ctx) => {
+var errorMap = (issue2, _ctx) => {
   let message;
-  switch (issue.code) {
+  switch (issue2.code) {
     case ZodIssueCode.invalid_type:
-      if (issue.received === ZodParsedType.undefined) {
+      if (issue2.received === ZodParsedType.undefined) {
         message = "Required";
       } else {
-        message = `Expected ${issue.expected}, received ${issue.received}`;
+        message = `Expected ${issue2.expected}, received ${issue2.received}`;
       }
       break;
     case ZodIssueCode.invalid_literal:
-      message = `Invalid literal value, expected ${JSON.stringify(issue.expected, util.jsonStringifyReplacer)}`;
+      message = `Invalid literal value, expected ${JSON.stringify(issue2.expected, util.jsonStringifyReplacer)}`;
       break;
     case ZodIssueCode.unrecognized_keys:
-      message = `Unrecognized key(s) in object: ${util.joinValues(issue.keys, ", ")}`;
+      message = `Unrecognized key(s) in object: ${util.joinValues(issue2.keys, ", ")}`;
       break;
     case ZodIssueCode.invalid_union:
       message = `Invalid input`;
       break;
     case ZodIssueCode.invalid_union_discriminator:
-      message = `Invalid discriminator value. Expected ${util.joinValues(issue.options)}`;
+      message = `Invalid discriminator value. Expected ${util.joinValues(issue2.options)}`;
       break;
     case ZodIssueCode.invalid_enum_value:
-      message = `Invalid enum value. Expected ${util.joinValues(issue.options)}, received '${issue.received}'`;
+      message = `Invalid enum value. Expected ${util.joinValues(issue2.options)}, received '${issue2.received}'`;
       break;
     case ZodIssueCode.invalid_arguments:
       message = `Invalid function arguments`;
@@ -1789,50 +1789,50 @@ var errorMap = (issue, _ctx) => {
       message = `Invalid date`;
       break;
     case ZodIssueCode.invalid_string:
-      if (typeof issue.validation === "object") {
-        if ("includes" in issue.validation) {
-          message = `Invalid input: must include "${issue.validation.includes}"`;
-          if (typeof issue.validation.position === "number") {
-            message = `${message} at one or more positions greater than or equal to ${issue.validation.position}`;
+      if (typeof issue2.validation === "object") {
+        if ("includes" in issue2.validation) {
+          message = `Invalid input: must include "${issue2.validation.includes}"`;
+          if (typeof issue2.validation.position === "number") {
+            message = `${message} at one or more positions greater than or equal to ${issue2.validation.position}`;
           }
-        } else if ("startsWith" in issue.validation) {
-          message = `Invalid input: must start with "${issue.validation.startsWith}"`;
-        } else if ("endsWith" in issue.validation) {
-          message = `Invalid input: must end with "${issue.validation.endsWith}"`;
+        } else if ("startsWith" in issue2.validation) {
+          message = `Invalid input: must start with "${issue2.validation.startsWith}"`;
+        } else if ("endsWith" in issue2.validation) {
+          message = `Invalid input: must end with "${issue2.validation.endsWith}"`;
         } else {
-          util.assertNever(issue.validation);
+          util.assertNever(issue2.validation);
         }
-      } else if (issue.validation !== "regex") {
-        message = `Invalid ${issue.validation}`;
+      } else if (issue2.validation !== "regex") {
+        message = `Invalid ${issue2.validation}`;
       } else {
         message = "Invalid";
       }
       break;
     case ZodIssueCode.too_small:
-      if (issue.type === "array")
-        message = `Array must contain ${issue.exact ? "exactly" : issue.inclusive ? `at least` : `more than`} ${issue.minimum} element(s)`;
-      else if (issue.type === "string")
-        message = `String must contain ${issue.exact ? "exactly" : issue.inclusive ? `at least` : `over`} ${issue.minimum} character(s)`;
-      else if (issue.type === "number")
-        message = `Number must be ${issue.exact ? `exactly equal to ` : issue.inclusive ? `greater than or equal to ` : `greater than `}${issue.minimum}`;
-      else if (issue.type === "bigint")
-        message = `Number must be ${issue.exact ? `exactly equal to ` : issue.inclusive ? `greater than or equal to ` : `greater than `}${issue.minimum}`;
-      else if (issue.type === "date")
-        message = `Date must be ${issue.exact ? `exactly equal to ` : issue.inclusive ? `greater than or equal to ` : `greater than `}${new Date(Number(issue.minimum))}`;
+      if (issue2.type === "array")
+        message = `Array must contain ${issue2.exact ? "exactly" : issue2.inclusive ? `at least` : `more than`} ${issue2.minimum} element(s)`;
+      else if (issue2.type === "string")
+        message = `String must contain ${issue2.exact ? "exactly" : issue2.inclusive ? `at least` : `over`} ${issue2.minimum} character(s)`;
+      else if (issue2.type === "number")
+        message = `Number must be ${issue2.exact ? `exactly equal to ` : issue2.inclusive ? `greater than or equal to ` : `greater than `}${issue2.minimum}`;
+      else if (issue2.type === "bigint")
+        message = `Number must be ${issue2.exact ? `exactly equal to ` : issue2.inclusive ? `greater than or equal to ` : `greater than `}${issue2.minimum}`;
+      else if (issue2.type === "date")
+        message = `Date must be ${issue2.exact ? `exactly equal to ` : issue2.inclusive ? `greater than or equal to ` : `greater than `}${new Date(Number(issue2.minimum))}`;
       else
         message = "Invalid input";
       break;
     case ZodIssueCode.too_big:
-      if (issue.type === "array")
-        message = `Array must contain ${issue.exact ? `exactly` : issue.inclusive ? `at most` : `less than`} ${issue.maximum} element(s)`;
-      else if (issue.type === "string")
-        message = `String must contain ${issue.exact ? `exactly` : issue.inclusive ? `at most` : `under`} ${issue.maximum} character(s)`;
-      else if (issue.type === "number")
-        message = `Number must be ${issue.exact ? `exactly` : issue.inclusive ? `less than or equal to` : `less than`} ${issue.maximum}`;
-      else if (issue.type === "bigint")
-        message = `BigInt must be ${issue.exact ? `exactly` : issue.inclusive ? `less than or equal to` : `less than`} ${issue.maximum}`;
-      else if (issue.type === "date")
-        message = `Date must be ${issue.exact ? `exactly` : issue.inclusive ? `smaller than or equal to` : `smaller than`} ${new Date(Number(issue.maximum))}`;
+      if (issue2.type === "array")
+        message = `Array must contain ${issue2.exact ? `exactly` : issue2.inclusive ? `at most` : `less than`} ${issue2.maximum} element(s)`;
+      else if (issue2.type === "string")
+        message = `String must contain ${issue2.exact ? `exactly` : issue2.inclusive ? `at most` : `under`} ${issue2.maximum} character(s)`;
+      else if (issue2.type === "number")
+        message = `Number must be ${issue2.exact ? `exactly` : issue2.inclusive ? `less than or equal to` : `less than`} ${issue2.maximum}`;
+      else if (issue2.type === "bigint")
+        message = `BigInt must be ${issue2.exact ? `exactly` : issue2.inclusive ? `less than or equal to` : `less than`} ${issue2.maximum}`;
+      else if (issue2.type === "date")
+        message = `Date must be ${issue2.exact ? `exactly` : issue2.inclusive ? `smaller than or equal to` : `smaller than`} ${new Date(Number(issue2.maximum))}`;
       else
         message = "Invalid input";
       break;
@@ -1843,14 +1843,14 @@ var errorMap = (issue, _ctx) => {
       message = `Intersection results could not be merged`;
       break;
     case ZodIssueCode.not_multiple_of:
-      message = `Number must be a multiple of ${issue.multipleOf}`;
+      message = `Number must be a multiple of ${issue2.multipleOf}`;
       break;
     case ZodIssueCode.not_finite:
       message = "Number must be finite";
       break;
     default:
       message = _ctx.defaultError;
-      util.assertNever(issue);
+      util.assertNever(issue2);
   }
   return { message };
 };
@@ -1894,7 +1894,7 @@ var makeIssue = (params) => {
 var EMPTY_PATH = [];
 function addIssueToContext(ctx, issueData) {
   const overrideMap = getErrorMap();
-  const issue = makeIssue({
+  const issue2 = makeIssue({
     issueData,
     data: ctx.data,
     path: ctx.path,
@@ -1909,7 +1909,7 @@ function addIssueToContext(ctx, issueData) {
       // then global default map
     ].filter((x) => !!x)
   });
-  ctx.common.issues.push(issue);
+  ctx.common.issues.push(issue2);
 }
 var ParseStatus = class _ParseStatus {
   constructor() {
@@ -3867,9 +3867,9 @@ var ZodObject = class _ZodObject extends ZodType {
       ...this._def,
       unknownKeys: "strict",
       ...message !== void 0 ? {
-        errorMap: (issue, ctx) => {
-          const defaultError = this._def.errorMap?.(issue, ctx).message ?? ctx.defaultError;
-          if (issue.code === "unrecognized_keys")
+        errorMap: (issue2, ctx) => {
+          const defaultError = this._def.errorMap?.(issue2, ctx).message ?? ctx.defaultError;
+          if (issue2.code === "unrecognized_keys")
             return {
               message: errorUtil.errToObj(message).message ?? defaultError
             };
@@ -5635,6 +5635,141 @@ var HostIdentityTaskChangedV1Schema = external_exports.object({
   }).strict()
 }).strict();
 
+// packages/plugin-sdk/src/aiChatContracts.ts
+var PLUGIN_AI_CHANNELS = Object.freeze({
+  REQUEST: "plugin-view:ai",
+  EVENT: "plugin-view:ai-event"
+});
+var AI_CHAT_LIMITS = Object.freeze({
+  systemChars: 16e3,
+  transcriptLines: 40,
+  transcriptLineChars: 8e3,
+  transcriptChars: 6e4,
+  inputChars: 8e3,
+  imageBytes: 2 * 1024 * 1024,
+  replyChars: 32e3,
+  sessionsPerPlugin: 1,
+  sessionsTotal: 8,
+  concurrentTurnsTotal: 4,
+  turnsPerMinute: 20,
+  turnsPerHour: 400,
+  turnTimeoutMs: 3e5,
+  attachGraceMs: 6e4,
+  quotaCooldownMs: 5 * 6e4,
+  hiddenWindowMs: 2 * 6e4,
+  hiddenOpensPerInput: 2,
+  hiddenTurnsPerInput: 2
+});
+var AI_CHAT_EFFORTS = Object.freeze(["minimal", "low", "medium", "high", "xhigh"]);
+var AI_CHAT_ERROR_CODES = Object.freeze([
+  "plugin_not_active",
+  "not_granted",
+  "request_invalid",
+  "input_too_large",
+  "provider_not_found",
+  "provider_not_ready",
+  "model_unavailable",
+  "unsupported_image",
+  "session_limit",
+  "session_not_found",
+  "turn_in_progress",
+  "rate_limited",
+  "quota_exhausted",
+  "busy",
+  "view_not_visible",
+  "unavailable"
+]);
+var sessionId = external_exports.string().regex(/^[0-9a-f]{32}$/);
+var providerId = external_exports.string().regex(/^[a-z][a-z0-9_-]{0,31}$/);
+var modelId = external_exports.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$/);
+var effort = external_exports.enum(AI_CHAT_EFFORTS);
+var line = external_exports.object({ role: external_exports.enum(["user", "assistant"]), text: external_exports.string().max(AI_CHAT_LIMITS.transcriptLineChars) }).strict();
+var AiChatImageSchema = external_exports.object({
+  mime: external_exports.enum(["image/jpeg", "image/png"]),
+  data: external_exports.custom((value) => value instanceof Uint8Array && value.byteLength > 0 && value.byteLength <= AI_CHAT_LIMITS.imageBytes)
+}).strict();
+var AiChatRequestVariants = external_exports.discriminatedUnion("op", [
+  external_exports.object({ op: external_exports.literal("getOptions") }).strict(),
+  external_exports.object({
+    op: external_exports.literal("openSession"),
+    providerId: providerId.optional(),
+    modelId: modelId.optional(),
+    effort: effort.optional(),
+    system: external_exports.string().min(1).max(AI_CHAT_LIMITS.systemChars),
+    transcript: external_exports.array(line).max(AI_CHAT_LIMITS.transcriptLines).optional()
+  }).strict(),
+  external_exports.object({ op: external_exports.literal("send"), sessionId, text: external_exports.string().max(AI_CHAT_LIMITS.inputChars), image: AiChatImageSchema.optional() }).strict(),
+  external_exports.object({ op: external_exports.literal("interrupt"), sessionId }).strict(),
+  external_exports.object({ op: external_exports.literal("close"), sessionId }).strict(),
+  external_exports.object({ op: external_exports.literal("attachSession"), sessionId }).strict()
+]);
+var AiChatRequestSchema = AiChatRequestVariants.refine((value) => value.op !== "send" || value.text.trim() !== "" || value.image !== void 0, { message: "a turn needs text or an image" });
+var modelView = external_exports.object({
+  id: external_exports.string().max(96),
+  label: external_exports.string().max(96),
+  efforts: external_exports.array(external_exports.string().max(16)).max(8),
+  defaultEffort: external_exports.string().max(16).nullable(),
+  supportsImages: external_exports.boolean(),
+  isDefault: external_exports.boolean()
+}).strict();
+var AiChatProviderViewSchema = external_exports.object({
+  id: providerId,
+  label: external_exports.string().max(48),
+  state: external_exports.enum(["ready", "not_installed", "not_logged_in", "unsupported_version", "unavailable", "not_supported_yet"]),
+  models: external_exports.array(modelView).max(32)
+}).strict();
+var AiChatOptionsSchema = external_exports.object({
+  providers: external_exports.array(AiChatProviderViewSchema).max(8),
+  defaultProviderId: providerId.nullable(),
+  limits: external_exports.object({
+    systemChars: external_exports.number().int(),
+    transcriptLines: external_exports.number().int(),
+    transcriptChars: external_exports.number().int(),
+    inputChars: external_exports.number().int(),
+    imageBytes: external_exports.number().int(),
+    turnsPerMinute: external_exports.number().int()
+  }).strict(),
+  quota: external_exports.object({ state: external_exports.enum(["ok", "exhausted"]), retryAfterMs: external_exports.number().int().nonnegative().nullable() }).strict()
+}).strict();
+var effective = external_exports.object({ providerId, modelId: external_exports.string().max(96), effort: external_exports.string().max(16).nullable() }).strict();
+var AiChatOpenedSchema = external_exports.object({ sessionId, effective }).strict();
+var AiChatSentSchema = external_exports.object({ turnId: external_exports.string().regex(/^[0-9a-f]{16}$/) }).strict();
+var AiChatFailureSchema = external_exports.object({
+  kind: external_exports.literal("failed"),
+  code: external_exports.enum(["provider_unavailable", "unsupported_version", "quota_exhausted", "stalled", "provider_error", "empty_reply", "session_closed", "reply_too_long", "turn_timeout", "access_revoked"]),
+  retryable: external_exports.boolean(),
+  fallbackUsed: external_exports.boolean(),
+  partialDelivered: external_exports.boolean()
+}).strict();
+var AiChatTurnEventSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("started") }).strict(),
+  external_exports.object({ kind: external_exports.literal("textDelta"), text: external_exports.string().max(AI_CHAT_LIMITS.replyChars) }).strict(),
+  external_exports.object({ kind: external_exports.literal("completed") }).strict(),
+  external_exports.object({ kind: external_exports.literal("interrupted") }).strict(),
+  AiChatFailureSchema
+]);
+var AiChatAttachedSchema = external_exports.object({
+  sessionId,
+  effective,
+  turn: external_exports.object({ turnId: external_exports.string().regex(/^[0-9a-f]{16}$/), text: external_exports.string().max(AI_CHAT_LIMITS.replyChars), terminal: AiChatTurnEventSchema.nullable() }).strict().nullable()
+}).strict();
+var AiChatEnvelopeSchema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ ok: external_exports.literal(true), value: external_exports.unknown() }).strict(),
+  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(AI_CHAT_ERROR_CODES) }).strict()
+]);
+var AiChatViewEventSchema = external_exports.object({ sessionId, turnId: external_exports.string().regex(/^[0-9a-f]{16}$/), event: AiChatTurnEventSchema }).strict();
+var AiChatUsageSchema = external_exports.object({
+  activeSessions: external_exports.number().int().nonnegative(),
+  sessionsOpened: external_exports.number().int().nonnegative(),
+  turns: external_exports.number().int().nonnegative(),
+  imageTurns: external_exports.number().int().nonnegative(),
+  failedTurns: external_exports.number().int().nonnegative(),
+  rateLimited: external_exports.number().int().nonnegative(),
+  inputChars: external_exports.number().int().nonnegative(),
+  outputChars: external_exports.number().int().nonnegative(),
+  lastTurnAt: external_exports.string().max(40).nullable()
+}).strict();
+
 // packages/plugin-sdk/src/textInputContracts.ts
 var TEXT_INPUT_CAPABILITY = "teamuq.text-input@1";
 var TEXT_INPUT_PERMISSION = "input:text";
@@ -5651,6 +5786,7 @@ var TEXT_INPUT_LIMITS = Object.freeze({
   ackTimeoutMs: 5e3
 });
 var CORE_INPUT_SOURCES = Object.freeze(["voice", "typed", "schedule"]);
+var TEXT_INPUT_INTERRUPT_REASONS = Object.freeze(["escape"]);
 var TEXT_INPUT_ACK_RESULTS = Object.freeze(["accepted", "dropped", "busy"]);
 var TEXT_INPUT_SUBMIT_ERRORS = Object.freeze([
   "no_input_target",
@@ -5690,6 +5826,8 @@ var TextInputDeliveredSchema = external_exports.object({
   arrivedWhileSpeaking: external_exports.boolean(),
   utterance: utterance.optional()
 }).strict();
+var TextInputInterruptRequestSchema = external_exports.object({ type: external_exports.literal("interrupt"), reason: external_exports.enum(TEXT_INPUT_INTERRUPT_REASONS) }).strict();
+var TextInputInterruptDeliveredSchema = external_exports.object({ type: external_exports.literal("interrupt"), reason: external_exports.enum(TEXT_INPUT_INTERRUPT_REASONS), receivedAtMs: external_exports.number().int().min(0) }).strict();
 var TextInputAckSchema = external_exports.object({ type: external_exports.literal("ack"), inputId, result: external_exports.enum(TEXT_INPUT_ACK_RESULTS), reason: reason.optional() }).strict();
 var TextInputStateSchema = external_exports.object({ type: external_exports.literal("state"), speaking: external_exports.boolean() }).strict();
 var TextInputStateRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion2 }).strict();
@@ -5746,7 +5884,9 @@ var CAPABILITY_LIMITS = Object.freeze({
   burstMessages: 100,
   openTimeoutMs: 15e3,
   idleSessionMs: 5 * 6e4,
-  consentCooldownMs: 8e3
+  consentCooldownMs: 8e3,
+  hiddenWindowMs: AI_CHAT_LIMITS.hiddenWindowMs,
+  hiddenOpensPerInput: AI_CHAT_LIMITS.hiddenOpensPerInput
 });
 var CAPABILITY_ERROR_CODES = Object.freeze([
   "capability_request_invalid",
@@ -5767,8 +5907,14 @@ var CAPABILITY_ERROR_CODES = Object.freeze([
   "provider_error",
   "open_timeout",
   "plugin_not_active",
-  "capability_unavailable"
+  "capability_unavailable",
+  "not_configured",
+  "auth_failed",
+  "quota_exceeded",
+  "network_unreachable",
+  "unsupported_options"
 ]);
+var CAPABILITY_PROVIDER_OPEN_ERRORS = Object.freeze(["not_configured", "auth_failed", "quota_exceeded", "network_unreachable", "unsupported_options"]);
 var CAPABILITY_CLOSE_REASONS = Object.freeze([
   "consumer_closed",
   "view_hidden",
@@ -5788,7 +5934,7 @@ var CAPABILITY_CLOSE_REASONS = Object.freeze([
 ]);
 var CAPABILITY_VIEW_STATUSES = Object.freeze([...CAPABILITY_DEPENDENCY_STATUSES, "not_granted"]);
 var capabilityId = external_exports.string().regex(CAPABILITY_PATTERN).max(96);
-var sessionId = external_exports.string().regex(/^[0-9a-f]{32}$/);
+var sessionId2 = external_exports.string().regex(/^[0-9a-f]{32}$/);
 var closeReason = external_exports.enum(CAPABILITY_CLOSE_REASONS);
 var viewStatus = external_exports.enum(CAPABILITY_VIEW_STATUSES);
 var pluginId3 = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
@@ -5805,9 +5951,9 @@ var CapabilityBytesSchema = external_exports.custom((value) => value instanceof 
 var CapabilityRequestSchema = external_exports.discriminatedUnion("op", [
   external_exports.object({ op: external_exports.literal("list") }).strict(),
   external_exports.object({ op: external_exports.literal("open"), capability: capabilityId, options: CapabilityOptionsSchema.optional() }).strict(),
-  external_exports.object({ op: external_exports.literal("close"), sessionId }).strict()
+  external_exports.object({ op: external_exports.literal("close"), sessionId: sessionId2 }).strict()
 ]);
-var CapabilitySendSchema = external_exports.object({ sessionId, message: CapabilityMessageSchema, data: CapabilityBytesSchema.optional() }).strict();
+var CapabilitySendSchema = external_exports.object({ sessionId: sessionId2, message: CapabilityMessageSchema, data: CapabilityBytesSchema.optional() }).strict();
 var CapabilityProviderViewSchema = external_exports.object({
   id: pluginId3,
   version: external_exports.string().max(32),
@@ -5822,27 +5968,27 @@ var CapabilityEntrySchema = external_exports.object({
   permission: external_exports.string().max(64).nullable()
 }).strict();
 var CapabilityEntryListSchema = external_exports.array(CapabilityEntrySchema).max(64);
-var CapabilityOpenedSchema = external_exports.object({ sessionId, capability: capabilityId, provider: CapabilityProviderViewSchema }).strict();
-var CapabilityErrorEnvelopeSchema = external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(CAPABILITY_ERROR_CODES) }).strict();
+var CapabilityOpenedSchema = external_exports.object({ sessionId: sessionId2, capability: capabilityId, provider: CapabilityProviderViewSchema }).strict();
+var CapabilityErrorEnvelopeSchema = external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(CAPABILITY_ERROR_CODES), message: external_exports.string().max(160).optional() }).strict();
 var CapabilityEnvelopeSchema = external_exports.discriminatedUnion("ok", [
   external_exports.object({ ok: external_exports.literal(true), value: external_exports.unknown() }).strict(),
   CapabilityErrorEnvelopeSchema
 ]);
 var CapabilityEventSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("message"), sessionId, message: CapabilityMessageSchema, data: CapabilityBytesSchema.optional() }).strict(),
-  external_exports.object({ kind: external_exports.literal("closed"), sessionId, reason: closeReason }).strict(),
+  external_exports.object({ kind: external_exports.literal("message"), sessionId: sessionId2, message: CapabilityMessageSchema, data: CapabilityBytesSchema.optional() }).strict(),
+  external_exports.object({ kind: external_exports.literal("closed"), sessionId: sessionId2, reason: closeReason }).strict(),
   external_exports.object({ kind: external_exports.literal("change"), capability: capabilityId, status: viewStatus, provider: CapabilityProviderViewSchema.nullable(), reason: external_exports.string().max(48).optional() }).strict()
 ]);
 var CapabilityProvideRequestSchema = external_exports.discriminatedUnion("op", [
   external_exports.object({ op: external_exports.literal("register"), capability: capabilityId }).strict(),
   external_exports.object({ op: external_exports.literal("unregister"), capability: capabilityId }).strict(),
-  external_exports.object({ op: external_exports.literal("send"), sessionId, message: CapabilityMessageSchema }).strict(),
-  external_exports.object({ op: external_exports.literal("close"), sessionId }).strict()
+  external_exports.object({ op: external_exports.literal("send"), sessionId: sessionId2, message: CapabilityMessageSchema }).strict(),
+  external_exports.object({ op: external_exports.literal("close"), sessionId: sessionId2 }).strict()
 ]);
 var CapabilityProviderEventSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("open"), sessionId, capability: capabilityId, callerId: external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN), options: CapabilityOptionsSchema }).strict(),
-  external_exports.object({ kind: external_exports.literal("message"), sessionId, message: CapabilityMessageSchema }).strict(),
-  external_exports.object({ kind: external_exports.literal("closed"), sessionId, reason: closeReason }).strict()
+  external_exports.object({ kind: external_exports.literal("open"), sessionId: sessionId2, capability: capabilityId, callerId: external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN), options: CapabilityOptionsSchema }).strict(),
+  external_exports.object({ kind: external_exports.literal("message"), sessionId: sessionId2, message: CapabilityMessageSchema }).strict(),
+  external_exports.object({ kind: external_exports.literal("closed"), sessionId: sessionId2, reason: closeReason }).strict()
 ]);
 var protocolVersion3 = external_exports.literal(1);
 var externalErrorCode = external_exports.string().min(3).max(96).regex(/^[a-z0-9_]+$/);
@@ -5850,26 +5996,26 @@ var base64Data = external_exports.string().max(Math.ceil(CAPABILITY_LIMITS.dataB
 var ExternalSessionOpenSchema = external_exports.object({
   protocolVersion: protocolVersion3,
   kind: external_exports.literal("ext-session-open"),
-  sessionId,
+  sessionId: sessionId2,
   capability: capabilityId,
   callerPluginId: pluginId3,
   options: CapabilityOptionsSchema
 }).strict();
 var ExternalSessionOpenedSchema = external_exports.discriminatedUnion("ok", [
-  external_exports.object({ protocolVersion: protocolVersion3, kind: external_exports.literal("ext-session-opened"), sessionId, ok: external_exports.literal(true) }).strict(),
-  external_exports.object({ protocolVersion: protocolVersion3, kind: external_exports.literal("ext-session-opened"), sessionId, ok: external_exports.literal(false), error: external_exports.object({ code: externalErrorCode, message: external_exports.string().max(240) }).strict() }).strict()
+  external_exports.object({ protocolVersion: protocolVersion3, kind: external_exports.literal("ext-session-opened"), sessionId: sessionId2, ok: external_exports.literal(true) }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion3, kind: external_exports.literal("ext-session-opened"), sessionId: sessionId2, ok: external_exports.literal(false), error: external_exports.object({ code: externalErrorCode, message: external_exports.string().max(240) }).strict() }).strict()
 ]);
 var ExternalSessionMessageSchema = external_exports.object({
   protocolVersion: protocolVersion3,
   kind: external_exports.literal("ext-session-message"),
-  sessionId,
+  sessionId: sessionId2,
   message: CapabilityMessageSchema,
   data: base64Data.optional()
 }).strict();
 var ExternalSessionCloseSchema = external_exports.object({
   protocolVersion: protocolVersion3,
   kind: external_exports.literal("ext-session-close"),
-  sessionId,
+  sessionId: sessionId2,
   reason: external_exports.string().min(3).max(48).regex(/^[a-z0-9_]+$/)
 }).strict();
 
@@ -6145,138 +6291,6 @@ function evaluateManifestSupport(manifest, context) {
   return issues;
 }
 
-// packages/plugin-sdk/src/aiChatContracts.ts
-var PLUGIN_AI_CHANNELS = Object.freeze({
-  REQUEST: "plugin-view:ai",
-  EVENT: "plugin-view:ai-event"
-});
-var AI_CHAT_LIMITS = Object.freeze({
-  systemChars: 16e3,
-  transcriptLines: 40,
-  transcriptLineChars: 8e3,
-  transcriptChars: 6e4,
-  inputChars: 8e3,
-  imageBytes: 2 * 1024 * 1024,
-  replyChars: 32e3,
-  sessionsPerPlugin: 1,
-  sessionsTotal: 8,
-  concurrentTurnsTotal: 4,
-  turnsPerMinute: 20,
-  turnsPerHour: 400,
-  turnTimeoutMs: 3e5,
-  attachGraceMs: 6e4,
-  quotaCooldownMs: 5 * 6e4
-});
-var AI_CHAT_EFFORTS = Object.freeze(["minimal", "low", "medium", "high", "xhigh"]);
-var AI_CHAT_ERROR_CODES = Object.freeze([
-  "plugin_not_active",
-  "not_granted",
-  "request_invalid",
-  "input_too_large",
-  "provider_not_found",
-  "provider_not_ready",
-  "model_unavailable",
-  "unsupported_image",
-  "session_limit",
-  "session_not_found",
-  "turn_in_progress",
-  "rate_limited",
-  "quota_exhausted",
-  "busy",
-  "view_not_visible",
-  "unavailable"
-]);
-var sessionId2 = external_exports.string().regex(/^[0-9a-f]{32}$/);
-var providerId = external_exports.string().regex(/^[a-z][a-z0-9_-]{0,31}$/);
-var modelId = external_exports.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$/);
-var effort = external_exports.enum(AI_CHAT_EFFORTS);
-var line = external_exports.object({ role: external_exports.enum(["user", "assistant"]), text: external_exports.string().max(AI_CHAT_LIMITS.transcriptLineChars) }).strict();
-var AiChatImageSchema = external_exports.object({
-  mime: external_exports.enum(["image/jpeg", "image/png"]),
-  data: external_exports.custom((value) => value instanceof Uint8Array && value.byteLength > 0 && value.byteLength <= AI_CHAT_LIMITS.imageBytes)
-}).strict();
-var AiChatRequestVariants = external_exports.discriminatedUnion("op", [
-  external_exports.object({ op: external_exports.literal("getOptions") }).strict(),
-  external_exports.object({
-    op: external_exports.literal("openSession"),
-    providerId: providerId.optional(),
-    modelId: modelId.optional(),
-    effort: effort.optional(),
-    system: external_exports.string().min(1).max(AI_CHAT_LIMITS.systemChars),
-    transcript: external_exports.array(line).max(AI_CHAT_LIMITS.transcriptLines).optional()
-  }).strict(),
-  external_exports.object({ op: external_exports.literal("send"), sessionId: sessionId2, text: external_exports.string().max(AI_CHAT_LIMITS.inputChars), image: AiChatImageSchema.optional() }).strict(),
-  external_exports.object({ op: external_exports.literal("interrupt"), sessionId: sessionId2 }).strict(),
-  external_exports.object({ op: external_exports.literal("close"), sessionId: sessionId2 }).strict(),
-  external_exports.object({ op: external_exports.literal("attachSession"), sessionId: sessionId2 }).strict()
-]);
-var AiChatRequestSchema = AiChatRequestVariants.refine((value) => value.op !== "send" || value.text.trim() !== "" || value.image !== void 0, { message: "a turn needs text or an image" });
-var modelView = external_exports.object({
-  id: external_exports.string().max(96),
-  label: external_exports.string().max(96),
-  efforts: external_exports.array(external_exports.string().max(16)).max(8),
-  defaultEffort: external_exports.string().max(16).nullable(),
-  supportsImages: external_exports.boolean(),
-  isDefault: external_exports.boolean()
-}).strict();
-var AiChatProviderViewSchema = external_exports.object({
-  id: providerId,
-  label: external_exports.string().max(48),
-  state: external_exports.enum(["ready", "not_installed", "not_logged_in", "unsupported_version", "unavailable", "not_supported_yet"]),
-  models: external_exports.array(modelView).max(32)
-}).strict();
-var AiChatOptionsSchema = external_exports.object({
-  providers: external_exports.array(AiChatProviderViewSchema).max(8),
-  defaultProviderId: providerId.nullable(),
-  limits: external_exports.object({
-    systemChars: external_exports.number().int(),
-    transcriptLines: external_exports.number().int(),
-    transcriptChars: external_exports.number().int(),
-    inputChars: external_exports.number().int(),
-    imageBytes: external_exports.number().int(),
-    turnsPerMinute: external_exports.number().int()
-  }).strict(),
-  quota: external_exports.object({ state: external_exports.enum(["ok", "exhausted"]), retryAfterMs: external_exports.number().int().nonnegative().nullable() }).strict()
-}).strict();
-var effective = external_exports.object({ providerId, modelId: external_exports.string().max(96), effort: external_exports.string().max(16).nullable() }).strict();
-var AiChatOpenedSchema = external_exports.object({ sessionId: sessionId2, effective }).strict();
-var AiChatSentSchema = external_exports.object({ turnId: external_exports.string().regex(/^[0-9a-f]{16}$/) }).strict();
-var AiChatFailureSchema = external_exports.object({
-  kind: external_exports.literal("failed"),
-  code: external_exports.enum(["provider_unavailable", "unsupported_version", "quota_exhausted", "stalled", "provider_error", "empty_reply", "session_closed", "reply_too_long", "turn_timeout", "access_revoked"]),
-  retryable: external_exports.boolean(),
-  fallbackUsed: external_exports.boolean(),
-  partialDelivered: external_exports.boolean()
-}).strict();
-var AiChatTurnEventSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("started") }).strict(),
-  external_exports.object({ kind: external_exports.literal("textDelta"), text: external_exports.string().max(AI_CHAT_LIMITS.replyChars) }).strict(),
-  external_exports.object({ kind: external_exports.literal("completed") }).strict(),
-  external_exports.object({ kind: external_exports.literal("interrupted") }).strict(),
-  AiChatFailureSchema
-]);
-var AiChatAttachedSchema = external_exports.object({
-  sessionId: sessionId2,
-  effective,
-  turn: external_exports.object({ turnId: external_exports.string().regex(/^[0-9a-f]{16}$/), text: external_exports.string().max(AI_CHAT_LIMITS.replyChars), terminal: AiChatTurnEventSchema.nullable() }).strict().nullable()
-}).strict();
-var AiChatEnvelopeSchema = external_exports.discriminatedUnion("ok", [
-  external_exports.object({ ok: external_exports.literal(true), value: external_exports.unknown() }).strict(),
-  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(AI_CHAT_ERROR_CODES) }).strict()
-]);
-var AiChatViewEventSchema = external_exports.object({ sessionId: sessionId2, turnId: external_exports.string().regex(/^[0-9a-f]{16}$/), event: AiChatTurnEventSchema }).strict();
-var AiChatUsageSchema = external_exports.object({
-  activeSessions: external_exports.number().int().nonnegative(),
-  sessionsOpened: external_exports.number().int().nonnegative(),
-  turns: external_exports.number().int().nonnegative(),
-  imageTurns: external_exports.number().int().nonnegative(),
-  failedTurns: external_exports.number().int().nonnegative(),
-  rateLimited: external_exports.number().int().nonnegative(),
-  inputChars: external_exports.number().int().nonnegative(),
-  outputChars: external_exports.number().int().nonnegative(),
-  lastTurnAt: external_exports.string().max(40).nullable()
-}).strict();
-
 // packages/plugin-sdk/src/coreApiContracts.ts
 var PLUGIN_CORE_CHANNELS = Object.freeze({
   STORAGE: "plugin-view:storage",
@@ -6467,8 +6481,6 @@ var PLUGIN_INSTALL_CHANNELS = Object.freeze({
   REMOVE_ASSET_PACK: "plugin-install:remove-asset-pack",
   SET_PERMISSION: "plugin-install:set-permission",
   SET_PROVIDER: "plugin-install:set-provider",
-  BUNDLED_REVIEW: "plugin-install:bundled-review",
-  BUNDLED_DECIDE: "plugin-install:bundled-decide",
   BUNDLED_RESTORE: "plugin-install:bundled-restore"
 });
 var protocolVersion5 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
@@ -6483,11 +6495,7 @@ var PluginAssetPackRemoveRequestV1Schema = external_exports.object({ protocolVer
 var PluginPermissionSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), permission: external_exports.string().min(3).max(64), revoked: external_exports.boolean() }).strict();
 var PluginDevKeyRemoveRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, keyId }).strict();
 var pluginIdField = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
-var BUNDLED_DECISIONS = ["consent", "decline"];
-var BUNDLED_INSTALLED_STATUSES = ["awaiting_consent", "consented", "declined"];
-var BUNDLED_LISTED_STATES = ["removed", "verification_failed", "update_pending"];
-var PluginBundledReviewRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField }).strict();
-var PluginBundledDecideRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField, version: external_exports.string().regex(VERSION_PATTERN), decision: external_exports.enum(BUNDLED_DECISIONS) }).strict();
+var BUNDLED_LISTED_STATES = ["removed", "verification_failed"];
 var PluginBundledRestoreRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: pluginIdField }).strict();
 var PluginProviderSetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, capability: external_exports.string().regex(CAPABILITY_PATTERN).max(96), providerId: external_exports.string().regex(IDENTIFIER_PATTERN).max(96).nullable() }).strict();
 var PLUGIN_RISK_NOTICES = ["full_trust", "native_code", "network_unrestricted", "dev_key_local_only", "file_sandbox_bypassable"];
@@ -6521,11 +6529,6 @@ var CapabilityConsentViewSchema = external_exports.object({
   providerVersion: external_exports.string().max(32),
   grantedAt: external_exports.string().max(40)
 }).strict();
-var BundledViewSchema = external_exports.object({
-  status: external_exports.enum(BUNDLED_INSTALLED_STATUSES),
-  pendingUpdateVersion: external_exports.string().regex(VERSION_PATTERN).nullable(),
-  failureCode: external_exports.string().max(96).nullable()
-}).strict();
 var InstalledPluginViewV1Schema = external_exports.object({
   id: external_exports.string().regex(IDENTIFIER_PATTERN),
   name: external_exports.string().max(96),
@@ -6542,8 +6545,7 @@ var InstalledPluginViewV1Schema = external_exports.object({
   backend: BackendViewSchema.nullable().default(null),
   riskNotices: external_exports.array(RiskNoticeSchema).max(8).default([]),
   capabilityConsents: external_exports.array(CapabilityConsentViewSchema).max(64).default([]),
-  aiUsage: AiChatUsageSchema.nullable().default(null),
-  bundled: BundledViewSchema.nullable().default(null)
+  aiUsage: AiChatUsageSchema.nullable().default(null)
 }).strict();
 var InstalledAssetPackViewV1Schema = external_exports.object({
   id: external_exports.string().regex(IDENTIFIER_PATTERN),
@@ -6608,17 +6610,13 @@ var PluginInstallBeginResultV1Schema = external_exports.discriminatedUnion("stat
   external_exports.object({ status: external_exports.literal("cancelled") }).strict(),
   external_exports.object({ status: external_exports.literal("review"), review: PluginInstallReviewV1Schema }).strict()
 ]);
-var PluginBundledReviewV1Schema = PluginInstallReviewV1Schema.omit({ installId: true, fileName: true, kind: true }).extend({ bundled: BundledViewSchema }).strict();
-var PluginBundledDecideResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.enum(["consented", "declined"]) }).strict();
-var PluginBundledRestoreResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.literal("awaiting_consent") }).strict();
+var PluginBundledRestoreResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.literal("consented") }).strict();
 var envelope = (value) => external_exports.discriminatedUnion("ok", [
   external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(true), value }).strict(),
   external_exports.object({ protocolVersion: protocolVersion5, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
 ]);
 var PluginInstallListEnvelopeV1Schema = envelope(PluginInstallListV1Schema);
 var PluginInstallBeginEnvelopeV1Schema = envelope(PluginInstallBeginResultV1Schema);
-var PluginBundledReviewEnvelopeV1Schema = envelope(PluginBundledReviewV1Schema);
-var PluginBundledDecideEnvelopeV1Schema = envelope(PluginBundledDecideResultV1Schema);
 var PluginBundledRestoreEnvelopeV1Schema = envelope(PluginBundledRestoreResultV1Schema);
 
 // packages/plugin-sdk/src/backendContracts.ts
@@ -6716,6 +6714,93 @@ var envelope2 = (value) => external_exports.discriminatedUnion("ok", [
 ]);
 var PluginBackendStatusEnvelopeV1Schema = envelope2(PluginBackendStatusListV1Schema);
 var PluginBackendProbeEnvelopeV1Schema = envelope2(PluginBackendProbeResultV1Schema);
+
+// packages/plugin-sdk/src/voiceInputContracts.ts
+var VOICE_INPUT_CHANNELS = Object.freeze({
+  STATE: "plugin-voice-input:state",
+  SET_ENABLED: "plugin-voice-input:set-enabled",
+  CHANGED: "plugin-voice-input:changed",
+  PLUGIN: "plugin-view:voice-input"
+});
+var VOICE_INPUT_LIMITS = Object.freeze({
+  chunkMs: 80,
+  sampleRate: 16e3,
+  pauseTimeoutMs: 3e4,
+  pauseMaxTotalMs: 12e4,
+  pauseCooldownMs: 3e4,
+  pauseReasonChars: 64,
+  restartsPerMinute: 3
+});
+var VOICE_INPUT_STATUSES = Object.freeze(["off", "starting", "listening", "paused", "unavailable"]);
+var VOICE_INPUT_REASONS = Object.freeze([
+  "no_recognizer",
+  "recognizer_selection_required",
+  "recognizer_not_ready",
+  "recognizer_not_allowed",
+  "recognizer_busy",
+  "recognizer_gone",
+  "recognizer_error",
+  "model_missing",
+  "no_input_target",
+  "consent_denied",
+  "os_denied",
+  "no_microphone",
+  "capture_failed"
+]);
+var PLUGIN_VOICE_ERRORS = Object.freeze(["plugin_not_active", "not_input_target", "pause_limited", "request_invalid", "unavailable"]);
+var protocolVersion7 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var pluginId6 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
+var pauseReason = external_exports.string().max(VOICE_INPUT_LIMITS.pauseReasonChars);
+var count = external_exports.number().int().min(0);
+var VoiceInputStateV1Schema = external_exports.object({
+  protocolVersion: protocolVersion7,
+  status: external_exports.enum(VOICE_INPUT_STATUSES),
+  enabled: external_exports.boolean(),
+  capturing: external_exports.boolean(),
+  available: external_exports.boolean(),
+  reason: external_exports.enum(VOICE_INPUT_REASONS).nullable(),
+  recognizer: external_exports.object({ id: pluginId6, name: external_exports.string().max(96), version: external_exports.string().max(32), signer: external_exports.enum(["teamuq", "dev"]) }).strict().nullable(),
+  target: external_exports.object({ id: pluginId6, name: external_exports.string().max(96) }).strict().nullable(),
+  pause: external_exports.object({ by: pluginId6, name: external_exports.string().max(96), reason: pauseReason, remainingMs: count }).strict().nullable(),
+  lastDeliveryError: external_exports.string().max(96).nullable(),
+  stats: external_exports.object({ chunksSent: count, chunksDroppedPaused: count, finals: count, delivered: count }).strict()
+}).strict();
+var VoiceInputStateRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion7 }).strict();
+var VoiceInputSetEnabledRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion7, enabled: external_exports.boolean() }).strict();
+var errorBody2 = external_exports.object({ code: external_exports.string().min(1).max(96).regex(/^[a-z0-9_]+$/), message: external_exports.string().min(1).max(512) }).strict();
+var VoiceInputStateEnvelopeV1Schema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ protocolVersion: protocolVersion7, ok: external_exports.literal(true), value: VoiceInputStateV1Schema }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion7, ok: external_exports.literal(false), error: errorBody2 }).strict()
+]);
+var PluginVoiceRequestSchema = external_exports.discriminatedUnion("op", [
+  external_exports.object({ op: external_exports.literal("state") }).strict(),
+  external_exports.object({ op: external_exports.literal("pause"), reason: pauseReason.optional() }).strict(),
+  external_exports.object({ op: external_exports.literal("resume") }).strict()
+]);
+var PluginVoiceStateSchema = external_exports.object({
+  status: external_exports.enum(VOICE_INPUT_STATUSES),
+  isInputTarget: external_exports.boolean(),
+  paused: external_exports.boolean(),
+  remainingMs: count.nullable()
+}).strict();
+var PluginVoiceEnvelopeSchema = external_exports.discriminatedUnion("ok", [
+  external_exports.object({ ok: external_exports.literal(true), value: PluginVoiceStateSchema }).strict(),
+  external_exports.object({ ok: external_exports.literal(false), error: external_exports.enum(PLUGIN_VOICE_ERRORS) }).strict()
+]);
+var VOICE_CAPTURE_CHANNELS = Object.freeze({
+  COMMAND: "voice-capture:command",
+  EVENT: "voice-capture:event"
+});
+var VoiceCaptureCommandSchema = external_exports.discriminatedUnion("op", [
+  external_exports.object({ op: external_exports.literal("start"), chunkMs: external_exports.number().int().min(20).max(200), echoCancellation: external_exports.boolean() }).strict(),
+  external_exports.object({ op: external_exports.literal("stop") }).strict()
+]);
+var VoiceCaptureEventSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("started"), label: external_exports.string().max(200), echoCancellation: external_exports.boolean().nullable() }).strict(),
+  external_exports.object({ kind: external_exports.literal("failed"), reason: external_exports.enum(["os_denied", "no_microphone", "capture_failed"]) }).strict(),
+  external_exports.object({ kind: external_exports.literal("ended"), reason: external_exports.enum(["device_lost", "stopped", "capture_failed"]) }).strict(),
+  external_exports.object({ kind: external_exports.literal("chunk"), seq: count, bytes: external_exports.custom((value) => value instanceof Uint8Array && value.byteLength >= 2 && value.byteLength <= 16384) }).strict()
+]);
 
 // packages/plugin-sdk/src/backendInvokeContracts.ts
 var PLUGIN_BACKEND_INVOKE_LIMITS = Object.freeze({ methods: 32, methodLength: 64, payloadBytes: 64 * 1024, inFlight: 8, timeoutMs: 3e4 });
@@ -7128,12 +7213,33 @@ function compareVersions(left, right) {
   return 0;
 }
 
+// packages/platform/plugin-artifact/src/trust/devTrustPolicy.ts
+var RESERVED_PREFIX = "teamuq.";
+var issued = /* @__PURE__ */ new WeakSet();
+function issue(scope, pluginIds) {
+  if (pluginIds.length === 0 || pluginIds.some((id) => !id.startsWith(RESERVED_PREFIX))) return null;
+  const ids = new Set(pluginIds);
+  const policy = {
+    scope,
+    permitsId: (pluginId7) => ids.has(pluginId7),
+    trustsInstalledSigner: async (pluginId7, signer, lookup) => scope === "isolated-dev-profile" && signer.kind === "dev" && ids.has(pluginId7) && (await lookup(signer.keyId)).status === "trusted"
+  };
+  issued.add(policy);
+  return Object.freeze(policy);
+}
+function createAuthoringDevTrustPolicy(pluginId7) {
+  return issue("authoring", [pluginId7]);
+}
+function permitsPreplantedDevId(policy, pluginId7) {
+  return policy !== void 0 && issued.has(policy) && policy.permitsId(pluginId7);
+}
+
 // packages/platform/plugin-artifact/src/install/updatePolicy.ts
-function assertUpdateAllowed(existing, next) {
+function assertUpdateAllowed(existing, next, devTrust) {
   const order = compareVersions(next.version, existing.version);
   if (order === 0) throw new ArtifactError("already_installed", `${existing.id}@${next.version}`);
   if (order < 0) throw new ArtifactError("downgrade_rejected", `${existing.id}@${next.version}`);
-  if (existing.signer.kind === "teamuq" && next.signer.kind === "dev") throw new ArtifactError("signer_not_allowed", existing.id);
+  if (existing.signer.kind === "teamuq" && next.signer.kind === "dev" && !permitsPreplantedDevId(devTrust, existing.id)) throw new ArtifactError("signer_not_allowed", existing.id);
   if (existing.signer.kind === "dev" && (next.signer.kind !== "dev" || next.signer.keyId !== existing.signer.keyId)) throw new ArtifactError("signer_changed", existing.id);
 }
 
@@ -7335,7 +7441,7 @@ async function openArchive(filePath, limits = PLUGIN_ARTIFACT_LIMITS) {
         }
         return Buffer.concat(chunks);
       },
-      readHead: async (name, count) => {
+      readHead: async (name, count2) => {
         const { stream } = await open(name);
         const chunks = [];
         let size = 0;
@@ -7343,14 +7449,14 @@ async function openArchive(filePath, limits = PLUGIN_ARTIFACT_LIMITS) {
           for await (const chunk of stream) {
             chunks.push(chunk);
             size += chunk.length;
-            if (size >= count) break;
+            if (size >= count2) break;
           }
         } catch (error) {
           throw mapYauzlError(error);
         } finally {
           stream.destroy();
         }
-        return Buffer.concat(chunks).subarray(0, count);
+        return Buffer.concat(chunks).subarray(0, count2);
       },
       extractTo: async (name, destination, budget) => {
         const handle = await fs2.open(destination, "wx", 420);
@@ -7399,15 +7505,15 @@ function parseManifest(bytes2) {
   try {
     return PluginManifestV2Schema.parse(JSON.parse(bytes2.toString("utf8")));
   } catch (error) {
-    const issue = error.issues?.[0];
-    throw new ArtifactError("manifest_invalid", issue === void 0 ? "manifest.json is not valid JSON" : `${issue.path.join(".")}: ${issue.message}`);
+    const issue2 = error.issues?.[0];
+    throw new ArtifactError("manifest_invalid", issue2 === void 0 ? "manifest.json is not valid JSON" : `${issue2.path.join(".")}: ${issue2.message}`);
   }
 }
-function assertSignerMayInstall(manifest, signer) {
+function assertSignerMayInstall(manifest, signer, devTrust) {
   if (manifest.id === CORE_CALLER_ID) throw new ArtifactError("id_reserved", manifest.id);
   const reservedId = manifest.id.startsWith("teamuq.");
   if (signer.kind === "dev") {
-    if (reservedId || manifest.publisher === "teamuq") throw new ArtifactError("id_reserved", manifest.id);
+    if ((reservedId || manifest.publisher === "teamuq") && !permitsPreplantedDevId(devTrust, manifest.id)) throw new ArtifactError("id_reserved", manifest.id);
   } else if (!reservedId && manifest.publisher === "teamuq") {
     throw new ArtifactError("id_reserved", manifest.id);
   }
@@ -7415,8 +7521,8 @@ function assertSignerMayInstall(manifest, signer) {
 function assertSupported(manifest, context) {
   const issues = evaluateManifestSupport(manifest, context);
   if (issues.length === 0) return;
-  const primary = issues.find((issue) => issue.code === "unsupported_in_this_core") ?? issues[0];
-  throw new ArtifactError(primary.code, issues.map((issue) => `${issue.field}: ${issue.message}`).join("; ").slice(0, 300));
+  const primary = issues.find((issue2) => issue2.code === "unsupported_in_this_core") ?? issues[0];
+  throw new ArtifactError(primary.code, issues.map((issue2) => `${issue2.field}: ${issue2.message}`).join("; ").slice(0, 300));
 }
 function referencedPaths(manifest) {
   return [
@@ -7487,14 +7593,14 @@ async function reviewArtifact(sourcePath, options2) {
     const listedManifest = integrity.files.find((entry) => entry.path === MANIFEST_FILE);
     if (listedManifest === void 0 || listedManifest.sha256 !== sha256(manifestBytes)) throw new ArtifactError("integrity_mismatch", MANIFEST_FILE);
     const manifest = parseManifest(manifestBytes);
-    assertSignerMayInstall(manifest, signer);
+    assertSignerMayInstall(manifest, signer, options2.devTrust);
     if (manifest.kind !== peeked) throw new ArtifactError("manifest_invalid", "kind changed between reads");
     const existing = await options2.findInstalled(manifest.id, manifest.kind);
     if (manifest.kind === "plugin" && options2.updateFrom !== void 0) {
       if (options2.updateFrom.id !== manifest.id) throw new ArtifactError("manifest_invalid", "update target id differs from the package");
       if (existing === null) throw new ArtifactError("not_installed", manifest.id);
       if (existing.version !== options2.updateFrom.version) throw new ArtifactError("install_failed", "installed version differs from the update base");
-      assertUpdateAllowed(existing, { version: manifest.version, signer });
+      assertUpdateAllowed(existing, { version: manifest.version, signer }, options2.devTrust);
     } else if (existing !== null && manifest.kind === "plugin") throw new ArtifactError(existing.signer.kind === "teamuq" && signer.kind === "dev" ? "signer_not_allowed" : "already_installed", manifest.id);
     if (existing !== null && manifest.kind === "asset-pack") {
       const order = compareVersions(manifest.version, existing.version);
@@ -7889,6 +7995,7 @@ async function verifyArtifactFile(filePath, options2) {
       anchors: options2.anchors,
       devKeys: options2.devKeys ?? createDevKeyStore({ pluginsRoot }),
       support: options2.support,
+      ...options2.devTrust === void 0 ? {} : { devTrust: options2.devTrust },
       findInstalled: async () => null,
       ...options2.limits === void 0 ? {} : { limits: options2.limits }
     });
@@ -8076,9 +8183,10 @@ var USAGE = [
   `tuq-plugin-tool (built from TeamUQ Core ${CORE_VERSION})`,
   "  validate <stageDir> [--core-version v] [--platform id] [--os-version v]",
   "  pack <stageDir> --key <file> [--key-id id] [--out file] [--anchors core|self] [--overrides file.json] [--core-version v] [--platform id] [--os-version v]",
-  "  verify <file.tuqplugin> [--anchors core|self] [--pub-file file.pub.json | --key-id id --public-key base64] [--core-version v] [--platform id] [--os-version v]",
+  "  verify <file.tuqplugin> [--anchors core|self] [--pub-file file.pub.json | --key-id id --public-key base64] [--preplanted-id teamuq.<name>] [--core-version v] [--platform id] [--os-version v]",
   "  dev-keygen --out-dir <directory outside git work trees>",
-  "  dev-pack <stageDir> --key <encrypted-dev-key.pem> --out <file.tuqplugin> --bump-patch",
+  "  dev-pack <stageDir> --key <encrypted-dev-key.pem> --out <file.tuqplugin> --bump-patch [--preplanted-id teamuq.<name>]",
+  "preplanted-id lets a development key sign a TeamUQ pre-planted plugin id for the isolated Core dev profile; a packaged or non-isolated Core rejects the result with id_reserved.",
   "  types --out <plugin-repo/types>",
   "  selftest-key --key <file> [--key-id id]",
   "anchors core (default) trusts only the TEAMUQ_TRUST_ANCHORS embedded in this tool; anchors self trusts only your own key and is for development.",
@@ -8141,9 +8249,9 @@ async function validateStage(stageDir, support) {
     return { problems: ["manifest.json is not valid JSON"] };
   }
   const parsed = PluginManifestV2Schema.safeParse(json);
-  if (!parsed.success) return { problems: parsed.error.issues.map((issue) => `manifest ${issue.path.join(".") || "(root)"}: ${issue.message}`) };
+  if (!parsed.success) return { problems: parsed.error.issues.map((issue2) => `manifest ${issue2.path.join(".") || "(root)"}: ${issue2.message}`) };
   const manifest = parsed.data;
-  for (const issue of evaluateManifestSupport(manifest, support)) problems.push(`support ${issue.code} ${issue.field}: ${issue.message}`);
+  for (const issue2 of evaluateManifestSupport(manifest, support)) problems.push(`support ${issue2.code} ${issue2.field}: ${issue2.message}`);
   const referenced = [
     ...manifest.entry.ui === void 0 ? [] : [manifest.entry.ui],
     ...manifest.entry.backend === void 0 ? [] : [manifest.entry.backend],
@@ -8200,6 +8308,13 @@ function keyIdFrom(flags, keyFile) {
   }
   return keyId2;
 }
+function preplantedPolicy(flags) {
+  const id = flags.get("--preplanted-id");
+  if (id === void 0) return void 0;
+  const policy = createAuthoringDevTrustPolicy(id);
+  if (policy === null) throw new UsageError("--preplanted-id must be a TeamUQ plugin id starting with teamuq.");
+  return policy;
+}
 function selfAnchors(keyId2, publicKey) {
   return { rootKeys: [{ keyId: keyId2, publicKey }], revokedKeyIds: [] };
 }
@@ -8251,7 +8366,7 @@ function bumpedPatch(version) {
   return `${match[1]}.${match[2]}.${patch}`;
 }
 async function commandDevPack(argv) {
-  const { positional, flags } = parse(argv, ["--key", "--out", "--core-version", "--platform", "--os-version", "--bump-patch"], ["--bump-patch"]);
+  const { positional, flags } = parse(argv, ["--key", "--out", "--core-version", "--platform", "--os-version", "--bump-patch", "--preplanted-id"], ["--bump-patch"]);
   if (positional.length !== 1 || flags.get("--bump-patch") !== "true") throw new UsageError("dev-pack needs <stageDir> --key <encrypted-dev-key.pem> --out <file.tuqplugin> --bump-patch");
   const keyFile = flags.get("--key");
   const outArg = flags.get("--out");
@@ -8261,6 +8376,7 @@ async function commandDevPack(argv) {
   assertOutsideGitWorkTree(keyFile, "development signing key");
   await assertOutsideStage(stageDir, outFile);
   const support = supportContext(flags);
+  const devTrust = preplantedPolicy(flags);
   const staged = await validateStage(stageDir, support);
   if (staged.manifest === void 0 || staged.problems.length > 0) {
     for (const problem of staged.problems) console.error(`invalid: ${problem}`);
@@ -8275,7 +8391,7 @@ async function commandDevPack(argv) {
   let version = bumpedPatch(staged.manifest.version);
   if (await isRegularFile(outFile)) {
     await withSelfDevKey(description.publicKey, async (devKeys) => {
-      const previous = await verifyArtifactFile(outFile, { anchors: { rootKeys: [], revokedKeyIds: [] }, devKeys, support });
+      const previous = await verifyArtifactFile(outFile, { anchors: { rootKeys: [], revokedKeyIds: [] }, devKeys, support, ...devTrust === void 0 ? {} : { devTrust } });
       if (previous.manifest.id !== staged.manifest?.id) throw new UsageError("existing output artifact belongs to a different plugin id");
       version = bumpedPatch(previous.manifest.version);
     });
@@ -8293,7 +8409,7 @@ async function commandDevPack(argv) {
       stageDir: copiedStage,
       outFile,
       signer: { keyId: keyId2, key },
-      review: { anchors: { rootKeys: [], revokedKeyIds: [] }, devKeys, support }
+      review: { anchors: { rootKeys: [], revokedKeyIds: [] }, devKeys, support, ...devTrust === void 0 ? {} : { devTrust } }
     }));
     show({ file: packed.file, id: packed.verified.manifest.id, version: packed.verified.manifest.version, signer: packed.verified.signer, anchors: "self", sha256: packed.sha256, integritySha256: packed.verified.integritySha256, stageChanged: false });
   } finally {
@@ -8390,14 +8506,15 @@ function publicKeyAnchors(flags) {
   return selfAnchors(keyId2, publicKey);
 }
 async function commandVerify(argv) {
-  const { positional, flags } = parse(argv, ["--anchors", "--pub-file", "--key-id", "--public-key", "--core-version", "--platform", "--os-version"]);
+  const { positional, flags } = parse(argv, ["--anchors", "--pub-file", "--key-id", "--public-key", "--preplanted-id", "--core-version", "--platform", "--os-version"]);
   if (positional.length !== 1) throw new UsageError("verify needs exactly one .tuqplugin file");
+  const devTrust = preplantedPolicy(flags);
   const mode = anchorMode(flags);
   const anchors = mode === "self" ? publicKeyAnchors(flags) : TEAMUQ_TRUST_ANCHORS;
   const file = path8.resolve(positional[0]);
   const support = supportContext(flags);
   const publicKey = mode === "self" ? anchors.rootKeys[0]?.publicKey : void 0;
-  const verified = mode === "self" && anchors.rootKeys[0]?.keyId.startsWith("dev-") && publicKey !== void 0 ? await withSelfDevKey(publicKey, (devKeys) => verifyArtifactFile(file, { anchors, devKeys, support })) : await verifyArtifactFile(file, { anchors, support });
+  const verified = mode === "self" && anchors.rootKeys[0]?.keyId.startsWith("dev-") && publicKey !== void 0 ? await withSelfDevKey(publicKey, (devKeys) => verifyArtifactFile(file, { anchors, devKeys, support, ...devTrust === void 0 ? {} : { devTrust } })) : await verifyArtifactFile(file, { anchors, support, ...devTrust === void 0 ? {} : { devTrust } });
   const { manifest } = verified;
   const pinned = manifest.kind === "plugin" ? { trustTier: manifest.trustTier, permissions: manifest.permissions, allowAddons: manifest.native?.allowAddons === true } : {};
   show({ file, id: manifest.id, version: manifest.version, kind: manifest.kind, ...pinned, signer: verified.signer, anchors: mode, fileCount: verified.fileCount, totalBytes: verified.totalBytes, integritySha256: verified.integritySha256 });

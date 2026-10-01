@@ -1,4 +1,5 @@
 import { backendClient } from "./api/backendClient.js";
+import { agentAvatarClient } from "./api/agentAvatarClient.js";
 import { mount } from "./dom/html.js";
 import { t } from "./i18n/index.js";
 import { itemKey } from "./state/timeline.js";
@@ -58,7 +59,7 @@ const status = createStatusLine({
   },
 });
 
-const home = createTeamHome({ client, now, preferences });
+const home = createTeamHome({ client, now, preferences, agentAvatar: agentAvatarClient() });
 const space = createMemorySpace({ client, now });
 
 const timeline = createTimeline({ client, now, onOpenDetail: (ref) => void detail.open(ref) });

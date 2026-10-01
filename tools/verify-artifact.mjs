@@ -13,13 +13,13 @@ const SIDE_EFFECT_IMPORT = /^[ \t]*import\s*(['"])([^'"]+)\1/gmu
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu
 const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
-// 1.6.3 is the first Core release with the whitelisted invokeBackend, the methodName regex that accepts '@' and the memory sink on invoke; older Cores accept the manifest but never call it.
-const MIN_CORE_VERSION = '>=1.6.3'
+// why: the plugin needs both the memory sink from 1.6.3 and the agent avatar bridge added in 1.7.0
+const MIN_CORE_VERSION = '>=1.7.0'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'
 const UI_ENTRY = 'ui/index.html'
 const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css']
-const EXPECTED_PERMISSIONS = ['backend:invoke', 'ui:view']
+const EXPECTED_PERMISSIONS = ['agent:avatar-read', 'backend:invoke', 'ui:view']
 const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
 const EXPECTED_MAX_SESSIONS = 4
 // why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin
@@ -126,7 +126,7 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   check('manifest is composed: entry.backend is backend.mjs and entry.ui is ui/index.html, both files exist', manifest.entry?.backend === 'backend.mjs' && manifest.entry?.ui === UI_ENTRY && entries.has('backend.mjs') && entries.has(UI_ENTRY), JSON.stringify(manifest.entry))
   const views = manifest.contributes?.views ?? []
   check('manifest declares exactly the memory view (title 記憶, tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === '記憶' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
-  check('manifest permissions are exactly ui:view and backend:invoke and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
+  check('manifest permissions are exactly ui:view, backend:invoke and agent:avatar-read and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
   const methods = Array.isArray(manifest.backendMethods) ? manifest.backendMethods : []
   check('manifest backendMethods are exactly the seven ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
   check('no memory.* method (nor diagnose) is exposed to the view through backendMethods', !methods.some((method) => /^(?:memory\.|diagnose$)/u.test(method)), methods.join(', '))

@@ -330,7 +330,7 @@ test("every dynamic string is escaped: hostile names, ids, snippets, project and
   assert.equal(count(wall, /class="acard"/gu), 6);
   assert.ok(wall.includes("&lt;img src=x onerror=alert(1)&gt;"));
   assert.ok(wall.includes("&quot;&gt;&lt;script&gt;alert(2)&lt;/script&gt;"));
-  assert.ok(!wall.includes("<script") && !wall.includes("<img") && !wall.includes("<svg onload"));
+  assert.ok(!wall.includes("<script") && !/<img\b[^>]*\bonerror=/iu.test(wall) && !wall.includes("<svg onload"));
   assert.ok(!targets.tools.innerHTML.includes("<script") && !targets.tools.innerHTML.includes("<img"));
   const failed = createHome({ client: { async call() { return { ok: false, superseded: false, attempts: 1, code: `<b>"x"</b>`, known: false, source: "client", message: `<i>m</i>`, action: `<u>a</u>`, actionKind: "report", retryable: false }; } } });
   await failed.home.start();

@@ -142,7 +142,7 @@ function sources(directory) {
   });
 }
 
-test("innerHTML is written only by mount and the dialog body, and only backendClient talks to the plugin bridge", () => {
+test("innerHTML is written only by mount and the dialog body, and bridge APIs stay in UI API adapters", () => {
   const writers = [];
   const bridge = [];
   for (const file of sources(UI_ROOT)) {
@@ -152,5 +152,5 @@ test("innerHTML is written only by mount and the dialog body, and only backendCl
     if (/tuqPlugin/u.test(text)) bridge.push(name);
   }
   assert.deepEqual(writers.sort(), ["components/dialog.ts", "dom/html.ts"]);
-  assert.deepEqual(bridge, ["api/backendClient.ts"]);
+  assert.deepEqual(bridge.sort(), ["api/agentAvatarClient.ts", "api/backendClient.ts"]);
 });

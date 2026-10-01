@@ -88,9 +88,9 @@ export function createSpace({ client, now = () => NOW, agentId = AGENT_ID, hint 
   return { space, targets, open: () => space.open(agentId, hint, targets) };
 }
 
-export const SPACE_ALLOWED_TAGS = new Set(["a", "article", "b", "br", "button", "div", "h2", "h3", "h4", "header", "i", "li", "p", "section", "span", "strong", "ul"]);
+export const SPACE_ALLOWED_TAGS = new Set(["a", "article", "b", "br", "button", "div", "h2", "h3", "h4", "header", "i", "img", "li", "p", "section", "span", "strong", "ul"]);
 export const SPACE_ALLOWED_ATTRIBUTES = new Set([
-  "aria-hidden", "aria-label", "aria-labelledby", "aria-live", "class", "data-act", "data-back", "data-code", "data-memory-id", "data-project-id", "data-scope", "data-slot", "href", "id", "role", "style", "tabindex", "title", "type",
+  "alt", "aria-hidden", "aria-label", "aria-labelledby", "aria-live", "class", "data-act", "data-agent-avatar", "data-avatar-image", "data-avatar-initials", "data-back", "data-code", "data-memory-id", "data-project-id", "data-scope", "data-slot", "hidden", "href", "id", "role", "style", "tabindex", "title", "type",
 ]);
 
 

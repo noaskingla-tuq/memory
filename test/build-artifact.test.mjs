@@ -100,10 +100,10 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.doesNotMatch(backend, /from "zod"/u);
   const manifest = JSON.parse(readFileSync(join(dist, "stage", "manifest.json"), "utf8"));
   assert.equal(manifest.version, packageJson.version);
-  assert.equal(manifest.minCoreVersion, ">=1.6.3");
+  assert.equal(manifest.minCoreVersion, ">=1.7.0");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
-    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke"], data: { uninstall: "keep" } },
+    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read"], data: { uninstall: "keep" } },
   );
   assert.deepEqual(manifest.contributes.views, [
     { id: "memory", title: "記憶", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
@@ -128,7 +128,7 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.anchors, "self");
   assert.equal(info.signer.kind, "teamuq");
   assert.match(info.signer.keyId, /^teamuq-tmp-[0-9a-f]{8}$/u);
-  assert.equal(info.file, join(dist, "teamuq.memory-1.1.0.tuqplugin"));
+  assert.equal(info.file, join(dist, "teamuq.memory-1.2.0.tuqplugin"));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
   assert.equal(report.fileCount, 8 + 58);
@@ -161,10 +161,10 @@ test("verify-artifact rejects a missing Cairn file, a smuggled test directory an
 test("verify-artifact rejects a manifest that lets Core 1.6.0 to 1.6.2 install the plugin", async (t) => {
   const report = await tamperedArtifact(t, (stageDir) => {
     const file = join(stageDir, "manifest.json");
-    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.6.3", ">=1.6.0"));
+    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.7.0", ">=1.6.0"));
   });
   assert.equal(report.ok, false);
-  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.6.3"));
+  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.7.0"));
 });
 
 test("verify-artifact rejects a backend that imports Cairn or a package by a bare name", async (t) => {

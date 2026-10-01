@@ -1,3 +1,4 @@
+import type { AgentAvatarReader } from "../api/agentAvatarClient.js";
 import { describeError, type ErrorDescription } from "../api/errors.js";
 import type { BackendClient, BackendParams } from "../api/backendClient.js";
 import { mount, type MountTarget } from "../dom/html.js";
@@ -34,6 +35,7 @@ export interface Preferences {
 
 export interface TeamHomeDeps {
   readonly client: Pick<BackendClient, "call">;
+  readonly agentAvatar?: AgentAvatarReader;
   readonly now: () => number;
   readonly preferences: Preferences;
   readonly pageSize?: number;
@@ -76,10 +78,84 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
     helpOpen: deps.preferences.get(HELP_DISMISSED_KEY) !== "1",
   };
   let cursor: string | null = null;
+  let avatarGeneration = 0;
+  let avatarObserver: IntersectionObserver | null = null;
+  let avatarInFlight = 0;
+  let avatarQueue: { readonly generation: number; readonly card: HTMLElement; readonly agentId: string }[] = [];
+  const avatarUrls = new Set<string>();
+  const avatarReads = new Set<string>();
+
+  function clearAvatarState(): void {
+    avatarGeneration += 1;
+    avatarObserver?.disconnect();
+    avatarObserver = null;
+    avatarQueue = [];
+    for (const url of avatarUrls) URL.revokeObjectURL(url);
+    avatarUrls.clear();
+  }
+
+  function drainAvatarQueue(): void {
+    while (avatarInFlight < 4 && avatarQueue.length > 0) {
+      const index = avatarQueue.findIndex((entry) => !avatarReads.has(entry.agentId));
+      if (index < 0) return;
+      const [item] = avatarQueue.splice(index, 1);
+      if (item === undefined) return;
+      if (item.generation !== avatarGeneration || !item.card.isConnected) continue;
+      avatarReads.add(item.agentId);
+      avatarInFlight += 1;
+      void deps.agentAvatar!.read(item.agentId).then((image) => {
+        if (image === null || item.generation !== avatarGeneration || !item.card.isConnected) return;
+        const imageElement = item.card.querySelector<HTMLImageElement>("[data-avatar-image]");
+        const initials = item.card.querySelector<HTMLElement>("[data-avatar-initials]");
+        if (imageElement === null || initials === null) return;
+        const ownedBytes = new ArrayBuffer(image.bytes.byteLength);
+        new Uint8Array(ownedBytes).set(image.bytes);
+        const url = URL.createObjectURL(new Blob([ownedBytes], { type: image.mimeType }));
+        avatarUrls.add(url);
+        imageElement.addEventListener("error", () => {
+          URL.revokeObjectURL(url);
+          avatarUrls.delete(url);
+          imageElement.hidden = true;
+          initials.hidden = false;
+        }, { once: true });
+        imageElement.addEventListener("load", () => {
+          imageElement.hidden = false;
+          initials.hidden = true;
+        }, { once: true });
+        imageElement.src = url;
+      }).catch(() => {
+        return;
+      }).finally(() => {
+        avatarReads.delete(item.agentId);
+        avatarInFlight -= 1;
+        drainAvatarQueue();
+      });
+    }
+  }
+
+  function loadVisibleAvatars(): void {
+    const root = targets?.wall as (MountTarget & { querySelectorAll?: (selector: string) => NodeListOf<HTMLElement> }) | null;
+    if (root === null || root?.querySelectorAll === undefined || deps.agentAvatar === undefined || typeof IntersectionObserver !== "function") return;
+    const generationAtStart = avatarGeneration;
+    const cards = Array.from(root.querySelectorAll("[data-agent-avatar]"));
+    avatarObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting || generationAtStart !== avatarGeneration) continue;
+        const card = entry.target as HTMLElement;
+        const agentId = card.dataset.agentAvatar;
+        avatarObserver?.unobserve(card);
+        if (agentId !== undefined && agentId.length > 0) avatarQueue.push({ generation: generationAtStart, card, agentId });
+      }
+      drainAvatarQueue();
+    });
+    for (const card of cards) avatarObserver.observe(card);
+  }
 
   function renderResults(): void {
     if (targets === null) return;
+    clearAvatarState();
     mount(targets.wall, renderWall(state, deps.now()));
+    loadVisibleAvatars();
     targets.count.textContent = renderCount(state, announce);
     announce = false;
   }
@@ -178,6 +254,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
 
   return {
     attach(next) {
+      if (next === null) clearAvatarState();
       targets = next;
       renderAll();
     },

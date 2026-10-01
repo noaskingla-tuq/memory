@@ -128,7 +128,7 @@ export function tokenize(markup) {
   return { tags, rest };
 }
 
-export const ALLOWED_TAGS = new Set(["a", "b", "br", "button", "div", "h2", "label", "option", "p", "rect", "section", "select", "span", "strong", "svg", "header", "h1"]);
+export const ALLOWED_TAGS = new Set(["a", "b", "br", "button", "div", "h2", "img", "label", "option", "p", "rect", "section", "select", "span", "strong", "svg", "header", "h1"]);
 export const ALLOWED_ATTRIBUTES = new Set([
-  "aria-hidden", "aria-label", "aria-labelledby", "aria-live", "class", "data-act", "data-agent-id", "data-code", "data-back", "data-role", "disabled", "for", "height", "href", "id", "role", "rx", "selected", "style", "tabindex", "title", "type", "value", "viewBox", "width", "x", "y",
+  "alt", "aria-hidden", "aria-label", "aria-labelledby", "aria-live", "class", "data-act", "data-agent-id", "data-agent-avatar", "data-avatar-image", "data-avatar-initials", "data-code", "data-back", "data-role", "disabled", "for", "height", "hidden", "href", "id", "role", "rx", "selected", "style", "tabindex", "title", "type", "value", "viewBox", "width", "x", "y",
 ]);

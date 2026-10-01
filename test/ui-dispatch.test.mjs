@@ -10,7 +10,7 @@ const template = JSON.parse(readFileSync(join(REPO_ROOT, "plugin", "manifest.tem
 test("the manifest template lists exactly the ui.* methods of the contract and no memory.* method", () => {
   assert.deepEqual(template.backendMethods, [...UI_METHOD_NAMES]);
   assert.equal(template.backendMethods.some((method) => !method.startsWith("ui.")), false);
-  assert.deepEqual(template.permissions, ["ui:view", "backend:invoke"]);
+  assert.deepEqual(template.permissions, ["ui:view", "backend:invoke", "agent:avatar-read"]);
   assert.equal(template.resources.maxSessions, 4);
 });
 

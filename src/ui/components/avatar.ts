@@ -17,5 +17,5 @@ export function avatarLetter(label: string): string {
 }
 
 export function avatar(id: string, label: string, size: number): SafeHtml {
-  return html`<span class="av" aria-hidden="true" style="--h:${avatarHue(id)};--s:${size}px">${avatarLetter(label)}</span>`;
+  return html`<span class="av" aria-hidden="true" data-agent-avatar="${id}" style="--h:${avatarHue(id)};--s:${size}px"><span data-avatar-initials>${avatarLetter(label)}</span><img data-avatar-image alt="" hidden></span>`;
 }

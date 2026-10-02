@@ -6133,9 +6133,9 @@ function isAssetPackPrefixOf(pluginId8, prefix) {
   return namespace !== null && prefix.length <= 90 && NAMESPACE_PATTERN.test(prefix) && prefix.startsWith(namespace);
 }
 
-// packages/plugin-sdk/src/hostDataContracts.ts
+// packages/plugin-sdk/src/hostData/contracts.ts
 var pluginId4 = external_exports.string().regex(/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/).max(96);
-var identifier = external_exports.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/);
+var identifier = external_exports.string().min(1).max(128).regex(/^[A-Za-z0-9._:/-]+$/);
 var cursor = external_exports.string().min(1).max(512);
 var generation = external_exports.string().min(1).max(96);
 var permission = external_exports.string().min(1).max(96);
@@ -6277,7 +6277,7 @@ var PluginHostWorkChangedEventV1Schema = external_exports.object({
   highWatermark: external_exports.string().max(40).nullable()
 }).strict();
 var PluginLegacyDataMigrationV1Schema = external_exports.object({
-  id: identifier,
+  id: external_exports.string().min(1).max(96).regex(/^[a-z0-9][a-z0-9._-]*$/),
   source: external_exports.string().min(1).max(96).regex(/^[a-z0-9][a-z0-9._-]*$/),
   target: external_exports.string().min(1).max(128).regex(/^[a-z0-9][a-z0-9._/-]*$/)
 }).strict().refine((entry) => !entry.target.split("/").some((part) => part === "." || part === ".."));

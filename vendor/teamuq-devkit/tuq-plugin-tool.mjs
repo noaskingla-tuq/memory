@@ -36,9 +36,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../../node_modules/pend/index.js
+// node_modules/pend/index.js
 var require_pend = __commonJS({
-  "../../../node_modules/pend/index.js"(exports, module) {
+  "node_modules/pend/index.js"(exports, module) {
     "use strict";
     module.exports = Pend;
     function Pend() {
@@ -92,9 +92,9 @@ var require_pend = __commonJS({
   }
 });
 
-// ../../../node_modules/yauzl/fd-slicer.js
+// node_modules/yauzl/fd-slicer.js
 var require_fd_slicer = __commonJS({
-  "../../../node_modules/yauzl/fd-slicer.js"(exports) {
+  "node_modules/yauzl/fd-slicer.js"(exports) {
     "use strict";
     var fs13 = __require("fs");
     var util2 = __require("util");
@@ -250,9 +250,9 @@ var require_fd_slicer = __commonJS({
   }
 });
 
-// ../../../node_modules/yauzl/crc32.js
+// node_modules/yauzl/crc32.js
 var require_crc32 = __commonJS({
-  "../../../node_modules/yauzl/crc32.js"(exports, module) {
+  "node_modules/yauzl/crc32.js"(exports, module) {
     "use strict";
     var CRC_TABLE = new Int32Array([
       0,
@@ -523,9 +523,9 @@ var require_crc32 = __commonJS({
   }
 });
 
-// ../../../node_modules/yauzl/index.js
+// node_modules/yauzl/index.js
 var require_yauzl = __commonJS({
-  "../../../node_modules/yauzl/index.js"(exports) {
+  "node_modules/yauzl/index.js"(exports) {
     "use strict";
     var fs13 = __require("fs");
     var zlib = __require("zlib");
@@ -1390,7 +1390,7 @@ import os3 from "node:os";
 import path11 from "node:path";
 import { fileURLToPath } from "node:url";
 
-// ../../../node_modules/zod/v3/external.js
+// node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -1502,7 +1502,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// ../../../node_modules/zod/v3/helpers/util.js
+// node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -1636,7 +1636,7 @@ var getParsedType = (data) => {
   }
 };
 
-// ../../../node_modules/zod/v3/ZodError.js
+// node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -1754,7 +1754,7 @@ ZodError.create = (issues) => {
   return error;
 };
 
-// ../../../node_modules/zod/v3/locales/en.js
+// node_modules/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -1857,7 +1857,7 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// ../../../node_modules/zod/v3/errors.js
+// node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -1866,7 +1866,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// ../../../node_modules/zod/v3/helpers/parseUtil.js
+// node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
   const { data, path: path12, errorMaps, issueData } = params;
   const fullPath = [...path12, ...issueData.path || []];
@@ -1976,14 +1976,14 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
-// ../../../node_modules/zod/v3/helpers/errorUtil.js
+// node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// ../../../node_modules/zod/v3/types.js
+// node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
   constructor(parent, value, path12, key2) {
     this._cachedPath = [];
@@ -6139,6 +6139,7 @@ var identifier = external_exports.string().min(1).max(128).regex(/^[A-Za-z0-9._:
 var cursor = external_exports.string().min(1).max(512);
 var generation = external_exports.string().min(1).max(96);
 var permission = external_exports.string().min(1).max(96);
+var presentStateValue = external_exports.custom((value) => value !== void 0);
 var PLUGIN_HOST_DATA_CAPABILITIES = Object.freeze({
   workRecords: "teamuq.work-records@1",
   agentDirectory: "teamuq.agent-directory@1",
@@ -6240,14 +6241,14 @@ var PluginHostProjectPageV1Schema = external_exports.object({
 }).strict();
 var PluginStateRecordV1Schema = external_exports.object({
   key: identifier,
-  value: external_exports.unknown(),
+  value: presentStateValue,
   sourceKind: external_exports.string().regex(/^[a-z][a-z0-9-]{0,31}$/).nullable().optional(),
   sourceId: identifier.nullable().optional(),
   revision: external_exports.number().int().nonnegative()
 }).strict();
 var PluginStateWriteRecordV1Schema = external_exports.object({
   key: identifier,
-  value: external_exports.unknown(),
+  value: presentStateValue,
   sourceKind: external_exports.string().regex(/^[a-z][a-z0-9-]{0,31}$/).nullable().optional(),
   sourceId: identifier.nullable().optional(),
   expectedRevision: external_exports.number().int().nonnegative().nullable().optional()

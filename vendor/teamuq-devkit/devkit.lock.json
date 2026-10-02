@@ -7,7 +7,7 @@
   "bytes": 521754,
   "source": {
     "repo": "teamuq-electron",
-    "coreCommit": "7afe06edc6d0a13696fffcfbaaf1ba65b8497da5",
+    "coreCommit": "a9df9d52249703d8ea939818ace1d1096d93ac2c",
     "coreVersion": "1.7.1",
     "buildCommand": "npm run build:plugin-devkit -- --out <repo>/vendor/teamuq-devkit/tuq-plugin-tool.mjs",
     "sources": [

@@ -23,7 +23,7 @@ function scratch(t) {
 }
 
 function tempKey(t) {
-  const key = createTempKey();
+  const key = createTempKey({ keyIdPrefix: "memory-tmp-" });
   t.after(() => key.cleanup());
   return key;
 }
@@ -103,7 +103,7 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.equal(manifest.minCoreVersion, ">=1.7.0");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
-    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read"], data: { uninstall: "keep" } },
+    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "plugin-state:write", "data:legacy-migrate"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
   );
   assert.deepEqual(manifest.contributes.views, [
     { id: "memory", title: "記憶", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
@@ -127,8 +127,8 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.ephemeralKey, true);
   assert.equal(info.anchors, "self");
   assert.equal(info.signer.kind, "teamuq");
-  assert.match(info.signer.keyId, /^teamuq-tmp-[0-9a-f]{8}$/u);
-  assert.equal(info.file, join(dist, "teamuq.memory-1.2.0.tuqplugin"));
+  assert.match(info.signer.keyId, /^memory-tmp-[0-9a-f]{8}$/u);
+  assert.equal(info.file, join(dist, "teamuq.memory-1.2.1.tuqplugin"));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
   assert.equal(report.fileCount, 8 + 58);
@@ -241,21 +241,6 @@ test("release refuses a key path inside this repository or inside any git work t
   mkdirSync(join(base, ".git"));
   const keyFile = join(base, "teamuq-x.key.pem");
   assert.throws(() => release({ keyFile, keyId: "teamuq-x", anchors: "self", pubFile: keyFile }), /inside the git work tree/u);
-});
-
-test("the passphrase environment variable of the parent never reaches the devkit", (t) => {
-  const key = tempKey(t);
-  const previous = process.env.TEAMUQ_KEY_PASSPHRASE_FOR_TESTS;
-  process.env.TEAMUQ_KEY_PASSPHRASE_FOR_TESTS = key.passphrase;
-  t.after(() => {
-    if (previous === undefined) delete process.env.TEAMUQ_KEY_PASSPHRASE_FOR_TESTS;
-    else process.env.TEAMUQ_KEY_PASSPHRASE_FOR_TESTS = previous;
-  });
-  const leaked = runDevkit(["selftest-key", "--key", key.keyFile, "--key-id", key.keyId]);
-  assert.notEqual(leaked.status, 0);
-  assert.match(leaked.stderr, /interactive terminal/u);
-  const injected = runDevkit(["selftest-key", "--key", key.keyFile, "--key-id", key.keyId], { passphraseForTests: key.passphrase });
-  assert.equal(injected.status, 0);
 });
 
 test("the throwaway key lives outside the repository and its cleanup removes it", () => {

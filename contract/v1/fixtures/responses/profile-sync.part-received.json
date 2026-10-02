@@ -1,0 +1,26 @@
+{
+  "case": "profile-sync.part-received",
+  "method": "memory.profile.sync@1",
+  "accept": true,
+  "note": "part 1 of 2 staged, table not yet effective",
+  "response": {
+    "accepted": true,
+    "generation": "783875e41d932603e71850485b428aeae9dfd97a123f0e562d7a65cd931d2ac2",
+    "complete": false,
+    "changed": false,
+    "received": 1,
+    "agents": 0,
+    "teams": 0,
+    "projects": 0
+  },
+  "parsed": {
+    "accepted": true,
+    "generation": "783875e41d932603e71850485b428aeae9dfd97a123f0e562d7a65cd931d2ac2",
+    "complete": false,
+    "changed": false,
+    "received": 1,
+    "agents": 0,
+    "teams": 0,
+    "projects": 0
+  }
+}

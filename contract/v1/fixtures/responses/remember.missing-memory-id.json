@@ -1,0 +1,16 @@
+{
+  "case": "remember.missing-memory-id",
+  "method": "memory.remember@1",
+  "accept": false,
+  "response": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "deduplicated": false
+        },
+        "requestId": "req-6"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "case": "remember.empty-ops",
+  "method": "memory.remember@1",
+  "valid": false,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex"
+    },
+    "ops": []
+  }
+}

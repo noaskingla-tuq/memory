@@ -3,12 +3,12 @@
   "tool": "tuq-plugin-tool",
   "file": "tuq-plugin-tool.mjs",
   "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
-  "sha256": "e1af711f007b197c0019755f3ba5dc073f1e7dbb264ead861d4b79c379ab17e9",
-  "bytes": 405535,
+  "sha256": "dc3a82b1f0453e067387d8477a9c0456c4cd1e69c8c5a759dc57c05dea5f91cb",
+  "bytes": 521690,
   "source": {
     "repo": "teamuq-electron",
-    "coreCommit": "a85e3b89d3151c1f16c7a3e755be3e471c539789",
-    "coreVersion": "1.7.0",
+    "coreCommit": "edd6db16f85fa04cf984819f8be6c00dc99869e6",
+    "coreVersion": "1.7.1",
     "buildCommand": "npm run build:plugin-devkit -- --out <repo>/vendor/teamuq-devkit/tuq-plugin-tool.mjs",
     "sources": [
       ".teamuq/scripts/plugin-tools",

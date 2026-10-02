@@ -8,12 +8,12 @@ export const VENDOR_DIR = join(REPO_ROOT, 'vendor', 'teamuq-contract')
 export const VENDOR_LOCK = 'vendor.lock.json'
 export const CORE_LOCK = 'lock.json'
 export const GENERATED_TS = join(REPO_ROOT, 'src', 'backend', 'vendoredContractLock.ts')
-export const CORE_CONTRACT_DIR = 'packages/features/agent-memory/contract/v1'
+export const CONTRACT_SOURCE_DIR = join(REPO_ROOT, 'contract', 'v1')
 export const PLUGIN_ID = 'teamuq.memory'
 export const METHODS = ['memory.remember@1', 'memory.inspect@1', 'diagnose', 'memory.profile.sync@1']
 export const HASH_RULE = 'sha256 hex of file bytes with CRLF normalised to LF'
 
-// why: tsc resolves an import of contract.mjs to contract.d.mts, so Core's contract.d.ts needs this one-line bridge
+// why: tsc resolves an import of contract.mjs to contract.d.mts, so the plugin-owned declarations need this one-line bridge
 export const SHIM_FILE = 'contract.d.mts'
 export const SHIM_TEXT = 'export * from "./contract.js";\n'
 export const PLUGIN_OWNED = [SHIM_FILE]
@@ -39,7 +39,7 @@ export function walkFiles(directory, prefix = '') {
 
 export function generatedSource(lockSha256) {
   return [
-    '// why: written by tools/sync-vendor.mjs; contract:verify compares it with the sha256 of vendor/teamuq-contract/lock.json',
+    '// why: written by tools/sync-contract.mjs; contract:verify compares it with the sha256 of contract/v1/lock.json',
     `export const CONTRACT_LOCK_SHA256 = "${lockSha256}";`,
     '',
   ].join('\n')

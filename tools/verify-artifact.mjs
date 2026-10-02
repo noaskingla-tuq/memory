@@ -17,9 +17,10 @@ const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY
 const MIN_CORE_VERSION = '>=1.7.0'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'
+const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metadata.json'), 'utf8'))
 const UI_ENTRY = 'ui/index.html'
 const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css']
-const EXPECTED_PERMISSIONS = ['agent:avatar-read', 'backend:invoke', 'ui:view']
+const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'plugin-state:write', 'project-directory:read', 'ui:view', 'work-records:read']
 const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
 const EXPECTED_MAX_SESSIONS = 4
 // why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin
@@ -126,7 +127,10 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   check('manifest is composed: entry.backend is backend.mjs and entry.ui is ui/index.html, both files exist', manifest.entry?.backend === 'backend.mjs' && manifest.entry?.ui === UI_ENTRY && entries.has('backend.mjs') && entries.has(UI_ENTRY), JSON.stringify(manifest.entry))
   const views = manifest.contributes?.views ?? []
   check('manifest declares exactly the memory view (title 記憶, tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === '記憶' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
-  check('manifest permissions are exactly ui:view, backend:invoke and agent:avatar-read and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
+  check('manifest permissions are exactly the seven UI methods, host data grants and legacy migration grant, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
+  const legacySources = RELEASE_METADATA.legacyDataSources ?? []
+  const migrations = manifest.data?.legacyMigrations ?? []
+  check('manifest requires the supported host data API and declares the opaque Cairn migration source/target bound by release metadata', RELEASE_METADATA.schemaVersion === 1 && RELEASE_METADATA.pluginId === PLUGIN_ID && legacySources.length === 1 && legacySources[0].sourceId === 'memory-cairn-v1' && legacySources[0].relativePath === 'memory-cairn-v1' && JSON.stringify(manifest.hostApis) === JSON.stringify([{ id: 'teamuq.host-data', range: '^1.0.0' }]) && migrations.length === 1 && migrations[0].id === 'cairn-v1' && migrations[0].source === legacySources[0].sourceId && migrations[0].target === legacySources[0].relativePath, JSON.stringify({ hostApis: manifest.hostApis, legacyMigrations: migrations, releaseMetadata: RELEASE_METADATA }))
   const methods = Array.isArray(manifest.backendMethods) ? manifest.backendMethods : []
   check('manifest backendMethods are exactly the seven ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
   check('no memory.* method (nor diagnose) is exposed to the view through backendMethods', !methods.some((method) => /^(?:memory\.|diagnose$)/u.test(method)), methods.join(', '))

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assertKeyOutsideRepo } from './devkit.mjs'
 
-export function createTempKey() {
-  const keyId = `teamuq-tmp-${randomBytes(4).toString('hex')}`
+export function createTempKey({ keyIdPrefix = 'teamuq-tmp-' } = {}) {
+  const keyId = `${keyIdPrefix}${randomBytes(4).toString('hex')}`
   const passphrase = randomBytes(18).toString('base64url')
   const directory = mkdtempSync(join(realpathSync(tmpdir()), 'teamuq-memory-key-'))
   const keyFile = join(directory, `${keyId}.key.pem`)

@@ -1,0 +1,8 @@
+{
+  "case": "inspect.missing-result",
+  "method": "memory.inspect@1",
+  "accept": false,
+  "response": {
+    "nextCursor": "c1"
+  }
+}

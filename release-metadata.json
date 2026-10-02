@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "pluginId": "teamuq.memory",
+  "legacyDataSources": [
+    {
+      "sourceId": "memory-cairn-v1",
+      "relativePath": "memory-cairn-v1"
+    }
+  ]
+}

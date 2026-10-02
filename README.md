@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust）的外部 plugin（id `teamuq.memory`，版本 1.2.0）。記憶 domain／application 與 Cairn adapter 自 TeamUQ `packages/platform/memory-server` 原樣搬來（P1）；`src/backend/` 是 TeamUQ 外部 full-trust 後端的入口（P2）；`tools/build.mjs` 一鍵產出 `.tuqplugin`（P3）。
+TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust）的外部 plugin（id `teamuq.memory`，版本 1.2.1）。記憶 domain／application 與 Cairn adapter 自 TeamUQ `packages/platform/memory-server` 原樣搬來（P1）；`src/backend/` 是 TeamUQ 外部 full-trust 後端的入口（P2）；`tools/build.mjs` 一鍵產出 `.tuqplugin`（P3）。
 
 > 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-devtrust` 的 `95956859c`，含 `dev-pack --preplanted-id`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
 
@@ -8,7 +8,8 @@ TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust�
 
 ```
 src/backend/            外部後端入口：entry（activate）、service（派送與生命週期）、rememberCall、inspectCall、uiDispatch、profileSync（名稱表推送）、diagnose、contractErrors
-vendor/teamuq-contract/ Core 契約的 vendor 副本（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
+contract/v1/             memory contract、types、fixture 的 plugin-owned 唯一來源；vendor 由 contract:sync 生成
+vendor/teamuq-contract/ memory contract 的生成快照（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
 vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
 src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{agentAvatarClient,backendClient,errors}.ts、dom/html.ts、components/{dialog,drawer,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間、時間軸與搜尋、詳情與遺忘）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
@@ -19,11 +20,11 @@ src/adapters/cairn/     Cairn core adapter（唯一 import cairn-memory 的檔�
 src/adapters/ui/        cairnReader（唯一對 Cairn 庫檔下 SQL、只讀）、agentCatalog（判讀一個 agent 庫、列出所有 agent）、profileStore（名稱表檔 `memory-ui/profile.json` 的讀寫）
 src/adapters/model/     Cairn 模型 callback adapter
 src/adapters/storage/   每 agent 一顆 SQLite 的資料配置、檔案安全檢查、identity 相容（cairnPin、upgradeBackup）
-src/application/        memory application、handle pool、write lane、resource governor、tool contract、ports
+src/application/        memory application、handle pool、write lane、resource governor、tool contract；punch catch-up 與 receipt state machine；agent/project profile snapshot projection
 src/domain/             namespace 與錯誤碼
 src/contracts/          actor.ts（呼叫身分型別）、cairn-memory.d.ts（Cairn core 的型別宣告）
 test/                   node --test 測試（讀 out/ 的 tsc 產物）；test/fixtures/legacy-db/<commit>/ 是各 accepted commit 的真實舊庫
-tools/                  build、stage-cairn、verify-artifact、release（P3）；verify-source-untouched、check-no-secrets、make-legacy-fixture、sync-vendor（契約與 devkit）、verify-contract
+tools/                  build、stage-cairn、verify-artifact、release（P3）；verify-source-untouched、check-no-secrets、make-legacy-fixture、sync-contract、sync-vendor（devkit）、verify-contract
 dist/                   build 產物（gitignored）：stage/、<id>-<version>.tuqplugin、signer.pub.json、build-info.json
 cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accepted[]、stage（打包檔案清單與 sha256）
 ```
@@ -50,7 +51,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
 - inspect：以整個回應 `JSON.stringify(...).length`（UTF-16 單位）60,000 為預算；超過就把 limit 對半、重查，直到符合。回 `nextCursor`（list 取 `nextCursor`，get 取 `nextReceiptCursor`）與 `appliedLimit`，呼叫端續頁必須用 `appliedLimit`。`limit` 沒給時明確用 6（與 application 預設一致）。降到 1 仍超過拋 `result_too_large`。**限制**：Cairn 的 cursor 綁定簽發時的 limit，帶 `cursor` 的續頁超過預算無法對半，同樣拋 `result_too_large`。
 - 每個回應在回傳前都用 vendored 回應 schema 解析（失敗拋 `internal`）；`diagnose` 不含任何路徑，`storage.status` 為 `ready` 或小寫的錯誤碼（如 `storage_unsafe`）。
-- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.2.0`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
+- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.2.1`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
 - 資料層的祖先目錄檢查只從 `dataDir` 往下走（`CairnDataLayout` 的 `trustedBase`）：`--permission` 下外掛讀不到 `dataDir` 以上的任何路徑，往上 lstat 會被拒（實測回 `STORAGE_BUSY`）。`dataDir` 以下仍拒絕 symlink／junction；`dataDir` 以上的重導向（例如 macOS `/var`）視為 host 的事。不傳 `trustedBase` 時維持從根目錄往下檢查。
 
 ## 唯讀讀取器與 agent 目錄（S1）
@@ -69,7 +70,7 @@ UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段�
 - `uiContract.ts`：每個方法一組請求 schema 與成功回應 schema（全部 `strict`），`UI_METHOD_SCHEMAS`、`parseUiParams`、`parseUiResponse`。時間篩選必須是 `toISOString()` 的完整形式（Cairn 的 `updated_at` 以字串比較），`scope` 與 `projectId` 必須相符，snippet 以 code point 計。失敗一律 `{ok:false, code, retryable}`，碼取自 `UI_FAILURE_CODES`。
 - `budget.ts`：回傳大小是 `Buffer.byteLength(JSON.stringify(x))`（UTF-8 bytes），上限 56,000；`fitToBudget` 以二分法取「放得下的最長前綴」並回 `truncated`，連第一筆都放不下才回 `result_too_large`（不回指向同一筆的游標）。CJK 每字 3 bytes，用 `.length` 會低估。
 - `cursor.ts`：游標是 `base64url(payload).base64url(HMAC-SHA256)`，payload 為版本、篩選條件雜湊與 1 到 4 段 keyset 位置；金鑰預設是行程內隨機值，所以重啟後舊游標會被拒（`ui.*` 一律回 `CURSOR_STALE`，畫面從第一頁重來）。雜湊不含 `limit` 與 `cursor`，換頁大小仍可續頁；篩選條件不同回 `filter_mismatch`；任何字元被改、簽章被換、格式不符都拒收。
-- `punchContent.ts`：以 NFKC 後的前綴 `[工作紀錄 <起>~<迄> <cli>/<model>] 請求:<標題>。成果:<內文>` 解析工作起訖（UTC 分鐘，轉成完整 ISO）、cli、model、標題；`unknown` 的 cli／model 與 `(未命名)` 標題成為 `null`，`(無文字)` 內文成為空字串。前綴格式與 Core 的 `punchMemoryContent.ts` 耦合，樣本是 `vendor/teamuq-contract/fixtures/requests/remember.work-prefix-*`（每種各有寫入形式與 NFKC 形式）。解析失敗（含只讀了內容前 160 字、標題被截斷）回 `{parsed:false, body:<原文>}`。標題本身若含「。成果:」會在該處被切開，這是格式本身的歧義。
+- `punchContent.ts`：以 NFKC 後的前綴 `[工作紀錄 <起>~<迄> <cli>/<model>] 請求:<標題>。成果:<內文>` 解析工作起訖（UTC 分鐘，轉成完整 ISO）、cli、model、標題；`unknown` 的 cli／model 與 `(未命名)` 標題成為 `null`，`(無文字)` 內文成為空字串。前綴相容樣本由 plugin-owned `contract/v1/fixtures/requests/remember.work-prefix-*` 保持（每種各有寫入形式與 NFKC 形式）。解析失敗（含只讀了內容前 160 字、標題被截斷）回 `{parsed:false, body:<原文>}`。標題本身若含「。成果:」會在該處被切開，這是格式本身的歧義。
 - `jsonSafe.ts`：出口的 `JSON.parse(JSON.stringify(x))`，去掉 `undefined`、把 `NaN` 與無限大變成 `null`（preload 的 zod 會拒收前者）。
 
 ## UI 方法（S3）
@@ -171,7 +172,7 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 
 ## 契約 vendor
 
-`vendor/teamuq-contract/` 是 TeamUQ `packages/features/agent-memory/contract/v1/` 的副本，Core 是唯一權威，禁止手改。
+`contract/v1/` 是外部 memory contract、types 與 fixtures 的唯一權威；`vendor/teamuq-contract/` 只是生成快照，禁止手改。
 
 | 檔 | 說明 |
 |---|---|
@@ -179,7 +180,7 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 | `contract.d.mts` | 本 repo 加的一行橋接（tsc 把對 `contract.mjs` 的 import 解析到 `.d.mts`），列在 `vendor.lock.json` 的 `pluginOwnedFiles` |
 | `vendor.lock.json` | Core commit（HEAD）、最後改到契約目錄的 commit、Core `lock.json` 的 sha256、每個 vendored 檔的 sha256 |
 
-- 同步：`node tools/sync-vendor.mjs --core <TeamUQ 路徑>`。先驗 Core 的 lock（每檔 hash、無多餘檔、方法清單、pluginId；方法清單現為 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`，見「名稱表（S4）」），且契約目錄不得有未提交變更；再重寫 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`（`diagnose.contractLockSha256` 的來源）。
+- 同步：`npm run contract:sync` 從 `contract/v1/` 重生 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`；變更來源後用 `node tools/sync-contract.mjs --refresh-lock` 更新 source hashes。Core SDK/devkit只用 `node tools/sync-vendor.mjs --core <TeamUQ 路徑> --only devkit` 生成同步。
 - 驗證：`npm run contract:verify`（不需要 Core）比對 vendored 檔與兩份 lock、橋接檔內容、`vendoredContractLock.ts`；加 `--core <路徑>` 會另外對照 Core 的 lock 與 commit。
 
 ## 升級 Cairn 後的舊庫（G7）
@@ -202,10 +203,10 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 ## 打包與簽章（P3）
 
 ```powershell
-node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.2.0.tuqplugin
+node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.2.1.tuqplugin
 node tools/build.mjs --stage-only           # 只做 stage 與 devkit validate
 node tools/build.mjs --key <file.key.pem>   # 真金鑰：互動輸入 passphrase，預設 --anchors core
-node tools/verify-artifact.mjs dist/teamuq.memory-1.2.0.tuqplugin --pub-file dist/signer.pub.json
+node tools/verify-artifact.mjs dist/teamuq.memory-1.2.1.tuqplugin --pub-file dist/signer.pub.json
 ```
 
 build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock）→ esbuild 打 `stage/backend.mjs`（zod 內聯；`cairn-memory/core/index.mjs` 改成外部相對路徑 `./cairn/core/index.mjs`，其他 `cairn-memory` import 一律報錯）→ `stage-cairn` → 由 `plugin/manifest.template.json` 產 manifest → devkit `validate` → `release`（devkit `pack`＋`verify`）→ `verify-artifact`。
@@ -282,7 +283,7 @@ npm run check          # tsc → node --test → contract:verify → verify-sour
 | `npm test` | 先 `build:ts`，再 `node --test test/*.test.mjs` |
 | `npm run perf:ui -- --data <目錄>` | 見「UI 方法（S3）」：10k 筆資料集上的耗時、事件迴圈停頓與並行寫入檢查 |
 | `npm run contract:verify` | 驗證 `vendor/teamuq-contract/` 與 lock、`vendoredContractLock.ts` 一致 |
-| `npm run contract:sync -- --core <路徑>` | 自 Core 重新 vendor 契約（寫入檔案）；`node tools/sync-vendor.mjs --core <路徑>` 不帶 `--only` 則契約與 devkit 都同步 |
+| `npm run contract:sync` | 從本 repo `contract/v1/` 重新生成 contract vendor（寫入檔案） |
 | `npm run verify:source` | 驗證 lock／package 的 Cairn pin、`core/` tree hash、`redact.mjs` sha256、唯一 import 位置 |
 | `npm run check:secrets` | 找私鑰區塊、`*.pem`／`*.key`／`keys/`，並確認 `.gitignore` 仍排除它們 |
 | `npm run build` | 見「打包與簽章」，輸出到 `dist/`（gitignored） |

@@ -1,0 +1,27 @@
+{
+  "case": "inspect.error-cursor-stale",
+  "method": "memory.inspect@1",
+  "accept": true,
+  "response": {
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "CURSOR_STALE",
+        "message": "Memory operation failed: CURSOR_STALE",
+        "retryable": true,
+        "requestId": "req-11"
+      }
+    }
+  },
+  "parsed": {
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "CURSOR_STALE",
+        "message": "Memory operation failed: CURSOR_STALE",
+        "retryable": true,
+        "requestId": "req-11"
+      }
+    }
+  }
+}

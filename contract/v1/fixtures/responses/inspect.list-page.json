@@ -1,0 +1,39 @@
+{
+  "case": "inspect.list-page",
+  "method": "memory.inspect@1",
+  "accept": true,
+  "response": {
+    "result": {
+      "ok": true,
+      "value": {
+        "memories": [
+          {
+            "id": "mem-1"
+          }
+        ],
+        "nextCursor": "c1",
+        "exhausted": false
+      },
+      "requestId": "req-9"
+    },
+    "nextCursor": "c1",
+    "appliedLimit": 3
+  },
+  "parsed": {
+    "result": {
+      "ok": true,
+      "value": {
+        "memories": [
+          {
+            "id": "mem-1"
+          }
+        ],
+        "nextCursor": "c1",
+        "exhausted": false
+      },
+      "requestId": "req-9"
+    },
+    "nextCursor": "c1",
+    "appliedLimit": 3
+  }
+}

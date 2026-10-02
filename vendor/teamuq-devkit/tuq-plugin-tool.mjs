@@ -96,7 +96,7 @@ var require_pend = __commonJS({
 var require_fd_slicer = __commonJS({
   "../../../node_modules/yauzl/fd-slicer.js"(exports) {
     "use strict";
-    var fs10 = __require("fs");
+    var fs13 = __require("fs");
     var util2 = __require("util");
     var stream = __require("stream");
     var Readable = stream.Readable;
@@ -116,7 +116,7 @@ var require_fd_slicer = __commonJS({
     FdSlicer.prototype.read = function(buffer, offset, length, position, callback) {
       var self = this;
       self.pend.go(function(cb) {
-        fs10.read(self.fd, buffer, offset, length, position, function(err, bytesRead, buffer2) {
+        fs13.read(self.fd, buffer, offset, length, position, function(err, bytesRead, buffer2) {
           cb();
           callback(err, bytesRead, buffer2);
         });
@@ -133,7 +133,7 @@ var require_fd_slicer = __commonJS({
       self.refCount -= 1;
       if (self.refCount < 0) throw new Error("invalid unref");
       if (self.refCount > 0) return;
-      fs10.close(self.fd, onCloseDone);
+      fs13.close(self.fd, onCloseDone);
       function onCloseDone(err) {
         if (err) {
           self.emit("error", err);
@@ -165,7 +165,7 @@ var require_fd_slicer = __commonJS({
       }
       self.context.pend.go(function(cb) {
         var buffer = Buffer.allocUnsafe(toRead);
-        fs10.read(self.context.fd, buffer, 0, toRead, self.pos, function(err, bytesRead) {
+        fs13.read(self.context.fd, buffer, 0, toRead, self.pos, function(err, bytesRead) {
           if (err) {
             self.destroy(err);
           } else if (bytesRead === 0) {
@@ -527,7 +527,7 @@ var require_crc32 = __commonJS({
 var require_yauzl = __commonJS({
   "../../../node_modules/yauzl/index.js"(exports) {
     "use strict";
-    var fs10 = __require("fs");
+    var fs13 = __require("fs");
     var zlib = __require("zlib");
     var fd_slicer = require_fd_slicer();
     var util2 = __require("util");
@@ -552,9 +552,9 @@ var require_yauzl = __commonJS({
     exports.Entry = Entry;
     exports.LocalFileHeader = LocalFileHeader;
     exports.RandomAccessReader = RandomAccessReader;
-    function openPromise2(path9, options2) {
+    function openPromise2(path12, options2) {
       return new Promise((resolve, reject) => {
-        open(path9, { ...options2, lazyEntries: true }, function(err, zipfile) {
+        open(path12, { ...options2, lazyEntries: true }, function(err, zipfile) {
           if (err) return reject(err);
           resolve(zipfile);
         });
@@ -584,7 +584,7 @@ var require_yauzl = __commonJS({
         });
       });
     }
-    function open(path9, options2, callback) {
+    function open(path12, options2, callback) {
       if (typeof options2 === "function") {
         callback = options2;
         options2 = null;
@@ -596,10 +596,10 @@ var require_yauzl = __commonJS({
       if (options2.validateEntrySizes == null) options2.validateEntrySizes = true;
       if (options2.strictFileNames == null) options2.strictFileNames = false;
       if (callback == null) callback = defaultCallback;
-      fs10.open(path9, "r", function(err, fd) {
+      fs13.open(path12, "r", function(err, fd) {
         if (err) return callback(err);
         fromFd(fd, options2, function(err2, zipfile) {
-          if (err2) fs10.close(fd, defaultCallback);
+          if (err2) fs13.close(fd, defaultCallback);
           callback(err2, zipfile);
         });
       });
@@ -616,7 +616,7 @@ var require_yauzl = __commonJS({
       if (options2.validateEntrySizes == null) options2.validateEntrySizes = true;
       if (options2.strictFileNames == null) options2.strictFileNames = false;
       if (callback == null) callback = defaultCallback;
-      fs10.fstat(fd, function(err, stats) {
+      fs13.fstat(fd, function(err, stats) {
         if (err) return callback(err);
         var reader = new fd_slicer.FdSlicer(fd);
         fromRandomAccessReader(reader, stats.size, options2, callback);
@@ -1384,10 +1384,11 @@ var require_yauzl = __commonJS({
 });
 
 // .teamuq/scripts/plugin-tools/tuq-plugin-tool.entry.ts
-import { createHash as createHash8, createPublicKey as createPublicKey4, randomBytes as randomBytes5 } from "node:crypto";
-import { promises as fs9, readdirSync, readFileSync, rmSync } from "node:fs";
+import { createHash as createHash9, createPublicKey as createPublicKey6, randomBytes as randomBytes6 } from "node:crypto";
+import { promises as fs12, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import os3 from "node:os";
-import path8 from "node:path";
+import path11 from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ../../../node_modules/zod/v3/external.js
 var external_exports = {};
@@ -1867,8 +1868,8 @@ function getErrorMap() {
 
 // ../../../node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path9, errorMaps, issueData } = params;
-  const fullPath = [...path9, ...issueData.path || []];
+  const { data, path: path12, errorMaps, issueData } = params;
+  const fullPath = [...path12, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -1984,11 +1985,11 @@ var errorUtil;
 
 // ../../../node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path9, key2) {
+  constructor(parent, value, path12, key2) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path9;
+    this._path = path12;
     this._key = key2;
   }
   get path() {
@@ -2383,8 +2384,8 @@ function isValidJWT(jwt, alg) {
     const [header] = jwt.split(".");
     if (!header)
       return false;
-    const base64 = header.replace(/-/g, "+").replace(/_/g, "/").padEnd(header.length + (4 - header.length % 4) % 4, "=");
-    const decoded = JSON.parse(atob(base64));
+    const base642 = header.replace(/-/g, "+").replace(/_/g, "/").padEnd(header.length + (4 - header.length % 4) % 4, "=");
+    const decoded = JSON.parse(atob(base642));
     if (typeof decoded !== "object" || decoded === null)
       return false;
     if ("typ" in decoded && decoded?.typ !== "JWT")
@@ -5460,6 +5461,7 @@ var PluginManifestV1Schema = external_exports.object({
 });
 var PLUGIN_LIFECYCLE_STATES = ["REGISTERED", "ACTIVATING", "READY", "DEACTIVATING", "INACTIVE", "DISABLED", "FAILED", "NEEDS_ASSETS", "BLOCKED_DEPENDENCY"];
 var CAPABILITY_DEPENDENCY_STATUSES = ["available", "provider_not_ready", "provider_not_allowed", "unresolved"];
+var PLUGIN_SIGNER_KINDS = ["teamuq", "dev", "unsigned"];
 var PluginRuntimeSnapshotRequestV1Schema = external_exports.object({
   protocolVersion: external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION)
 }).strict();
@@ -5482,7 +5484,7 @@ var PluginDependencyProviderV1Schema = external_exports.object({
   id: external_exports.string().regex(IDENTIFIER_PATTERN),
   version: external_exports.string().regex(VERSION_PATTERN),
   name: external_exports.string().max(96),
-  signer: external_exports.enum(["teamuq", "dev"]),
+  signer: external_exports.enum(PLUGIN_SIGNER_KINDS),
   state: external_exports.enum(PLUGIN_LIFECYCLE_STATES),
   allowed: external_exports.boolean(),
   selected: external_exports.boolean()
@@ -5836,7 +5838,7 @@ var ProviderRowSchema = external_exports.object({
   id: pluginId2,
   name: external_exports.string().max(96),
   version: external_exports.string().max(32),
-  signer: external_exports.enum(["teamuq", "dev"]),
+  signer: external_exports.enum(PLUGIN_SIGNER_KINDS),
   state: external_exports.enum(PLUGIN_LIFECYCLE_STATES),
   ready: external_exports.boolean(),
   live: external_exports.boolean(),
@@ -5845,7 +5847,7 @@ var ProviderRowSchema = external_exports.object({
 var TextInputStateV1Schema = external_exports.object({
   protocolVersion: protocolVersion2,
   status: external_exports.enum(CAPABILITY_DEPENDENCY_STATUSES),
-  target: external_exports.object({ id: pluginId2, name: external_exports.string().max(96), version: external_exports.string().max(32), signer: external_exports.enum(["teamuq", "dev"]), live: external_exports.boolean() }).strict().nullable(),
+  target: external_exports.object({ id: pluginId2, name: external_exports.string().max(96), version: external_exports.string().max(32), signer: external_exports.enum(PLUGIN_SIGNER_KINDS), live: external_exports.boolean() }).strict().nullable(),
   explicitTargetId: pluginId2.nullable(),
   providers: external_exports.array(ProviderRowSchema).max(16)
 }).strict();
@@ -5958,7 +5960,7 @@ var CapabilityProviderViewSchema = external_exports.object({
   id: pluginId3,
   version: external_exports.string().max(32),
   name: external_exports.string().max(96),
-  signer: external_exports.enum(["teamuq", "dev"])
+  signer: external_exports.enum(PLUGIN_SIGNER_KINDS)
 }).strict();
 var CapabilityEntrySchema = external_exports.object({
   capability: capabilityId,
@@ -6108,8 +6110,8 @@ var PluginSettingsSchemaSchema = external_exports.object({
 }).strict().superRefine((schema, context) => {
   const seen = /* @__PURE__ */ new Set();
   schema.fields.forEach((field, index) => {
-    const fail = (path9, message) => {
-      context.addIssue({ code: external_exports.ZodIssueCode.custom, path: ["fields", index, path9], message });
+    const fail = (path12, message) => {
+      context.addIssue({ code: external_exports.ZodIssueCode.custom, path: ["fields", index, path12], message });
     };
     if (seen.has(field.key)) fail("key", "setting keys must be unique");
     seen.add(field.key);
@@ -6121,15 +6123,164 @@ var PluginSettingsSchemaSchema = external_exports.object({
 });
 var SETTINGS_SCHEMA_PERMISSION = "settings:plugin";
 var NAMESPACE_PATTERN = /^[a-z0-9]+(?:[.-][a-z0-9]+)*-$/u;
-function assetPackNamespaceOf(pluginId7) {
-  const dot = pluginId7.indexOf(".");
-  if (dot <= 0 || dot === pluginId7.length - 1 || !IDENTIFIER_PATTERN.test(pluginId7)) return null;
-  return `${pluginId7.slice(0, dot)}.asset.${pluginId7.slice(dot + 1)}-`;
+function assetPackNamespaceOf(pluginId8) {
+  const dot = pluginId8.indexOf(".");
+  if (dot <= 0 || dot === pluginId8.length - 1 || !IDENTIFIER_PATTERN.test(pluginId8)) return null;
+  return `${pluginId8.slice(0, dot)}.asset.${pluginId8.slice(dot + 1)}-`;
 }
-function isAssetPackPrefixOf(pluginId7, prefix) {
-  const namespace = assetPackNamespaceOf(pluginId7);
+function isAssetPackPrefixOf(pluginId8, prefix) {
+  const namespace = assetPackNamespaceOf(pluginId8);
   return namespace !== null && prefix.length <= 90 && NAMESPACE_PATTERN.test(prefix) && prefix.startsWith(namespace);
 }
+
+// packages/plugin-sdk/src/hostDataContracts.ts
+var pluginId4 = external_exports.string().regex(/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/).max(96);
+var identifier = external_exports.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/);
+var cursor = external_exports.string().min(1).max(512);
+var generation = external_exports.string().min(1).max(96);
+var permission = external_exports.string().min(1).max(96);
+var PLUGIN_HOST_DATA_CAPABILITIES = Object.freeze({
+  workRecords: "teamuq.work-records@1",
+  agentDirectory: "teamuq.agent-directory@1",
+  projectDirectory: "teamuq.project-directory@1",
+  pluginState: "teamuq.plugin-state@1"
+});
+var PLUGIN_HOST_DATA_API = "teamuq.host-data";
+var PLUGIN_HOST_DATA_API_VERSION = "1.0.0";
+var PLUGIN_HOST_DATA_PERMISSIONS = Object.freeze({
+  workRecords: "work-records:read",
+  agentDirectory: "agent-directory:read",
+  projectDirectory: "project-directory:read",
+  pluginStateRead: "plugin-state:read",
+  pluginStateWrite: "plugin-state:write"
+});
+var PLUGIN_HOST_DATA_LIMITS = Object.freeze({
+  pageSize: 100,
+  payloadBytes: 256 * 1024,
+  stateValueBytes: 32 * 1024,
+  stateBatchBytes: 256 * 1024
+});
+var PLUGIN_HOST_DATA_METHODS = Object.freeze({
+  workRecords: Object.freeze({ openSnapshot: "openSettledSnapshot", readPage: "readSettledPage" }),
+  agentDirectory: Object.freeze({ openSnapshot: "openSnapshot", readPage: "readPage" }),
+  projectDirectory: Object.freeze({ openSnapshot: "openSnapshot", readPage: "readPage" }),
+  pluginState: Object.freeze({ readPage: "readPage", writeBatch: "writeBatch", deleteBatch: "deleteBatch" })
+});
+var PluginHostDataRequestV1Schema = external_exports.object({
+  protocolVersion: external_exports.literal(1),
+  requestId: external_exports.string().min(1).max(64),
+  kind: external_exports.literal("capability-call"),
+  pluginId: pluginId4,
+  capabilityId: external_exports.enum([
+    PLUGIN_HOST_DATA_CAPABILITIES.workRecords,
+    PLUGIN_HOST_DATA_CAPABILITIES.agentDirectory,
+    PLUGIN_HOST_DATA_CAPABILITIES.projectDirectory,
+    PLUGIN_HOST_DATA_CAPABILITIES.pluginState
+  ]),
+  method: external_exports.string().min(1).max(64).regex(/^[A-Za-z0-9._@-]+$/),
+  args: external_exports.array(external_exports.unknown()).max(8)
+}).strict();
+var PluginHostDataPermissionsV1Schema = external_exports.array(permission).max(64);
+var PluginDataPageRequestV1Schema = external_exports.object({
+  snapshotId: identifier,
+  cursor: cursor.nullable(),
+  limit: external_exports.number().int().min(1).max(100)
+}).strict();
+var PluginHostSnapshotV1Schema = external_exports.object({
+  snapshotId: identifier,
+  generation,
+  highWatermark: external_exports.string().max(40).nullable()
+}).strict();
+var PluginHostWorkRecordV1Schema = external_exports.object({
+  id: identifier,
+  agentId: identifier,
+  projectId: identifier.nullable(),
+  sessionId: identifier.nullable(),
+  providerId: identifier.nullable(),
+  punchId: identifier,
+  punchType: external_exports.enum(["main", "subagent"]),
+  startedAtMs: external_exports.number().int().nonnegative(),
+  endedAtMs: external_exports.number().int().nonnegative(),
+  model: external_exports.string().max(256).nullable(),
+  name: external_exports.string().max(32768).nullable(),
+  description: external_exports.string().max(32768).nullable()
+}).strict();
+var PluginHostWorkRecordPageV1Schema = external_exports.object({
+  snapshot: PluginHostSnapshotV1Schema,
+  records: external_exports.array(PluginHostWorkRecordV1Schema).max(100),
+  nextCursor: cursor.nullable()
+}).strict();
+var PluginHostAgentV1Schema = external_exports.object({
+  id: identifier,
+  name: external_exports.string().max(512),
+  teamKey: external_exports.string().max(128),
+  teamName: external_exports.string().max(512).nullable(),
+  title: external_exports.string().max(512),
+  enabled: external_exports.boolean()
+}).strict();
+var PluginHostProjectV1Schema = external_exports.object({
+  id: identifier,
+  name: external_exports.string().max(512),
+  archived: external_exports.boolean()
+}).strict();
+var PluginHostDirectoryPageV1Schema = external_exports.object({
+  snapshot: PluginHostSnapshotV1Schema,
+  entries: external_exports.array(external_exports.union([PluginHostAgentV1Schema, PluginHostProjectV1Schema])).max(100),
+  nextCursor: cursor.nullable()
+}).strict();
+var PluginHostAgentPageV1Schema = external_exports.object({
+  snapshot: PluginHostSnapshotV1Schema,
+  entries: external_exports.array(PluginHostAgentV1Schema).max(100),
+  nextCursor: cursor.nullable()
+}).strict();
+var PluginHostProjectPageV1Schema = external_exports.object({
+  snapshot: PluginHostSnapshotV1Schema,
+  entries: external_exports.array(PluginHostProjectV1Schema).max(100),
+  nextCursor: cursor.nullable()
+}).strict();
+var PluginStateRecordV1Schema = external_exports.object({
+  key: identifier,
+  value: external_exports.unknown(),
+  sourceKind: external_exports.string().regex(/^[a-z][a-z0-9-]{0,31}$/).nullable().optional(),
+  sourceId: identifier.nullable().optional(),
+  revision: external_exports.number().int().nonnegative()
+}).strict();
+var PluginStateWriteRecordV1Schema = external_exports.object({
+  key: identifier,
+  value: external_exports.unknown(),
+  sourceKind: external_exports.string().regex(/^[a-z][a-z0-9-]{0,31}$/).nullable().optional(),
+  sourceId: identifier.nullable().optional(),
+  expectedRevision: external_exports.number().int().nonnegative().nullable().optional()
+}).strict();
+var PluginStateReadPageV1Schema = external_exports.object({
+  records: external_exports.array(PluginStateRecordV1Schema).max(100),
+  nextCursor: cursor.nullable()
+}).strict();
+var PluginStateBatchV1Schema = external_exports.object({
+  namespace: identifier,
+  records: external_exports.array(PluginStateWriteRecordV1Schema).min(1).max(100)
+}).strict().refine((batch) => new Set(batch.records.map((record) => record.key)).size === batch.records.length);
+var PluginStateDeleteBatchV1Schema = external_exports.object({
+  namespace: identifier,
+  keys: external_exports.array(identifier).min(1).max(100)
+}).strict().refine((batch) => new Set(batch.keys).size === batch.keys.length);
+var PluginStateBatchResultV1Schema = external_exports.object({
+  written: external_exports.number().int().nonnegative().max(100),
+  deleted: external_exports.number().int().nonnegative().max(100)
+}).strict();
+var PluginHostWorkChangedEventV1Schema = external_exports.object({
+  protocolVersion: external_exports.literal(1),
+  kind: external_exports.literal("ext-capability-event"),
+  capabilityId: external_exports.literal(PLUGIN_HOST_DATA_CAPABILITIES.workRecords),
+  event: external_exports.literal("settled-changed"),
+  generation,
+  highWatermark: external_exports.string().max(40).nullable()
+}).strict();
+var PluginLegacyDataMigrationV1Schema = external_exports.object({
+  id: identifier,
+  source: external_exports.string().min(1).max(96).regex(/^[a-z0-9][a-z0-9._-]*$/),
+  target: external_exports.string().min(1).max(128).regex(/^[a-z0-9][a-z0-9._/-]*$/)
+}).strict().refine((entry) => !entry.target.split("/").some((part) => part === "." || part === ".."));
 
 // packages/plugin-sdk/src/manifestV2.ts
 var PLUGIN_MANIFEST_V2_SCHEMA_VERSION = 2;
@@ -6157,12 +6308,18 @@ var KNOWN_PLUGIN_PERMISSIONS = Object.freeze([
   "process:spawn",
   "backend:invoke",
   "store:browse",
-  "agent:avatar-read"
+  "agent:avatar-read",
+  "work-records:read",
+  "agent-directory:read",
+  "project-directory:read",
+  "plugin-state:read",
+  "plugin-state:write",
+  "data:legacy-migrate"
 ]);
-var CORE_SUPPORTED_PLUGIN_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data", "assets:plugin-data", "settings:plugin", "secrets:plugin", "asset:pack", "media:microphone", "media:camera", "network:fetch", "ai:chat", "speech:transcribe", "speech:synthesize", "input:text", "native:addons", "backend:invoke", "store:browse", "agent:avatar-read"]);
+var CORE_SUPPORTED_PLUGIN_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data", "assets:plugin-data", "settings:plugin", "secrets:plugin", "asset:pack", "media:microphone", "media:camera", "network:fetch", "ai:chat", "speech:transcribe", "speech:synthesize", "input:text", "native:addons", "backend:invoke", "store:browse", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "plugin-state:write", "data:legacy-migrate"]);
 var BACKEND_UI_ONLY_PERMISSION_PREFIXES = Object.freeze(["ui:", "media:", "assets:", "store:"]);
 var REVOCABLE_PLUGIN_PERMISSION_PREFIXES = Object.freeze(["media:", "network:", "ai:", "input:", "backend:", "store:"]);
-var REVOCABLE_PLUGIN_EXACT_PERMISSIONS = Object.freeze(["agent:avatar-read"]);
+var REVOCABLE_PLUGIN_EXACT_PERMISSIONS = Object.freeze(["agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "plugin-state:write", "data:legacy-migrate"]);
 var CORE_SUPPORTED_PRESENTATIONS = Object.freeze(["tab", "fullpage", "settings"]);
 var CORE_IMPLEMENTED_PLATFORM_IDS = Object.freeze(["win32-x64", "darwin-arm64", "darwin-x64", "linux-x64"]);
 var PLATFORM_ID_PATTERN = /^[a-z0-9]+-[a-z0-9]+$/;
@@ -6176,6 +6333,7 @@ function isSafeRelativePath(value) {
   return value.split("/").every((segment) => segment !== "." && segment !== "..");
 }
 var relativePath = external_exports.string().refine(isSafeRelativePath, { message: "must be a safe relative path" });
+var HostApiSchema = external_exports.object({ id: external_exports.string().min(3).max(64).regex(/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/), range: external_exports.string().regex(RANGE_PATTERN) }).strict();
 var pngPath = relativePath.refine((value) => /\.png$/iu.test(value), { message: "icon must be a .png file" });
 var ViewSchema = external_exports.object({
   id: external_exports.string().regex(IDENTIFIER_PATTERN).max(32),
@@ -6249,6 +6407,7 @@ var PluginManifestV2Schema = external_exports.object({
   description: external_exports.string().max(512).refine(isPlainText, { message: "must be plain text" }).optional(),
   icon: pngPath.optional(),
   pluginApi: external_exports.string().regex(RANGE_PATTERN),
+  hostApis: external_exports.array(HostApiSchema).max(16).default([]),
   minCoreVersion: external_exports.string().regex(RANGE_PATTERN),
   maxCoreVersion: external_exports.string().regex(MAX_CORE_PATTERN).optional(),
   platforms: external_exports.array(PlatformSchema).max(8).default([]),
@@ -6266,14 +6425,15 @@ var PluginManifestV2Schema = external_exports.object({
   permissions: external_exports.array(external_exports.string().regex(PERMISSION_PATTERN)).max(64).default([]),
   network: external_exports.object({ allow: external_exports.array(external_exports.string().url().max(200)).max(32) }).strict().default({ allow: [] }),
   contributes: external_exports.object({ views: external_exports.array(ViewSchema).max(3) }).strict().default({ views: [] }),
-  data: external_exports.object({ uninstall: external_exports.enum(["keep", "delete", "ask"]) }).strict().default({ uninstall: "ask" }),
+  data: external_exports.object({ uninstall: external_exports.enum(["keep", "delete", "ask"]), legacyMigrations: external_exports.array(PluginLegacyDataMigrationV1Schema).max(8).default([]) }).strict().default({ uninstall: "ask", legacyMigrations: [] }),
   provenance: external_exports.object({ upstream: external_exports.string().max(300), upstreamSha256: external_exports.string().regex(/^[0-9a-f]{64}$/), license: external_exports.string().max(64) }).strict().optional()
 }).strict().superRefine((manifest, context) => {
-  const fail = (path9, message) => {
-    context.addIssue({ code: external_exports.ZodIssueCode.custom, path: [path9], message });
+  const fail = (path12, message) => {
+    context.addIssue({ code: external_exports.ZodIssueCode.custom, path: [path12], message });
   };
   for (const [field, values] of [
     ["requiredCapabilities", manifest.requiredCapabilities],
+    ["hostApis", manifest.hostApis.map((entry) => entry.id)],
     ["optionalCapabilities", manifest.optionalCapabilities],
     ["permissions", manifest.permissions],
     ["network", manifest.network.allow],
@@ -6311,7 +6471,7 @@ var PluginManifestV2Schema = external_exports.object({
   if (!composed && manifest.permissions.includes("backend:invoke")) fail("permissions", "backend:invoke requires a composed plugin");
   if (manifest.entry.backend !== void 0 && !BACKEND_ENTRY_PATTERN.test(manifest.entry.backend)) fail("entry", "entry.backend must be an .mjs or .cjs file");
   if (fullTrust) {
-    if (!composed && manifest.permissions.some((permission) => BACKEND_UI_ONLY_PERMISSION_PREFIXES.some((prefix) => permission.startsWith(prefix)))) fail("permissions", "backend-only plugins have no view and cannot request ui, media or assets permissions");
+    if (!composed && manifest.permissions.some((permission2) => BACKEND_UI_ONLY_PERMISSION_PREFIXES.some((prefix) => permission2.startsWith(prefix)))) fail("permissions", "backend-only plugins have no view and cannot request ui, media or assets permissions");
     if (manifest.native !== void 0 && manifest.platforms.length === 0) fail("platforms", "native files require an explicit platforms list");
     if (manifest.native !== void 0 && !unique2(manifest.native.files.map((file) => `${file.platform}:${file.path}`))) fail("native", "native files must not contain duplicates");
     if (manifest.native?.allowAddons === true !== manifest.permissions.includes("native:addons")) fail("permissions", "native.allowAddons and the native:addons permission must be declared together");
@@ -6323,6 +6483,9 @@ var PluginManifestV2Schema = external_exports.object({
   if (settingsViews.length > 1) fail("contributes", "a plugin may contribute only one settings view");
   if (settingsViews.length > 0 && manifest.settingsSchema !== void 0) fail("settingsSchema", "a plugin with a settings view cannot also declare settingsSchema");
   if (manifest.settingsSchema !== void 0 && !manifest.permissions.includes(SETTINGS_SCHEMA_PERMISSION)) fail("permissions", `settingsSchema requires the ${SETTINGS_SCHEMA_PERMISSION} permission`);
+  if (manifest.data.legacyMigrations.length > 0 && !manifest.permissions.includes("data:legacy-migrate")) fail("permissions", "data.legacyMigrations requires data:legacy-migrate");
+  if (manifest.data.legacyMigrations.length > 0 && !fullTrust) fail("trustTier", "data.legacyMigrations requires full-trust");
+  if (!unique2(manifest.data.legacyMigrations.map((entry) => entry.id)) || !unique2(manifest.data.legacyMigrations.map((entry) => entry.source)) || !unique2(manifest.data.legacyMigrations.map((entry) => entry.target))) fail("data", "legacy data migration ids, sources and targets must be unique");
   if (!fullTrust && manifest.provides.length > 0 && manifest.contributes.views.length === settingsViews.length) fail("provides", "a sandboxed provider receives its input in a view, so it must contribute one that is not a settings view");
   for (const prefix of manifest.assetPackPrefixes) {
     if (!isAssetPackPrefixOf(manifest.id, prefix)) fail("assetPackPrefixes", `prefix ${prefix} must start with this plugin's own namespace ${assetPackNamespaceOf(manifest.id) ?? "(none: the plugin id has no publisher part)"}`);
@@ -6362,6 +6525,9 @@ function evaluateManifestSupport(manifest, context) {
   };
   const unsupported = (field, message) => add("unsupported_in_this_core", field, message);
   if (!versionSatisfies(PLUGIN_API_EXTERNAL_VERSION, manifest.pluginApi)) add("plugin_api_incompatible", "pluginApi", manifest.pluginApi);
+  for (const requirement of manifest.hostApis) {
+    if (requirement.id !== PLUGIN_HOST_DATA_API || !versionSatisfies(PLUGIN_HOST_DATA_API_VERSION, requirement.range)) add("unsupported_in_this_core", "hostApis", requirement.id);
+  }
   if (!versionSatisfies(context.coreVersion, manifest.minCoreVersion)) add("core_version_incompatible", "minCoreVersion", manifest.minCoreVersion);
   if (manifest.maxCoreVersion !== void 0 && context.coreVersion.split(".")[0] !== manifest.maxCoreVersion.split(".")[0]) add("core_version_too_new", "maxCoreVersion", manifest.maxCoreVersion);
   if (manifest.trustTier === "full-trust") {
@@ -6382,9 +6548,9 @@ function evaluateManifestSupport(manifest, context) {
     if (!CAPABILITY_GATE_PERMISSIONS.includes(provided.permission)) unsupported("provides", `capability ${provided.capability} is gated by ${provided.permission}, which is not a capability permission of this Core`);
   }
   if (manifest.trustTier === "full-trust" && (manifest.requiredCapabilities.length > 0 || manifest.optionalCapabilities.length > 0)) unsupported("requiredCapabilities", "only a plugin with a view can consume a capability, and a provider cannot depend on other plugins");
-  for (const permission of manifest.permissions) {
-    if (!KNOWN_PLUGIN_PERMISSIONS.includes(permission)) add("permission_unknown", "permissions", permission);
-    else if (!CORE_SUPPORTED_PLUGIN_PERMISSIONS.includes(permission)) unsupported("permissions", `permission ${permission} is not supported by this Core`);
+  for (const permission2 of manifest.permissions) {
+    if (!KNOWN_PLUGIN_PERMISSIONS.includes(permission2)) add("permission_unknown", "permissions", permission2);
+    else if (!CORE_SUPPORTED_PLUGIN_PERMISSIONS.includes(permission2)) unsupported("permissions", `permission ${permission2} is not supported by this Core`);
   }
   if (manifest.platforms.length > 0) {
     const entry = manifest.platforms.find((candidate) => candidate.id === context.platform.id);
@@ -6410,7 +6576,8 @@ var PLUGIN_STORE_ERROR_CODES = Object.freeze([
   "store_disk_insufficient",
   "store_download_failed",
   "store_hash_mismatch",
-  "store_busy"
+  "store_busy",
+  "store_client_outdated"
 ]);
 var PLUGIN_STORE_LIMITS = Object.freeze({
   pageSize: 50,
@@ -6666,6 +6833,24 @@ var PluginCoreEnvelopeSchema = external_exports.discriminatedUnion("ok", [
 ]);
 
 // packages/plugin-sdk/src/surfaceContracts.ts
+var PluginSurfaceInstallRecordV1Schema = external_exports.object({
+  id: external_exports.string().min(3).max(96),
+  version: external_exports.string().min(5).max(32),
+  name: external_exports.string().min(1).max(96),
+  publisher: external_exports.string().min(2).max(48),
+  signer: external_exports.discriminatedUnion("kind", [external_exports.object({ kind: external_exports.literal("teamuq"), keyId: external_exports.string().min(3).max(64) }).strict(), external_exports.object({ kind: external_exports.literal("dev"), keyId: external_exports.string().min(3).max(64), label: external_exports.string().min(1).max(48) }).strict(), external_exports.object({ kind: external_exports.literal("unsigned") }).strict()]),
+  manifestSha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  integritySha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  grants: external_exports.array(external_exports.string().min(3).max(64)).max(64),
+  revoked: external_exports.array(external_exports.string().min(3).max(64)).max(64),
+  enabled: external_exports.boolean(),
+  installedAt: external_exports.string().min(1).max(40),
+  dataUninstall: external_exports.enum(["keep", "delete", "ask"]),
+  assetPacks: external_exports.array(external_exports.object({ id: external_exports.string().min(3).max(96), range: external_exports.string().max(32), required: external_exports.boolean() }).strict()).max(16),
+  assetPackPrefixes: external_exports.array(external_exports.string().min(3).max(90)).max(4),
+  trustTier: external_exports.enum(["sandboxed", "full-trust"]),
+  backend: external_exports.object({ resources: external_exports.object({ memoryMB: external_exports.number().int().positive(), cpuThreads: external_exports.number().int().positive(), maxSessions: external_exports.number().int().positive(), idleUnloadSec: external_exports.number().int().nonnegative(), bootTimeoutSec: external_exports.number().int().positive() }).strict(), allowAddons: external_exports.boolean(), nativeFiles: external_exports.array(external_exports.string().max(200)).max(64) }).strict().nullable()
+}).strict();
 var PLUGIN_SURFACE_CHANNELS = Object.freeze({
   SYNC: "plugin-runtime:surface-sync",
   PRESENTATION_SET: "plugin-runtime:presentation-set",
@@ -6693,7 +6878,7 @@ var PRESENTATION_ERROR_CODES = Object.freeze([
   "presentation_view_unavailable"
 ]);
 var protocolVersion4 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
-var pluginId4 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
+var pluginId5 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
 var viewId = external_exports.string().min(1).max(32).regex(IDENTIFIER_PATTERN);
 var coordinate = external_exports.number().finite().min(-1e5).max(1e5);
 var extent = external_exports.number().finite().min(0).max(1e5);
@@ -6702,7 +6887,7 @@ var PluginRequestedModeSchema = external_exports.enum(["tab", "window", "fullpag
 var PluginSurfaceRectV1Schema = external_exports.object({ x: coordinate, y: coordinate, width: extent, height: extent }).strict();
 var PluginSurfaceSyncRequestV1Schema = external_exports.object({
   protocolVersion: protocolVersion4,
-  pluginId: pluginId4,
+  pluginId: pluginId5,
   viewId,
   active: external_exports.boolean(),
   rect: PluginSurfaceRectV1Schema.nullable(),
@@ -6711,16 +6896,16 @@ var PluginSurfaceSyncRequestV1Schema = external_exports.object({
 }).strict();
 var PluginPresentationSetRequestV1Schema = external_exports.object({
   protocolVersion: protocolVersion4,
-  pluginId: pluginId4,
+  pluginId: pluginId5,
   viewId,
   mode: PluginPresentationModeSchema,
   fullscreen: external_exports.boolean()
 }).strict();
 var PluginSurfaceMaskRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, masked: external_exports.boolean() }).strict();
-var PluginSurfaceTargetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginId4, viewId }).strict();
+var PluginSurfaceTargetRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion4, pluginId: pluginId5, viewId }).strict();
 var PluginCaptureStateSchema = external_exports.object({ microphone: external_exports.boolean(), camera: external_exports.boolean() }).strict();
 var PluginSurfaceStateV1Schema = external_exports.object({
-  pluginId: pluginId4,
+  pluginId: pluginId5,
   viewId,
   mode: PluginPresentationModeSchema,
   fullscreen: external_exports.boolean(),
@@ -6773,12 +6958,12 @@ var PNG_END = [0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130];
 var DATA_URL_PREFIX = "data:image/png;base64,";
 var PLUGIN_ICON_DATA_URL_MAX_CHARS = Math.ceil(PLUGIN_ICON_MAX_BYTES / 3) * 4 + DATA_URL_PREFIX.length;
 var PLUGIN_ICON_DATA_URL_PATTERN = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
-var startsWith = (bytes3, at, expected) => expected.every((value, index) => bytes3[at + index] === value);
-function isPngIcon(bytes3) {
-  if (bytes3.length < 33 + PNG_END.length || bytes3.length > PLUGIN_ICON_MAX_BYTES) return false;
-  if (!startsWith(bytes3, 0, PNG_SIGNATURE) || !startsWith(bytes3, 12, [73, 72, 68, 82]) || !startsWith(bytes3, 8, [0, 0, 0, 13])) return false;
-  if (!startsWith(bytes3, bytes3.length - PNG_END.length, PNG_END)) return false;
-  const view = new DataView(bytes3.buffer, bytes3.byteOffset, bytes3.byteLength);
+var startsWith = (bytes4, at, expected) => expected.every((value, index) => bytes4[at + index] === value);
+function isPngIcon(bytes4) {
+  if (bytes4.length < 33 + PNG_END.length || bytes4.length > PLUGIN_ICON_MAX_BYTES) return false;
+  if (!startsWith(bytes4, 0, PNG_SIGNATURE) || !startsWith(bytes4, 12, [73, 72, 68, 82]) || !startsWith(bytes4, 8, [0, 0, 0, 13])) return false;
+  if (!startsWith(bytes4, bytes4.length - PNG_END.length, PNG_END)) return false;
+  const view = new DataView(bytes4.buffer, bytes4.byteOffset, bytes4.byteLength);
   const width = view.getUint32(16);
   const height = view.getUint32(20);
   return width >= 1 && height >= 1 && width <= PLUGIN_ICON_MAX_EDGE && height <= PLUGIN_ICON_MAX_EDGE;
@@ -6788,8 +6973,6 @@ function isPngIcon(bytes3) {
 var PLUGIN_INSTALL_CHANNELS = Object.freeze({
   LIST: "plugin-install:list",
   BEGIN: "plugin-install:begin",
-  CONFIRM: "plugin-install:confirm",
-  CANCEL: "plugin-install:cancel",
   UNINSTALL: "plugin-install:uninstall",
   IMPORT_DEV_KEY: "plugin-install:import-dev-key",
   REMOVE_DEV_KEY: "plugin-install:remove-dev-key",
@@ -6821,7 +7004,6 @@ var installId = external_exports.string().regex(/^[0-9a-f]{32}$/);
 var keyId = external_exports.string().regex(/^dev-[0-9a-f]{16}$/);
 var PluginInstallListRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5 }).strict();
 var PluginInstallBeginRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5 }).strict();
-var PluginInstallDecisionRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, installId }).strict();
 var PluginUninstallRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, pluginId: external_exports.string().regex(IDENTIFIER_PATTERN), deleteData: external_exports.boolean() }).strict();
 var PluginDevKeyImportRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, publicKey: external_exports.string().min(1).max(4096), label: external_exports.string().min(1).max(48) }).strict();
 var settingValue = external_exports.union([external_exports.boolean(), external_exports.number().finite(), external_exports.string().max(1024)]);
@@ -6866,11 +7048,11 @@ var BackendViewSchema = external_exports.object({
   allowAddons: external_exports.boolean(),
   nativeFiles: external_exports.array(external_exports.string().max(200)).max(64)
 }).strict();
-var SignerViewSchema = external_exports.object({
-  kind: external_exports.enum(["teamuq", "dev"]),
-  keyId: external_exports.string().min(3).max(64),
-  label: external_exports.string().max(48).nullable()
-}).strict();
+var PluginSignerViewV1Schema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("teamuq"), keyId: external_exports.string().min(3).max(64), label: external_exports.null() }).strict(),
+  external_exports.object({ kind: external_exports.literal("dev"), keyId: external_exports.string().min(3).max(64), label: external_exports.string().max(48).nullable() }).strict(),
+  external_exports.object({ kind: external_exports.literal("unsigned"), keyId: external_exports.null(), label: external_exports.null() }).strict()
+]);
 var AssetPackRefViewSchema = external_exports.object({
   id: external_exports.string().max(96),
   range: external_exports.string().max(32),
@@ -6891,7 +7073,7 @@ var InstalledPluginViewV1Schema = external_exports.object({
   name: external_exports.string().max(96),
   version: external_exports.string().max(32),
   publisher: external_exports.string().max(48),
-  signer: SignerViewSchema,
+  signer: PluginSignerViewV1Schema,
   permissions: external_exports.array(external_exports.string().max(64)).max(64),
   revokedPermissions: external_exports.array(external_exports.string().max(64)).max(64).default([]),
   dataUninstall: external_exports.enum(["keep", "delete", "ask"]),
@@ -6916,7 +7098,7 @@ var InstalledAssetPackViewV1Schema = external_exports.object({
   version: external_exports.string().max(32),
   name: external_exports.string().max(96),
   publisher: external_exports.string().max(48),
-  signer: SignerViewSchema,
+  signer: PluginSignerViewV1Schema,
   installedAt: external_exports.string().max(40),
   sizeBytes: external_exports.number().int().nonnegative(),
   fileCount: external_exports.number().int().nonnegative(),
@@ -6936,8 +7118,7 @@ var DevKeyTrustReviewV1Schema = external_exports.object({
   fingerprint: external_exports.string().regex(/^[0-9a-f]{64}$/),
   fileName: external_exports.string().max(200),
   defaultLabel: external_exports.string().min(1).max(48),
-  alreadyTrusted: external_exports.boolean(),
-  forPackage: external_exports.object({ fileName: external_exports.string().max(200) }).strict().nullable()
+  alreadyTrusted: external_exports.boolean()
 }).strict();
 var BundledPluginEntryViewV1Schema = external_exports.object({
   id: pluginIdField,
@@ -6958,8 +7139,7 @@ var PluginInstallListV1Schema = external_exports.object({
   devKeys: external_exports.array(DevKeyViewV1Schema)
 }).strict();
 var ReviewPermissionSchema = external_exports.object({ permission: external_exports.string().max(64), description: external_exports.string().max(200) }).strict();
-var PluginInstallReviewV1Schema = external_exports.object({
-  installId,
+var PluginInstalledSummaryV1Schema = external_exports.object({
   kind: external_exports.enum(["plugin", "asset-pack"]).default("plugin"),
   sizeBytes: external_exports.number().int().nonnegative().default(0),
   assetPacks: external_exports.array(external_exports.object({ id: external_exports.string().max(96), range: external_exports.string().max(32), required: external_exports.boolean(), installed: external_exports.boolean() }).strict()).max(16).default([]),
@@ -6969,7 +7149,7 @@ var PluginInstallReviewV1Schema = external_exports.object({
   version: external_exports.string().max(32),
   publisher: external_exports.string().max(48),
   description: external_exports.string().max(512).nullable(),
-  signer: SignerViewSchema,
+  signer: PluginSignerViewV1Schema,
   permissions: external_exports.array(ReviewPermissionSchema).max(64),
   updateFrom: external_exports.object({ id: external_exports.string().regex(IDENTIFIER_PATTERN), version: external_exports.string().max(32) }).strict().nullable().default(null),
   addedPermissions: external_exports.array(ReviewPermissionSchema).max(64).default([]),
@@ -6990,8 +7170,7 @@ var PluginAssetPackRedirectV1Schema = external_exports.object({
 var PluginInstallBeginResultV1Schema = external_exports.discriminatedUnion("status", [
   PluginAssetPackRedirectV1Schema,
   external_exports.object({ status: external_exports.literal("cancelled") }).strict(),
-  external_exports.object({ status: external_exports.literal("review"), review: PluginInstallReviewV1Schema }).strict(),
-  external_exports.object({ status: external_exports.literal("dev_key_required"), keyId, fileName: external_exports.string().max(200), foreign: external_exports.boolean() }).strict()
+  external_exports.object({ status: external_exports.literal("installed"), installed: PluginInstalledSummaryV1Schema, list: PluginInstallListV1Schema }).strict()
 ]);
 var PluginDevKeyPickResultV1Schema = external_exports.discriminatedUnion("status", [
   external_exports.object({ status: external_exports.literal("cancelled") }).strict(),
@@ -6999,7 +7178,7 @@ var PluginDevKeyPickResultV1Schema = external_exports.discriminatedUnion("status
 ]);
 var PluginDevKeyDecideResultV1Schema = external_exports.discriminatedUnion("status", [
   external_exports.object({ status: external_exports.literal("declined") }).strict(),
-  external_exports.object({ status: external_exports.literal("trusted"), keyId, next: PluginInstallBeginResultV1Schema.nullable(), continueError: external_exports.string().max(96).nullable() }).strict()
+  external_exports.object({ status: external_exports.literal("trusted"), keyId }).strict()
 ]);
 var PluginBundledRestoreResultV1Schema = external_exports.object({ pluginId: pluginIdField, status: external_exports.literal("consented") }).strict();
 var PluginStoreCatalogRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion5, refresh: external_exports.boolean() }).strict();
@@ -7169,20 +7348,21 @@ var EXTERNAL_HOST_PROTOCOL_VERSION = 1;
 var EXTERNAL_HOST_MAX_RESULT_BYTES = 64 * 1024;
 var protocolVersion6 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
 var hostVersion = external_exports.literal(EXTERNAL_HOST_PROTOCOL_VERSION);
-var pluginId5 = external_exports.string().regex(IDENTIFIER_PATTERN);
+var pluginId6 = external_exports.string().regex(IDENTIFIER_PATTERN);
 var methodName = external_exports.string().min(1).max(64).regex(/^[A-Za-z0-9._@-]+$/);
 var errorCode = external_exports.string().min(3).max(96).regex(/^[a-z0-9_]+$/);
 var settingValues = external_exports.record(external_exports.string().regex(/^[A-Za-z0-9._-]{1,64}$/), external_exports.union([external_exports.boolean(), external_exports.number().finite(), external_exports.string().max(1024)])).refine((values) => Object.keys(values).length <= 16);
 var ExternalSettingsMessageSchema = external_exports.object({ protocolVersion: hostVersion, kind: external_exports.literal("ext-settings"), values: settingValues }).strict();
 var ExternalHostInitSchema = external_exports.object({
   version: hostVersion,
-  pluginId: pluginId5,
+  pluginId: pluginId6,
   installDir: external_exports.string().min(1).max(1024),
   dataDir: external_exports.string().min(1).max(1024),
   entry: external_exports.string().min(1).max(1024),
   assetPacks: external_exports.record(external_exports.string().min(1).max(96), external_exports.string().min(1).max(1024)),
   allowAddons: external_exports.boolean(),
   corePackaged: external_exports.boolean(),
+  grantedPermissions: external_exports.array(external_exports.string().min(1).max(96)).max(64).default([]),
   heartbeatMs: external_exports.number().int().min(50).max(3e4).optional(),
   settings: settingValues.optional()
 }).strict();
@@ -7216,7 +7396,7 @@ var ExternalResultMessageSchema = external_exports.discriminatedUnion("ok", [
 var BACKEND_STATES = ["idle", "starting", "running", "stopping", "failed"];
 var BACKEND_STOP_REASONS = ["idle", "memory_exceeded", "disabled", "crashed", "shutdown", "uninstalled", "hung"];
 var PluginBackendStatusV1Schema = external_exports.object({
-  pluginId: pluginId5,
+  pluginId: pluginId6,
   state: external_exports.enum(BACKEND_STATES),
   pid: external_exports.number().int().nonnegative().nullable(),
   startedAt: external_exports.string().max(40).nullable(),
@@ -7240,7 +7420,7 @@ var PluginBackendStatusListV1Schema = external_exports.object({
   backends: external_exports.array(PluginBackendStatusV1Schema).max(256)
 }).strict();
 var PluginBackendProbeResultV1Schema = external_exports.object({
-  pluginId: pluginId5,
+  pluginId: pluginId6,
   coldStart: external_exports.boolean(),
   totalMs: external_exports.number().nonnegative(),
   core: external_exports.unknown(),
@@ -7251,7 +7431,7 @@ var PluginBackendProbeResultV1Schema = external_exports.object({
   status: PluginBackendStatusV1Schema
 }).strict();
 var PluginBackendStatusRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion6 }).strict();
-var PluginBackendProbeRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion6, pluginId: pluginId5 }).strict();
+var PluginBackendProbeRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion6, pluginId: pluginId6 }).strict();
 var envelope2 = (value) => external_exports.discriminatedUnion("ok", [
   external_exports.object({ protocolVersion: protocolVersion6, ok: external_exports.literal(true), value }).strict(),
   external_exports.object({ protocolVersion: protocolVersion6, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
@@ -7293,7 +7473,7 @@ var VOICE_INPUT_REASONS = Object.freeze([
 ]);
 var PLUGIN_VOICE_ERRORS = Object.freeze(["plugin_not_active", "not_input_target", "pause_limited", "request_invalid", "unavailable"]);
 var protocolVersion7 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
-var pluginId6 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
+var pluginId7 = external_exports.string().min(3).max(96).regex(IDENTIFIER_PATTERN);
 var pauseReason = external_exports.string().max(VOICE_INPUT_LIMITS.pauseReasonChars);
 var count = external_exports.number().int().min(0);
 var VoiceInputStateV1Schema = external_exports.object({
@@ -7303,9 +7483,9 @@ var VoiceInputStateV1Schema = external_exports.object({
   capturing: external_exports.boolean(),
   available: external_exports.boolean(),
   reason: external_exports.enum(VOICE_INPUT_REASONS).nullable(),
-  recognizer: external_exports.object({ id: pluginId6, name: external_exports.string().max(96), version: external_exports.string().max(32), signer: external_exports.enum(["teamuq", "dev"]) }).strict().nullable(),
-  target: external_exports.object({ id: pluginId6, name: external_exports.string().max(96) }).strict().nullable(),
-  pause: external_exports.object({ by: pluginId6, name: external_exports.string().max(96), reason: pauseReason, remainingMs: count }).strict().nullable(),
+  recognizer: external_exports.object({ id: pluginId7, name: external_exports.string().max(96), version: external_exports.string().max(32), signer: external_exports.enum(PLUGIN_SIGNER_KINDS) }).strict().nullable(),
+  target: external_exports.object({ id: pluginId7, name: external_exports.string().max(96) }).strict().nullable(),
+  pause: external_exports.object({ by: pluginId7, name: external_exports.string().max(96), reason: pauseReason, remainingMs: count }).strict().nullable(),
   lastDeliveryError: external_exports.string().max(96).nullable(),
   stats: external_exports.object({ chunksSent: count, chunksDroppedPaused: count, finals: count, delivered: count }).strict()
 }).strict();
@@ -7386,14 +7566,14 @@ function normalizeKeyFingerprint(input) {
 }
 function deriveKeyIdentity(fingerprint) {
   const normalized = normalizeKeyFingerprint(fingerprint);
-  const bytes3 = Array.from({ length: 32 }, (_, index) => Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16));
+  const bytes4 = Array.from({ length: 32 }, (_, index) => Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16));
   const symbols = [];
   for (let index = 0; index < 8; index += 1) {
     const bitOffset = index * 5;
-    const window = (bytes3[bitOffset >> 3] << 8 | (bytes3[(bitOffset >> 3) + 1] ?? 0)) >> 11 - (bitOffset & 7);
+    const window = (bytes4[bitOffset >> 3] << 8 | (bytes4[(bitOffset >> 3) + 1] ?? 0)) >> 11 - (bitOffset & 7);
     symbols.push(SHORT_CODE_ALPHABET[window & 31]);
   }
-  const grid = bytes3[5] << 8 | bytes3[6];
+  const grid = bytes4[5] << 8 | bytes4[6];
   const cells = new Array(GRID_SIZE * GRID_SIZE).fill(false);
   for (let row = 0; row < GRID_SIZE; row += 1) {
     for (let column = 0; column < FREE_COLUMNS; column += 1) {
@@ -7403,7 +7583,7 @@ function deriveKeyIdentity(fingerprint) {
     }
   }
   if (!cells.includes(true)) cells[2 * GRID_SIZE + 2] = true;
-  return { fingerprint: normalized, shortCode: `${symbols.slice(0, 4).join("")}-${symbols.slice(4).join("")}`, hue: Math.floor(bytes3[7] * 360 / 256), cells };
+  return { fingerprint: normalized, shortCode: `${symbols.slice(0, 4).join("")}-${symbols.slice(4).join("")}`, hue: Math.floor(bytes4[7] * 360 / 256), cells };
 }
 function renderKeyIdentityText(identity) {
   const lines = [];
@@ -7414,6 +7594,93 @@ function renderKeyIdentityText(identity) {
   }
   return lines.join("\n");
 }
+
+// packages/plugin-sdk/src/kitContracts.ts
+var PLUGIN_KIT_CHANNELS = Object.freeze({
+  LIST: "plugin-install:kit-list",
+  REVIEW: "plugin-install:kit-review",
+  INSTALL: "plugin-install:kit-install",
+  CANCEL: "plugin-install:kit-cancel",
+  PROGRESS: "plugin-install:kit-progress"
+});
+var PLUGIN_KIT_ITEM_STATES = ["not_installed", "installed", "installed_older", "file_missing", "file_size_mismatch"];
+var PLUGIN_KIT_STATES = ["unavailable", "not_installed", "partial", "installed"];
+var PLUGIN_KIT_PROGRESS_STAGES = ["checking", "installing", "enabling", "rolling_back", "done", "failed"];
+var protocolVersion8 = external_exports.literal(PLUGIN_RUNTIME_PROTOCOL_VERSION);
+var kitId = external_exports.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(48);
+var consentId = external_exports.string().regex(/^[0-9a-f]{32}$/);
+var itemId = external_exports.string().regex(IDENTIFIER_PATTERN).max(96);
+var itemKind = external_exports.enum(["plugin", "asset-pack"]);
+var bytes3 = external_exports.number().int().nonnegative();
+var PluginKitListRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion8 }).strict();
+var PluginKitReviewRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion8, kitId }).strict();
+var PluginKitDecisionRequestV1Schema = external_exports.object({ protocolVersion: protocolVersion8, consentId }).strict();
+var KitItemViewSchema = external_exports.object({
+  id: itemId,
+  version: external_exports.string().max(32),
+  kind: itemKind,
+  sizeBytes: bytes3,
+  state: external_exports.enum(PLUGIN_KIT_ITEM_STATES),
+  installedVersion: external_exports.string().max(32).nullable()
+}).strict();
+var PluginKitViewV1Schema = external_exports.object({
+  kitId,
+  title: external_exports.string().min(1).max(60),
+  state: external_exports.enum(PLUGIN_KIT_STATES),
+  totalBytes: bytes3,
+  items: external_exports.array(KitItemViewSchema).max(8)
+}).strict();
+var PluginKitListV1Schema = external_exports.object({
+  index: external_exports.enum(["ok", "missing", "invalid"]),
+  kits: external_exports.array(PluginKitViewV1Schema).max(8)
+}).strict();
+var ConsentPluginSchema = PluginInstalledSummaryV1Schema.omit({ kind: true, fileName: true });
+var PluginKitConsentV1Schema = external_exports.object({
+  consentId,
+  kitId,
+  title: external_exports.string().min(1).max(60),
+  plugins: external_exports.array(ConsentPluginSchema).max(8),
+  assetPacks: external_exports.array(external_exports.object({ id: itemId, name: external_exports.string().max(96), version: external_exports.string().max(32), publisher: external_exports.string().max(48), sizeBytes: bytes3 }).strict()).max(8),
+  skipped: external_exports.array(external_exports.object({ id: itemId, name: external_exports.string().max(96), kind: itemKind, reason: external_exports.literal("already_installed") }).strict()).max(8),
+  riskNotices: external_exports.array(external_exports.enum(PLUGIN_RISK_NOTICES)).max(8),
+  networkOrigins: external_exports.array(external_exports.string().max(200)).max(32),
+  diskBytesNeeded: bytes3,
+  expiresInSec: external_exports.number().int().positive()
+}).strict();
+var PluginKitFailureV1Schema = external_exports.object({
+  code: external_exports.string().min(3).max(96),
+  message: external_exports.string().min(1).max(400),
+  itemId: itemId.nullable(),
+  rolledBack: external_exports.boolean(),
+  leftover: external_exports.array(itemId).max(8)
+}).strict();
+var PluginKitReviewResultV1Schema = external_exports.discriminatedUnion("status", [
+  external_exports.object({ status: external_exports.literal("ready"), consent: PluginKitConsentV1Schema }).strict(),
+  external_exports.object({ status: external_exports.literal("nothing_to_install"), kitId }).strict(),
+  external_exports.object({ status: external_exports.literal("failed"), kitId, failure: PluginKitFailureV1Schema }).strict()
+]);
+var PluginKitInstallResultV1Schema = external_exports.discriminatedUnion("status", [
+  external_exports.object({ status: external_exports.literal("installed"), kitId, installed: external_exports.array(itemId).max(8), skipped: external_exports.array(itemId).max(8) }).strict(),
+  external_exports.object({ status: external_exports.literal("failed"), kitId, failure: PluginKitFailureV1Schema }).strict()
+]);
+var PluginKitProgressEventV1Schema = external_exports.object({
+  kitId,
+  stage: external_exports.enum(PLUGIN_KIT_PROGRESS_STAGES),
+  itemId: itemId.nullable(),
+  itemName: external_exports.string().max(96).nullable(),
+  itemIndex: external_exports.number().int().nonnegative(),
+  itemCount: external_exports.number().int().nonnegative(),
+  bytesDone: bytes3,
+  bytesTotal: bytes3
+}).strict();
+var envelope3 = (value) => external_exports.discriminatedUnion("ok", [
+  external_exports.object({ protocolVersion: protocolVersion8, ok: external_exports.literal(true), value }).strict(),
+  external_exports.object({ protocolVersion: protocolVersion8, ok: external_exports.literal(false), error: PluginRuntimeErrorV1Schema }).strict()
+]);
+var PluginKitListEnvelopeV1Schema = envelope3(PluginKitListV1Schema);
+var PluginKitReviewEnvelopeV1Schema = envelope3(PluginKitReviewResultV1Schema);
+var PluginKitInstallEnvelopeV1Schema = envelope3(PluginKitInstallResultV1Schema);
+var PluginKitCancelEnvelopeV1Schema = envelope3(external_exports.object({ done: external_exports.literal(true) }).strict());
 
 // packages/platform/plugin-artifact/src/errors.ts
 var ArtifactError = class extends Error {
@@ -7553,7 +7820,7 @@ function hasNativeMagic(head) {
   const word = (head[0] << 24 | head[1] << 16 | head[2] << 8 | head[3]) >>> 0;
   return word === 2135247942 || word === 4277009102 || word === 4277009103 || word === 3472551422 || word === 3489328638 || word === 3405691582 || word === 3199925962;
 }
-var foldKey = (path9) => path9.normalize("NFKC").toUpperCase().toLowerCase();
+var foldKey = (path12) => path12.normalize("NFKC").toUpperCase().toLowerCase();
 function createNameRegistry() {
   const files = /* @__PURE__ */ new Set();
   const directories = /* @__PURE__ */ new Set();
@@ -7587,9 +7854,11 @@ function createNameRegistry() {
 var MANIFEST_FILE = "manifest.json";
 var INTEGRITY_FILE = "integrity.json";
 var SIGNATURE_FILE = "signature.json";
+var DELEGATION_FILE = "delegation.json";
 var MAX_MANIFEST_BYTES = 256 * 1024;
 var MAX_INTEGRITY_BYTES = 1024 * 1024;
 var MAX_SIGNATURE_BYTES = 4 * 1024;
+var MAX_DELEGATION_BYTES = 8 * 1024;
 var IntegrityFileSchema = external_exports.object({
   algorithm: external_exports.literal("sha256"),
   files: external_exports.array(external_exports.object({
@@ -7600,10 +7869,10 @@ var IntegrityFileSchema = external_exports.object({
     platform: external_exports.string().regex(/^[a-z0-9]+-[a-z0-9]+$/).nullable()
   }).strict()).max(5e3)
 }).strict();
-function parseIntegrity(bytes3) {
+function parseIntegrity(bytes4) {
   let parsed;
   try {
-    parsed = IntegrityFileSchema.parse(JSON.parse(bytes3.toString("utf8")));
+    parsed = IntegrityFileSchema.parse(JSON.parse(bytes4.toString("utf8")));
   } catch {
     throw new ArtifactError("integrity_invalid", "integrity.json is not valid");
   }
@@ -7612,7 +7881,7 @@ function parseIntegrity(bytes3) {
   for (const entry of parsed.files) {
     auditEntryName(entry.path);
     if (entry.path.endsWith("/")) throw new ArtifactError("integrity_invalid", `directory listed: ${entry.path}`);
-    if (entry.path === SIGNATURE_FILE || entry.path === INTEGRITY_FILE) throw new ArtifactError("integrity_invalid", `${entry.path} must not be listed`);
+    if (entry.path === SIGNATURE_FILE || entry.path === INTEGRITY_FILE || entry.path === DELEGATION_FILE) throw new ArtifactError("integrity_invalid", `${entry.path} must not be listed`);
     if (seen.has(entry.path)) throw new ArtifactError("integrity_invalid", `duplicate path: ${entry.path}`);
     if (previous !== "" && entry.path < previous) throw new ArtifactError("integrity_invalid", "files are not sorted by path");
     seen.add(entry.path);
@@ -7621,14 +7890,14 @@ function parseIntegrity(bytes3) {
   if (!seen.has(MANIFEST_FILE)) throw new ArtifactError("integrity_invalid", "manifest.json is not listed");
   return parsed;
 }
-function assertCoverage(integrity, entries) {
+function assertCoverage(integrity, entries, options2 = {}) {
   const files = new Map(entries.filter((entry) => !entry.isDirectory).map((entry) => [entry.name, entry]));
-  for (const required of [MANIFEST_FILE, INTEGRITY_FILE, SIGNATURE_FILE]) {
-    if (!files.has(required)) throw new ArtifactError(required === MANIFEST_FILE ? "manifest_missing" : required === INTEGRITY_FILE ? "integrity_missing" : "signature_missing");
+  for (const required of [MANIFEST_FILE, INTEGRITY_FILE]) {
+    if (!files.has(required)) throw new ArtifactError(required === MANIFEST_FILE ? "manifest_missing" : "integrity_missing");
   }
   const listed = new Map(integrity.files.map((entry) => [entry.path, entry]));
   for (const name of files.keys()) {
-    if (name === INTEGRITY_FILE || name === SIGNATURE_FILE) continue;
+    if (name === INTEGRITY_FILE || name === SIGNATURE_FILE || name === DELEGATION_FILE && options2.delegationFile === "allow") continue;
     if (!listed.has(name)) throw new ArtifactError("integrity_unlisted_file", name);
   }
   for (const entry of integrity.files) {
@@ -7661,13 +7930,362 @@ function auditNativeContent(integrity, manifest) {
     if (entry.kind !== "native" || !library) throw new ArtifactError("native_not_whitelisted", `${entry.path} must be a native library listed with kind native`);
     if (entry.platform === null || entry.platform !== declared.get(entry.path)) throw new ArtifactError("native_platform_mismatch", entry.path);
   }
-  for (const path9 of declared.keys()) if (!listed.has(path9)) throw new ArtifactError("integrity_missing_file", path9);
-  const hasAddon = [...declared.keys()].some((path9) => path9.toLowerCase().endsWith(".node"));
+  for (const path12 of declared.keys()) if (!listed.has(path12)) throw new ArtifactError("integrity_missing_file", path12);
+  const hasAddon = [...declared.keys()].some((path12) => path12.toLowerCase().endsWith(".node"));
   if (hasAddon !== (manifest.native?.allowAddons === true)) throw new ArtifactError("native_addons_mismatch", hasAddon ? "a .node file needs native.allowAddons" : "native.allowAddons without a .node file");
   const backend = manifest.entry.backend;
   const backendEntry = backend === void 0 ? void 0 : listed.get(backend);
   if (backendEntry === void 0 || backendEntry.kind !== "code" || backendEntry.platform !== null) throw new ArtifactError("backend_entry_invalid", backend ?? "missing");
   return { files: declared, hasAddon };
+}
+
+// packages/platform/plugin-artifact/src/trust/signature.ts
+import { createHash, createPublicKey as createPublicKey2, verify as verify2 } from "node:crypto";
+
+// packages/platform/plugin-artifact/src/trust/delegation.ts
+import { createPublicKey, verify } from "node:crypto";
+var RELEASE_KEY_PREFIX = "teamuq-release-";
+var MAX_DELEGATION_LIFETIME_MS = 400 * 24 * 60 * 60 * 1e3;
+var DELEGATION_CLOCK_SKEW_MS = 24 * 60 * 60 * 1e3;
+var DELEGATION_DOMAIN_PREFIX = Buffer.from("TeamUQ-Release-Delegation-v1\0", "utf8");
+var SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+var RAW_KEY_BYTES = 32;
+var SIGNATURE_BYTES = 64;
+var MAX_ENTRIES = 64;
+var MAX_STRING = 200;
+var base64 = (max) => external_exports.string().min(1).max(max).regex(/^[A-Za-z0-9+/]+={0,2}$/);
+var timestamp = external_exports.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+var identifier2 = external_exports.string().min(3).max(96).regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/);
+var text = external_exports.string().min(1).max(MAX_STRING);
+var list = (item) => external_exports.array(item).max(MAX_ENTRIES).default([]);
+var OuterSchema = external_exports.object({
+  format: external_exports.literal(1),
+  issuerKeyId: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{2,62}$/),
+  cert: base64(8192),
+  signature: base64(200)
+}).strict();
+var CertificateSchema = external_exports.object({
+  schema: external_exports.literal(1),
+  serial: external_exports.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  issuer: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{2,62}$/),
+  release: external_exports.object({
+    keyId: external_exports.string().regex(/^teamuq-release-[a-z0-9][a-z0-9-]{0,46}$/),
+    algorithm: external_exports.literal("ed25519"),
+    publicKey: base64(64)
+  }).strict(),
+  notBefore: timestamp,
+  notAfter: timestamp,
+  scope: external_exports.object({
+    plugins: list(external_exports.object({
+      id: identifier2,
+      publisher: text,
+      trustTier: external_exports.enum(["sandboxed", "full-trust"]).default("sandboxed"),
+      native: external_exports.enum(["none", "libraries", "addons"]).default("none"),
+      permissions: list(text),
+      networkAllow: list(text),
+      provides: list(text),
+      assetPackRefs: list(identifier2),
+      assetPackPrefixes: list(text)
+    }).strict()),
+    assetPacks: list(identifier2)
+  }).strict()
+}).strict();
+function delegationSigningInput(certBytes) {
+  return Buffer.concat([DELEGATION_DOMAIN_PREFIX, certBytes]);
+}
+function isReleaseKeyId(keyId2) {
+  return keyId2.startsWith(RELEASE_KEY_PREFIX);
+}
+function invalid2(detail) {
+  throw new ArtifactError("delegation_invalid", detail);
+}
+function decodeBase64(value, label) {
+  const bytes4 = Buffer.from(value, "base64");
+  if (bytes4.toString("base64") !== value) return invalid2(`${label} is not canonical base64`);
+  return bytes4;
+}
+function parseCanonicalJson(bytes4, label, allowTrailingNewline) {
+  let source = bytes4.toString("utf8");
+  if (allowTrailingNewline && source.endsWith("\n")) source = source.slice(0, -1);
+  let value;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    return invalid2(`${label} is not JSON`);
+  }
+  if (JSON.stringify(value) !== source) return invalid2(`${label} is not in canonical compact form`);
+  return value;
+}
+function parseTimestamp(value, label) {
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 19) + "Z" !== value) return invalid2(`${label} is not a valid UTC time`);
+  return ms;
+}
+function assertNoDuplicates(values, label) {
+  if (new Set(values).size !== values.length) invalid2(`${label} has a duplicate entry`);
+}
+function parseCertificate(certBytes) {
+  const value = parseCanonicalJson(certBytes, "certificate", false);
+  const parsed = CertificateSchema.safeParse(value);
+  if (!parsed.success) return invalid2("certificate does not match the schema");
+  const { scope } = parsed.data;
+  assertNoDuplicates(scope.plugins.map((plugin) => plugin.id), "scope.plugins");
+  assertNoDuplicates(scope.assetPacks, "scope.assetPacks");
+  for (const plugin of scope.plugins) {
+    for (const [label, entries] of [["permissions", plugin.permissions], ["networkAllow", plugin.networkAllow], ["provides", plugin.provides], ["assetPackRefs", plugin.assetPackRefs], ["assetPackPrefixes", plugin.assetPackPrefixes]]) assertNoDuplicates(entries, `${plugin.id}.${label}`);
+  }
+  return parsed.data;
+}
+function freezeScope(scope) {
+  return Object.freeze({
+    plugins: Object.freeze(scope.plugins.map((plugin) => Object.freeze({
+      id: plugin.id,
+      publisher: plugin.publisher,
+      trustTier: plugin.trustTier,
+      native: plugin.native,
+      permissions: Object.freeze([...plugin.permissions]),
+      networkAllow: Object.freeze([...plugin.networkAllow]),
+      provides: Object.freeze([...plugin.provides]),
+      assetPackRefs: Object.freeze([...plugin.assetPackRefs]),
+      assetPackPrefixes: Object.freeze([...plugin.assetPackPrefixes])
+    }))),
+    assetPacks: Object.freeze([...scope.assetPacks])
+  });
+}
+function rawToKey(raw) {
+  return createPublicKey({ key: Buffer.concat([SPKI_ED25519_PREFIX, raw]), format: "der", type: "spki" });
+}
+function verifyDelegation(releaseKeyId, anchors, options2) {
+  const { delegationBytes, now } = options2;
+  if (typeof now !== "number" || !Number.isFinite(now)) return invalid2("now is not a finite time");
+  const expiry = options2.expiry === void 0 ? "enforce" : options2.expiry;
+  if (expiry !== "enforce" && expiry !== "ignore") return invalid2("expiry is neither enforce nor ignore");
+  if (delegationBytes === null) throw new ArtifactError("delegation_missing", releaseKeyId);
+  if (delegationBytes.length > MAX_DELEGATION_BYTES) return invalid2("delegation.json is too large");
+  const outerParsed = OuterSchema.safeParse(parseCanonicalJson(delegationBytes, "delegation.json", true));
+  if (!outerParsed.success) return invalid2("delegation.json does not match the schema");
+  const outer = outerParsed.data;
+  const certBytes = decodeBase64(outer.cert, "cert");
+  const rootSignature = decodeBase64(outer.signature, "signature");
+  const cert = parseCertificate(certBytes);
+  const issuer = anchors.rootKeys.find((candidate) => candidate.keyId === outer.issuerKeyId);
+  if (issuer === void 0) return invalid2(`issuer ${outer.issuerKeyId} is not a built-in root key`);
+  if (anchors.revokedKeyIds.includes(issuer.keyId)) throw new ArtifactError("signer_revoked", issuer.keyId);
+  if ((issuer.role ?? "package") !== "package") throw new ArtifactError("signer_role_mismatch", issuer.keyId);
+  const issuerRaw = Buffer.from(issuer.publicKey, "base64");
+  if (rootSignature.length !== SIGNATURE_BYTES || issuerRaw.length !== RAW_KEY_BYTES) return invalid2("unexpected issuer key or signature length");
+  if (!verify(null, delegationSigningInput(certBytes), rawToKey(issuerRaw), rootSignature)) return invalid2("root signature does not verify");
+  if (cert.issuer !== outer.issuerKeyId) return invalid2("cert.issuer differs from issuerKeyId");
+  if (cert.release.keyId !== releaseKeyId) return invalid2("certificate is for another key id");
+  if (anchors.rootKeys.some((candidate) => candidate.keyId === cert.release.keyId)) return invalid2("the release key id is a built-in anchor");
+  const releaseRaw = decodeBase64(cert.release.publicKey, "release.publicKey");
+  if (releaseRaw.length !== RAW_KEY_BYTES) return invalid2("release public key is not 32 bytes");
+  try {
+    rawToKey(releaseRaw);
+  } catch {
+    return invalid2("release public key is not a valid ed25519 key");
+  }
+  const notBefore = parseTimestamp(cert.notBefore, "notBefore");
+  const notAfter = parseTimestamp(cert.notAfter, "notAfter");
+  if (notAfter <= notBefore) return invalid2("notAfter is not after notBefore");
+  if (notAfter - notBefore > MAX_DELEGATION_LIFETIME_MS) return invalid2("certificate lifetime exceeds 400 days");
+  if (notBefore > now + DELEGATION_CLOCK_SKEW_MS) throw new ArtifactError("delegation_not_yet_valid", cert.notBefore);
+  if (expiry === "enforce" && now > notAfter) throw new ArtifactError("delegation_expired", cert.notAfter);
+  return {
+    publicKey: releaseRaw,
+    grant: Object.freeze({ issuer: cert.issuer, serial: cert.serial, notBefore: cert.notBefore, notAfter: cert.notAfter, scope: freezeScope(cert.scope) })
+  };
+}
+
+// packages/platform/plugin-artifact/src/trust/signature.ts
+var TEAMUQ_TRUST_ANCHORS = Object.freeze({
+  rootKeys: Object.freeze([
+    Object.freeze({ keyId: "teamuq-root-2026a", publicKey: "uw/H7oqXWeNFGbN60pr8SRWr2T1Eo8/suCokKWH3kd0=" }),
+    Object.freeze({ keyId: "teamuq-root-2026b", publicKey: "WNhfR7OaRj1WuNcy2bNC2k8NLHGmjUNdxJiBR+6wk9E=" })
+  ]),
+  revokedKeyIds: Object.freeze([]),
+  revokedArtifactSha256: Object.freeze([])
+});
+var DEV_KEY_PREFIX = "dev-";
+var SPKI_ED25519_PREFIX2 = Buffer.from("302a300506032b6570032100", "hex");
+var RAW_KEY_BYTES2 = 32;
+var SIGNATURE_BYTES2 = 64;
+var INTEGRITY_FIRST_BYTE = 123;
+var SignatureFileSchema = external_exports.object({
+  algorithm: external_exports.literal("ed25519"),
+  keyId: external_exports.string().regex(/^(?:dev-[0-9a-f]{16}|[a-z0-9][a-z0-9-]{2,62})$/),
+  signature: external_exports.string().regex(/^[A-Za-z0-9+/]+={0,2}$/).max(200)
+}).strict();
+function rawKeyToObject(raw) {
+  return createPublicKey2({ key: Buffer.concat([SPKI_ED25519_PREFIX2, raw]), format: "der", type: "spki" });
+}
+function devKeyIdOf(raw) {
+  return `${DEV_KEY_PREFIX}${createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
+}
+var PublicKeyFileSchema = external_exports.object({
+  keyId: external_exports.string().optional(),
+  publicKey: external_exports.string().min(1)
+}).strict();
+function parsePublicKeyFile(input) {
+  let json;
+  try {
+    json = JSON.parse(input);
+  } catch {
+    throw new ArtifactError("dev_key_invalid");
+  }
+  const file = PublicKeyFileSchema.safeParse(json);
+  if (!file.success || file.data.publicKey.trim().startsWith("{")) throw new ArtifactError("dev_key_invalid");
+  const raw = parsePublicKeyInput(file.data.publicKey);
+  if (file.data.keyId !== void 0 && file.data.keyId !== devKeyIdOf(raw)) throw new ArtifactError("dev_key_invalid");
+  return raw;
+}
+function parsePublicKeyInput(text2) {
+  const fail = () => {
+    throw new ArtifactError("dev_key_invalid");
+  };
+  const input = text2.trim();
+  if (input.length === 0 || input.length > 4096) return fail();
+  if (input.startsWith("{")) return parsePublicKeyFile(input);
+  let raw;
+  try {
+    if (input.startsWith("-----BEGIN")) {
+      const key2 = createPublicKey2(input);
+      if (key2.asymmetricKeyType !== "ed25519") return fail();
+      const der = key2.export({ type: "spki", format: "der" });
+      raw = Buffer.from(der.subarray(der.length - RAW_KEY_BYTES2));
+    } else if (/^[0-9a-fA-F]{64}$/.test(input)) {
+      raw = Buffer.from(input, "hex");
+    } else {
+      const decoded = Buffer.from(input.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+      if (decoded.length === RAW_KEY_BYTES2) raw = decoded;
+      else if (decoded.length === SPKI_ED25519_PREFIX2.length + RAW_KEY_BYTES2 && decoded.subarray(0, SPKI_ED25519_PREFIX2.length).equals(SPKI_ED25519_PREFIX2)) raw = decoded.subarray(SPKI_ED25519_PREFIX2.length);
+      else return fail();
+    }
+    rawKeyToObject(raw);
+  } catch {
+    return fail();
+  }
+  return raw;
+}
+function parseSignatureFile(signatureBytes) {
+  try {
+    return SignatureFileSchema.parse(JSON.parse(signatureBytes.toString("utf8")));
+  } catch {
+    throw new ArtifactError("signature_invalid", "signature.json is not valid");
+  }
+}
+async function classifyKey(parsed, anchors, lookupDevKey, delegation, integrityBytes) {
+  if (anchors.revokedKeyIds.includes(parsed.keyId)) throw new ArtifactError("signer_revoked", parsed.keyId);
+  if (delegation !== void 0 && integrityBytes[0] !== INTEGRITY_FIRST_BYTE) throw new ArtifactError("integrity_invalid", "integrity.json is not valid");
+  if (parsed.keyId.startsWith(DEV_KEY_PREFIX)) {
+    if (delegation !== void 0 && delegation.delegationBytes !== null) throw new ArtifactError("delegation_invalid", "a development-key package must not carry delegation.json");
+    const found = await lookupDevKey(parsed.keyId);
+    if (found.status !== "trusted") return { status: found.status };
+    return { status: "known", publicKey: found.publicKey, signer: Object.freeze({ kind: "dev", keyId: parsed.keyId, label: found.label }) };
+  }
+  if (isReleaseKeyId(parsed.keyId)) {
+    if (delegation === void 0) throw new ArtifactError("signer_unknown", parsed.keyId);
+    const verified = verifyDelegation(parsed.keyId, anchors, delegation);
+    return { status: "known", publicKey: verified.publicKey.toString("base64"), signer: Object.freeze({ kind: "teamuq", keyId: parsed.keyId, delegation: verified.grant }) };
+  }
+  const root = anchors.rootKeys.find((candidate) => candidate.keyId === parsed.keyId);
+  if (root === void 0) return { status: "unknown" };
+  if ((root.role ?? "package") !== "package") throw new ArtifactError("signer_role_mismatch", parsed.keyId);
+  if (delegation !== void 0 && delegation.delegationBytes !== null) throw new ArtifactError("delegation_invalid", "a root-signed package must not carry delegation.json");
+  return { status: "known", publicKey: root.publicKey, signer: Object.freeze({ kind: "teamuq", keyId: parsed.keyId }) };
+}
+function assertSignatureMatches(parsed, publicKey, integrityBytes) {
+  const signature = Buffer.from(parsed.signature, "base64");
+  const raw = Buffer.from(publicKey, "base64");
+  if (signature.length !== SIGNATURE_BYTES2 || raw.length !== RAW_KEY_BYTES2) throw new ArtifactError("signature_invalid", "unexpected key or signature length");
+  if (!verify2(null, integrityBytes, rawKeyToObject(raw), signature)) throw new ArtifactError("signature_invalid", parsed.keyId);
+}
+async function resolveArtifactSigner(integrityBytes, signatureBytes, anchors, lookupDevKey, delegation) {
+  if (signatureBytes === null) return { signer: Object.freeze({ kind: "unsigned" }), claimedKeyId: null };
+  const parsed = parseSignatureFile(signatureBytes);
+  const classified = await classifyKey(parsed, anchors, lookupDevKey, delegation, integrityBytes);
+  if (classified.status !== "known") return { signer: Object.freeze({ kind: "unsigned" }), claimedKeyId: parsed.keyId };
+  assertSignatureMatches(parsed, classified.publicKey, integrityBytes);
+  return { signer: classified.signer, claimedKeyId: parsed.keyId };
+}
+
+// packages/platform/plugin-artifact/src/trust/recordedSigner.ts
+var SignerRecordSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("teamuq"), keyId: external_exports.string().min(3).max(64) }).strict(),
+  external_exports.object({ kind: external_exports.literal("dev"), keyId: external_exports.string().min(3).max(64), label: external_exports.string().min(1).max(48) }).strict(),
+  external_exports.object({ kind: external_exports.literal("unsigned") }).strict()
+]);
+var ProviderSignerRecordSchema = external_exports.union([
+  external_exports.object({ kind: external_exports.enum(["teamuq", "dev"]), keyId: external_exports.string().min(3).max(64) }).strict(),
+  external_exports.object({ kind: external_exports.literal("unsigned") }).strict()
+]);
+
+// packages/platform/plugin-artifact/src/install/installPersistence.ts
+var InstallRecordSchema = external_exports.object({
+  id: external_exports.string().min(3).max(96),
+  version: external_exports.string().min(5).max(32),
+  name: external_exports.string().min(1).max(96),
+  publisher: external_exports.string().min(2).max(48),
+  signer: SignerRecordSchema,
+  manifestSha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  integritySha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  grants: external_exports.array(external_exports.string().min(3).max(64)).max(64),
+  revoked: external_exports.array(external_exports.string().min(3).max(64)).max(64).default([]),
+  enabled: external_exports.boolean(),
+  installedAt: external_exports.string().min(1).max(40),
+  dataUninstall: external_exports.enum(["keep", "delete", "ask"]),
+  assetPacks: external_exports.array(external_exports.object({ id: external_exports.string().min(3).max(96), range: external_exports.string().max(32), required: external_exports.boolean() }).strict()).max(16).default([]),
+  assetPackPrefixes: external_exports.array(external_exports.string().min(3).max(90)).max(4).default([]),
+  trustTier: external_exports.enum(["sandboxed", "full-trust"]).default("sandboxed"),
+  backend: external_exports.object({ resources: external_exports.object({ memoryMB: external_exports.number().int().positive(), cpuThreads: external_exports.number().int().positive(), maxSessions: external_exports.number().int().positive(), idleUnloadSec: external_exports.number().int().nonnegative(), bootTimeoutSec: external_exports.number().int().positive() }).strict(), allowAddons: external_exports.boolean(), nativeFiles: external_exports.array(external_exports.string().max(200)).max(64) }).strict().nullable().default(null)
+}).strict();
+var InstallFileSchema = external_exports.object({ version: external_exports.literal(1), plugins: external_exports.array(InstallRecordSchema).max(256) }).strict();
+var LegacyRollbackEntrySchema = external_exports.object({ id: external_exports.string().min(3).max(96), pending: external_exports.string().min(5).max(32).nullable(), retained: external_exports.array(InstallRecordSchema).max(2) }).strict();
+var RollbackFileSchema = external_exports.object({ version: external_exports.literal(1), updates: external_exports.array(LegacyRollbackEntrySchema).max(256) }).strict();
+var RollbackEntrySchema = LegacyRollbackEntrySchema.extend({ pendingRecord: InstallRecordSchema.optional() });
+var InstallSnapshotSchema = external_exports.object({ plugins: external_exports.array(InstallRecordSchema).max(256), updates: external_exports.array(RollbackEntrySchema).max(256) }).strict();
+
+// packages/platform/plugin-artifact/src/trust/delegationScope.ts
+var TIER_RANK = { sandboxed: 0, "full-trust": 1 };
+var NATIVE_RANK = { none: 0, libraries: 1, addons: 2 };
+function nativeLevelOf(manifest) {
+  const native = manifest.native;
+  if (native === void 0) return "none";
+  if (native.allowAddons || native.files.some((file) => file.path.toLowerCase().endsWith(".node"))) return "addons";
+  return native.files.length > 0 ? "libraries" : "none";
+}
+function publisherOfId(id) {
+  const dot = id.indexOf(".");
+  return dot <= 0 || dot === id.length - 1 ? null : id.slice(0, dot);
+}
+function delegationNow(now) {
+  const ms = now().getTime();
+  if (!Number.isFinite(ms)) throw new ArtifactError("install_failed", "the clock returned an invalid time");
+  return ms;
+}
+function assertDelegationScope(signer, manifest) {
+  if (signer.kind !== "teamuq" || signer.delegation === void 0) return;
+  const { scope } = signer.delegation;
+  const exceeds = (field, value) => {
+    throw new ArtifactError("delegation_scope_exceeded", `${manifest.id}: ${field}${value === void 0 ? "" : ` ${value}`}`.replace(/[^ -~]/g, "?").slice(0, 200));
+  };
+  if (manifest.kind === "asset-pack") {
+    if (!scope.assetPacks.includes(manifest.id)) return exceeds("assetPacks");
+    const namespace = publisherOfId(manifest.id);
+    if (namespace === null || manifest.publisher !== namespace) return exceeds("publisher", manifest.publisher);
+    return;
+  }
+  const entry = scope.plugins.find((candidate) => candidate.id === manifest.id);
+  if (entry === void 0) return exceeds("id");
+  if (manifest.publisher !== entry.publisher) exceeds("publisher", manifest.publisher);
+  if (TIER_RANK[manifest.trustTier] > TIER_RANK[entry.trustTier]) exceeds("trustTier", manifest.trustTier);
+  const level = nativeLevelOf(manifest);
+  if (NATIVE_RANK[level] > NATIVE_RANK[entry.native]) exceeds("native", level);
+  for (const permission2 of manifest.permissions) if (!entry.permissions.includes(permission2)) exceeds("permissions", permission2);
+  for (const origin of manifest.network.allow) if (!entry.networkAllow.includes(origin)) exceeds("networkAllow", origin);
+  for (const provided of manifest.provides) if (!entry.provides.includes(provided.capability)) exceeds("provides", provided.capability);
+  for (const reference of manifest.assetPacks) if (!entry.assetPackRefs.includes(reference.id)) exceeds("assetPackRefs", reference.id);
+  for (const prefix of manifest.assetPackPrefixes) if (!entry.assetPackPrefixes.includes(prefix)) exceeds("assetPackPrefixes", prefix);
 }
 
 // packages/platform/plugin-artifact/src/stateFile.ts
@@ -7680,15 +8298,15 @@ var LOCK_STALE_MS = 3e4;
 var LOCK_RELEASE_RETRIES = 10;
 var LOCK_RELEASE_RETRY_MS = 20;
 async function readStateFile(file, parse2, empty) {
-  let text;
+  let text2;
   try {
-    text = await fs2.readFile(file, "utf8");
+    text2 = await fs2.readFile(file, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") return empty();
     throw new ArtifactError("store_corrupt", `${path.basename(file)} unreadable`);
   }
   try {
-    return parse2(JSON.parse(text));
+    return parse2(JSON.parse(text2));
   } catch {
     throw new ArtifactError("store_corrupt", `${path.basename(file)} is not valid`);
   }
@@ -7734,99 +8352,13 @@ async function updateStateFile(file, parse2, empty, mutate) {
   }
 }
 
-// packages/platform/plugin-artifact/src/trust/signature.ts
-import { createHash, createPublicKey, verify } from "node:crypto";
-var TEAMUQ_TRUST_ANCHORS = Object.freeze({
-  rootKeys: Object.freeze([
-    Object.freeze({ keyId: "teamuq-root-2026a", publicKey: "uw/H7oqXWeNFGbN60pr8SRWr2T1Eo8/suCokKWH3kd0=" }),
-    Object.freeze({ keyId: "teamuq-root-2026b", publicKey: "WNhfR7OaRj1WuNcy2bNC2k8NLHGmjUNdxJiBR+6wk9E=" })
-  ]),
-  revokedKeyIds: Object.freeze([]),
-  revokedArtifactSha256: Object.freeze([])
-});
-var DEV_KEY_PREFIX = "dev-";
-var SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
-var RAW_KEY_BYTES = 32;
-var SIGNATURE_BYTES = 64;
-var SignatureFileSchema = external_exports.object({
-  algorithm: external_exports.literal("ed25519"),
-  keyId: external_exports.string().regex(/^(?:dev-[0-9a-f]{16}|[a-z0-9][a-z0-9-]{2,62})$/),
-  signature: external_exports.string().regex(/^[A-Za-z0-9+/]+={0,2}$/).max(200)
-}).strict();
-function rawKeyToObject(raw) {
-  return createPublicKey({ key: Buffer.concat([SPKI_ED25519_PREFIX, raw]), format: "der", type: "spki" });
-}
-function devKeyIdOf(raw) {
-  return `${DEV_KEY_PREFIX}${createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
-}
-function parsePublicKeyInput(text) {
-  const fail = () => {
-    throw new ArtifactError("dev_key_invalid");
-  };
-  const input = text.trim();
-  if (input.length === 0 || input.length > 4096) return fail();
-  let raw;
-  try {
-    if (input.startsWith("-----BEGIN")) {
-      const key2 = createPublicKey(input);
-      if (key2.asymmetricKeyType !== "ed25519") return fail();
-      const der = key2.export({ type: "spki", format: "der" });
-      raw = Buffer.from(der.subarray(der.length - RAW_KEY_BYTES));
-    } else if (/^[0-9a-fA-F]{64}$/.test(input)) {
-      raw = Buffer.from(input, "hex");
-    } else {
-      const decoded = Buffer.from(input.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-      if (decoded.length === RAW_KEY_BYTES) raw = decoded;
-      else if (decoded.length === SPKI_ED25519_PREFIX.length + RAW_KEY_BYTES && decoded.subarray(0, SPKI_ED25519_PREFIX.length).equals(SPKI_ED25519_PREFIX)) raw = decoded.subarray(SPKI_ED25519_PREFIX.length);
-      else return fail();
-    }
-    rawKeyToObject(raw);
-  } catch {
-    return fail();
-  }
-  return raw;
-}
-async function verifyIntegritySignature(integrityBytes, signatureBytes, anchors, lookupDevKey) {
-  let parsed;
-  try {
-    parsed = SignatureFileSchema.parse(JSON.parse(signatureBytes.toString("utf8")));
-  } catch {
-    throw new ArtifactError("signature_invalid", "signature.json is not valid");
-  }
-  if (anchors.revokedKeyIds.includes(parsed.keyId)) throw new ArtifactError("signer_revoked", parsed.keyId);
-  let publicKey;
-  let signer;
-  if (parsed.keyId.startsWith(DEV_KEY_PREFIX)) {
-    const found = await lookupDevKey(parsed.keyId);
-    if (found.status === "unknown") throw new ArtifactError("signer_unknown", parsed.keyId);
-    if (found.status === "foreign") throw new ArtifactError("signer_not_trusted_on_this_machine", parsed.keyId);
-    publicKey = found.publicKey;
-    signer = Object.freeze({ kind: "dev", keyId: parsed.keyId, label: found.label });
-  } else {
-    const root = anchors.rootKeys.find((candidate) => candidate.keyId === parsed.keyId);
-    if (root === void 0) throw new ArtifactError("signer_unknown", parsed.keyId);
-    if ((root.role ?? "package") !== "package") throw new ArtifactError("signer_role_mismatch", parsed.keyId);
-    publicKey = root.publicKey;
-    signer = Object.freeze({ kind: "teamuq", keyId: parsed.keyId });
-  }
-  const signature = Buffer.from(parsed.signature, "base64");
-  const raw = Buffer.from(publicKey, "base64");
-  if (signature.length !== SIGNATURE_BYTES || raw.length !== RAW_KEY_BYTES) throw new ArtifactError("signature_invalid", "unexpected key or signature length");
-  if (!verify(null, integrityBytes, rawKeyToObject(raw), signature)) throw new ArtifactError("signature_invalid", parsed.keyId);
-  return signer;
-}
-
 // packages/platform/plugin-artifact/src/assetPacks/assetPackStore.ts
-var SignerSchema = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("teamuq"), keyId: external_exports.string().min(3).max(64) }).strict(),
-  external_exports.object({ kind: external_exports.literal("dev"), keyId: external_exports.string().min(3).max(64), label: external_exports.string().min(1).max(48) }).strict()
-]);
 var PackRecordSchema = external_exports.object({
   id: external_exports.string().min(3).max(96),
   version: external_exports.string().min(5).max(32),
   name: external_exports.string().min(1).max(96),
   publisher: external_exports.string().min(2).max(48),
-  signer: SignerSchema,
+  signer: SignerRecordSchema,
   manifestSha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
   integritySha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
   installedAt: external_exports.string().min(1).max(40),
@@ -7852,17 +8384,17 @@ function issue(scope, pluginIds) {
   const ids = new Set(pluginIds);
   const policy = {
     scope,
-    permitsId: (pluginId7) => ids.has(pluginId7),
-    trustsInstalledSigner: async (pluginId7, signer, lookup) => scope === "isolated-dev-profile" && signer.kind === "dev" && ids.has(pluginId7) && (await lookup(signer.keyId)).status === "trusted"
+    permitsId: (pluginId8) => ids.has(pluginId8),
+    trustsInstalledSigner: async (pluginId8, signer, lookup) => scope === "isolated-dev-profile" && signer.kind === "dev" && ids.has(pluginId8) && (await lookup(signer.keyId)).status === "trusted"
   };
   issued.add(policy);
   return Object.freeze(policy);
 }
-function createAuthoringDevTrustPolicy(pluginId7) {
-  return issue("authoring", [pluginId7]);
+function createAuthoringDevTrustPolicy(pluginId8) {
+  return issue("authoring", [pluginId8]);
 }
-function permitsPreplantedDevId(policy, pluginId7) {
-  return policy !== void 0 && issued.has(policy) && policy.permitsId(pluginId7);
+function permitsPreplantedDevId(policy, pluginId8) {
+  return policy !== void 0 && issued.has(policy) && policy.permitsId(pluginId8);
 }
 
 // packages/platform/plugin-artifact/src/install/updatePolicy.ts
@@ -7871,20 +8403,17 @@ function assertUpdateAllowed(existing, next, devTrust) {
   if (order === 0) throw new ArtifactError("already_installed", `${existing.id}@${next.version}`);
   if (order < 0) throw new ArtifactError("downgrade_rejected", `${existing.id}@${next.version}`);
   if (existing.signer.kind === "teamuq" && next.signer.kind === "dev" && !permitsPreplantedDevId(devTrust, existing.id)) throw new ArtifactError("signer_not_allowed", existing.id);
+  if (existing.signer.kind === "teamuq" && next.signer.kind === "unsigned") throw new ArtifactError("signer_not_allowed", existing.id);
   if (existing.signer.kind === "dev" && (next.signer.kind !== "dev" || next.signer.keyId !== existing.signer.keyId)) throw new ArtifactError("signer_changed", existing.id);
 }
 
 // packages/platform/plugin-artifact/src/install/installStore.ts
-var SignerSchema2 = external_exports.discriminatedUnion("kind", [
-  external_exports.object({ kind: external_exports.literal("teamuq"), keyId: external_exports.string().min(3).max(64) }).strict(),
-  external_exports.object({ kind: external_exports.literal("dev"), keyId: external_exports.string().min(3).max(64), label: external_exports.string().min(1).max(48) }).strict()
-]);
-var InstallRecordSchema = external_exports.object({
+var InstallRecordSchema2 = external_exports.object({
   id: external_exports.string().min(3).max(96),
   version: external_exports.string().min(5).max(32),
   name: external_exports.string().min(1).max(96),
   publisher: external_exports.string().min(2).max(48),
-  signer: SignerSchema2,
+  signer: SignerRecordSchema,
   manifestSha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
   integritySha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
   grants: external_exports.array(external_exports.string().min(3).max(64)).max(64),
@@ -7900,10 +8429,6 @@ var InstallRecordSchema = external_exports.object({
     allowAddons: external_exports.boolean(),
     nativeFiles: external_exports.array(external_exports.string().max(200)).max(64)
   }).strict().nullable().default(null)
-}).strict();
-var InstallFileSchema = external_exports.object({
-  version: external_exports.literal(1),
-  plugins: external_exports.array(InstallRecordSchema).max(256)
 }).strict();
 var RECHECK_SMALL_FILE_BYTES = 8 * 1024 * 1024;
 
@@ -8136,10 +8661,10 @@ async function openArchive(filePath, limits = PLUGIN_ARTIFACT_LIMITS) {
 // packages/platform/plugin-artifact/src/install/reviewArtifact.ts
 var PLUGIN_FILE_EXTENSION = ".tuqplugin";
 var ADOPTABLE_FOLDER = ["store", "downloads"];
-var sha256 = (bytes3) => createHash3("sha256").update(bytes3).digest("hex");
-function parseManifest(bytes3) {
+var sha256 = (bytes4) => createHash3("sha256").update(bytes4).digest("hex");
+function parseManifest(bytes4) {
   try {
-    return PluginManifestV2Schema.parse(JSON.parse(bytes3.toString("utf8")));
+    return PluginManifestV2Schema.parse(JSON.parse(bytes4.toString("utf8")));
   } catch (error) {
     const issue2 = error.issues?.[0];
     throw new ArtifactError("manifest_invalid", issue2 === void 0 ? "manifest.json is not valid JSON" : `${issue2.path.join(".")}: ${issue2.message}`);
@@ -8150,9 +8675,32 @@ function assertSignerMayInstall(manifest, signer, devTrust) {
   const reservedId = manifest.id.startsWith("teamuq.");
   if (signer.kind === "dev") {
     if ((reservedId || manifest.publisher === "teamuq") && !permitsPreplantedDevId(devTrust, manifest.id)) throw new ArtifactError("id_reserved", manifest.id);
+  } else if (signer.kind === "unsigned") {
+    if (reservedId || manifest.publisher === "teamuq") throw new ArtifactError("id_reserved", manifest.id);
   } else if (!reservedId && manifest.publisher === "teamuq") {
     throw new ArtifactError("id_reserved", manifest.id);
   }
+}
+async function assertDelegatedIdNotReserved(signer, manifest, isReservedId) {
+  if (signer.kind !== "teamuq" || signer.delegation === void 0 || manifest.kind !== "plugin") return;
+  if (isReservedId === void 0) throw new ArtifactError("install_failed", "no reserved id check was given");
+  let reserved;
+  try {
+    reserved = await isReservedId(manifest.id);
+  } catch {
+    reserved = true;
+  }
+  if (reserved) throw new ArtifactError("id_reserved", manifest.id);
+}
+async function assertUnsignedIdNotOfficial(signer, manifest, isOfficialId) {
+  if (signer.kind !== "unsigned" || isOfficialId === void 0) return;
+  let official;
+  try {
+    official = await isOfficialId(manifest.id);
+  } catch {
+    official = true;
+  }
+  if (official) throw new ArtifactError("id_reserved", manifest.id);
 }
 function assertSupported(manifest, context) {
   const issues = evaluateManifestSupport(manifest, context);
@@ -8170,15 +8718,21 @@ function referencedPaths(manifest) {
 }
 async function assertIconIsPng(payloadDir, icon, listed) {
   if (listed === void 0 || listed.platform !== null || listed.size > PLUGIN_ICON_MAX_BYTES) throw new ArtifactError("icon_invalid", icon);
-  const bytes3 = await fs4.readFile(path2.join(payloadDir, ...icon.split("/"))).catch(() => null);
-  if (bytes3 === null || !isPngIcon(bytes3)) throw new ArtifactError("icon_invalid", icon);
+  const bytes4 = await fs4.readFile(path2.join(payloadDir, ...icon.split("/"))).catch(() => null);
+  if (bytes4 === null || !isPngIcon(bytes4)) throw new ArtifactError("icon_invalid", icon);
 }
-function peekKind(bytes3) {
+function peekKind(bytes4) {
   try {
-    return JSON.parse(bytes3.toString("utf8")).kind === "asset-pack" ? "asset-pack" : "plugin";
+    return JSON.parse(bytes4.toString("utf8")).kind === "asset-pack" ? "asset-pack" : "plugin";
   } catch {
     return "plugin";
   }
+}
+async function readDelegation(archive) {
+  if (!archive.entries.some((entry) => !entry.isDirectory && entry.name === DELEGATION_FILE)) return null;
+  return archive.readSmall(DELEGATION_FILE, MAX_DELEGATION_BYTES).catch((error) => {
+    throw isArtifactError(error) && error.code === "zip_size_exceeded" ? new ArtifactError("delegation_invalid", "delegation.json is too large") : error;
+  });
 }
 function enforceLimits(entries, archiveBytes, limits) {
   if (archiveBytes > limits.maxArchiveBytes) throw new ArtifactError("zip_size_exceeded", "archive");
@@ -8227,22 +8781,27 @@ async function reviewArtifact(sourcePath, options2) {
       const needed = options2.adoptSource === true ? declaredTotal : declaredTotal * 2;
       if (free < needed) throw new ArtifactError("disk_space_insufficient", `${needed} bytes needed`);
     }
-    const signatureBytes = await archive.readSmall(SIGNATURE_FILE, MAX_SIGNATURE_BYTES).catch((error) => {
-      throw isArtifactError(error) && error.code === "integrity_missing_file" ? new ArtifactError("signature_missing") : error;
-    });
+    const signatureBytes = archive.entries.some((entry) => !entry.isDirectory && entry.name === SIGNATURE_FILE) ? await archive.readSmall(SIGNATURE_FILE, MAX_SIGNATURE_BYTES) : null;
     const integrityBytes = await archive.readSmall(INTEGRITY_FILE, MAX_INTEGRITY_BYTES).catch((error) => {
       throw isArtifactError(error) && error.code === "integrity_missing_file" ? new ArtifactError("integrity_missing") : error;
     });
-    const signer = await verifyIntegritySignature(integrityBytes, signatureBytes, options2.anchors, options2.devKeys.lookup);
+    const accepting = options2.delegation === "accept";
+    const delegationBytes = accepting ? await readDelegation(archive) : null;
+    const { signer, claimedKeyId } = await resolveArtifactSigner(integrityBytes, signatureBytes, options2.anchors, options2.devKeys.lookup, accepting ? { delegationBytes, now: delegationNow(options2.now ?? (() => /* @__PURE__ */ new Date())), expiry: "enforce" } : void 0);
+    if (signer.kind === "unsigned" && delegationBytes !== null) throw new ArtifactError("delegation_invalid", "an unsigned package must not carry delegation.json");
+    if (options2.refuseUnverifiedKey === true && signer.kind === "unsigned" && claimedKeyId !== null) throw new ArtifactError("signer_unknown", claimedKeyId);
     const integrityHash = sha256(integrityBytes);
     if ((options2.anchors.revokedArtifactSha256 ?? []).includes(integrityHash) || (options2.revokedArtifacts ?? []).includes(integrityHash)) throw new ArtifactError("artifact_revoked", integrityHash);
     const integrity = parseIntegrity(integrityBytes);
-    assertCoverage(integrity, archive.entries);
+    assertCoverage(integrity, archive.entries, { delegationFile: accepting ? "allow" : "refuse" });
     const manifestBytes = await archive.readSmall(MANIFEST_FILE, MAX_MANIFEST_BYTES);
     const listedManifest = integrity.files.find((entry) => entry.path === MANIFEST_FILE);
     if (listedManifest === void 0 || listedManifest.sha256 !== sha256(manifestBytes)) throw new ArtifactError("integrity_mismatch", MANIFEST_FILE);
     const manifest = parseManifest(manifestBytes);
     assertSignerMayInstall(manifest, signer, options2.devTrust);
+    await assertUnsignedIdNotOfficial(signer, manifest, options2.isOfficialId);
+    assertDelegationScope(signer, manifest);
+    await assertDelegatedIdNotReserved(signer, manifest, options2.isReservedId);
     if (manifest.kind !== peeked) throw new ArtifactError("manifest_invalid", "kind changed between reads");
     const existing = await options2.findInstalled(manifest.id, manifest.kind);
     if (manifest.kind === "plugin" && options2.updateFrom !== void 0) {
@@ -8256,6 +8815,7 @@ async function reviewArtifact(sourcePath, options2) {
       if (order === 0) throw new ArtifactError("already_installed", `${manifest.id}@${manifest.version}`);
       if (order < 0) throw new ArtifactError("downgrade_rejected", `${manifest.id}@${manifest.version}`);
       if (existing.signer.kind === "teamuq" && signer.kind === "dev") throw new ArtifactError("signer_not_allowed", manifest.id);
+      if (existing.signer.kind !== "unsigned" && signer.kind === "unsigned") throw new ArtifactError("signer_not_allowed", manifest.id);
     }
     assertSupported(manifest, options2.support);
     const whitelist = auditNativeContent(integrity, manifest);
@@ -8277,11 +8837,12 @@ async function reviewArtifact(sourcePath, options2) {
     }
     if (manifest.icon !== void 0) await assertIconIsPng(payloadDir, manifest.icon, integrity.files.find((entry) => entry.path === manifest.icon));
     await fs4.writeFile(path2.join(payloadDir, INTEGRITY_FILE), integrityBytes, { flag: "wx", mode: 420 });
-    await fs4.writeFile(path2.join(payloadDir, SIGNATURE_FILE), signatureBytes, { flag: "wx", mode: 420 });
+    if (signer.kind !== "unsigned" && signatureBytes !== null) await fs4.writeFile(path2.join(payloadDir, SIGNATURE_FILE), signatureBytes, { flag: "wx", mode: 420 });
+    if (delegationBytes !== null) await fs4.writeFile(path2.join(payloadDir, DELEGATION_FILE), delegationBytes, { flag: "wx", mode: 420 });
     archive.close();
     archive = null;
     await fs4.rm(copyPath, { force: true });
-    return { txId, stagingDir, payloadDir, manifest, manifestSha256: listedManifest.sha256, integritySha256: integrityHash, signer, totalBytes: declaredTotal, fileCount: integrity.files.length, discard };
+    return { txId, stagingDir, payloadDir, manifest, manifestSha256: listedManifest.sha256, integritySha256: integrityHash, signer, claimedKeyId, totalBytes: declaredTotal, fileCount: integrity.files.length, discard };
   } catch (error) {
     archive?.close();
     await discard().catch(() => void 0);
@@ -8332,9 +8893,9 @@ function createDevKeyStore(options2) {
     trustedHere: record.machine === machineId()
   });
   return {
-    inspect: (text) => {
-      if (/PRIVATE KEY|privatePkcs8/i.test(text)) throw new ArtifactError("dev_key_private");
-      const raw = parsePublicKeyInput(text);
+    inspect: (text2) => {
+      if (/PRIVATE KEY|privatePkcs8/i.test(text2)) throw new ArtifactError("dev_key_private");
+      const raw = parsePublicKeyInput(text2);
       return { keyId: devKeyIdOf(raw), fingerprint: fingerprintOf(raw), publicKey: raw.toString("base64") };
     },
     list: async () => (await readStateFile(file, parse2, empty)).keys.map(view),
@@ -8379,7 +8940,7 @@ var ConsentSchema = external_exports.object({
   capability: external_exports.string().regex(CAPABILITY).max(96),
   providerId: external_exports.string().regex(ID).max(96),
   providerVersion: external_exports.string().min(5).max(32),
-  providerSigner: external_exports.object({ kind: external_exports.enum(["teamuq", "dev"]), keyId: external_exports.string().min(3).max(64) }).strict(),
+  providerSigner: ProviderSignerRecordSchema,
   providerIntegritySha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
   grantedAt: external_exports.string().min(1).max(40)
 }).strict();
@@ -8442,7 +9003,7 @@ import { promises as fs7 } from "node:fs";
 import path6 from "node:path";
 
 // packages/platform/plugin-artifact/src/authoring/signing.ts
-import { createPrivateKey, createPublicKey as createPublicKey2, sign, verify as verify2 } from "node:crypto";
+import { createPrivateKey, createPublicKey as createPublicKey3, sign, verify as verify3 } from "node:crypto";
 var KEY_ID_PATTERN = /^[a-z0-9][a-z0-9-]{2,62}$/;
 var SPKI_ED25519_PREFIX_BYTES = 12;
 function loadPrivateKey(key2) {
@@ -8461,7 +9022,7 @@ function loadPrivateKey(key2) {
 }
 function signIntegrity(integrityBytes, signer) {
   const privateKey = loadPrivateKey(signer.key);
-  const publicKey = createPublicKey2(privateKey);
+  const publicKey = createPublicKey3(privateKey);
   if (signer.keyId.startsWith(DEV_KEY_PREFIX)) {
     const der = publicKey.export({ type: "spki", format: "der" });
     if (devKeyIdOf(Buffer.from(der.subarray(SPKI_ED25519_PREFIX_BYTES))) !== signer.keyId) throw new ArtifactError("signature_invalid", "a dev- keyId must be the one derived from the public key");
@@ -8469,7 +9030,7 @@ function signIntegrity(integrityBytes, signer) {
     throw new ArtifactError("signature_invalid", "keyId does not match the signature.json rule");
   }
   const signature = sign(null, integrityBytes, privateKey);
-  if (!verify2(null, integrityBytes, publicKey, signature)) throw new ArtifactError("signature_invalid", "signature does not verify against the key it was made with");
+  if (!verify3(null, integrityBytes, publicKey, signature)) throw new ArtifactError("signature_invalid", "signature does not verify against the key it was made with");
   return Buffer.from(JSON.stringify({ algorithm: "ed25519", keyId: signer.keyId, signature: signature.toString("base64") }));
 }
 
@@ -8587,9 +9148,9 @@ async function walk(root, relative, found) {
     if (found.length > MAX_FILES) throw new ArtifactError("zip_entry_count_exceeded", `more than ${MAX_FILES} files`);
   }
 }
-function peekManifestKind(bytes3) {
+function peekManifestKind(bytes4) {
   try {
-    const parsed = JSON.parse(bytes3.toString("utf8"));
+    const parsed = JSON.parse(bytes4.toString("utf8"));
     return typeof parsed === "object" && parsed !== null && parsed.kind === "asset-pack" ? "asset-pack" : "plugin";
   } catch {
     throw new ArtifactError("manifest_invalid", "manifest.json is not valid JSON");
@@ -8614,7 +9175,7 @@ async function collectStage(stageDir, overrides) {
   const registry = createNameRegistry();
   for (const name of relatives) registry.add(auditEntryName(name), false);
   if (!relatives.includes(MANIFEST_FILE)) throw new ArtifactError("manifest_missing");
-  for (const generated of [INTEGRITY_FILE, SIGNATURE_FILE]) if (relatives.includes(generated)) throw new ArtifactError("integrity_invalid", `${generated} is generated and must not be in the stage directory`);
+  for (const generated of [INTEGRITY_FILE, SIGNATURE_FILE, DELEGATION_FILE]) if (relatives.includes(generated)) throw new ArtifactError("integrity_invalid", `${generated} is generated and must not be in the stage directory`);
   const indexed = indexOverrides(overrides);
   for (const override of indexed.values()) if (!relatives.includes(override.path)) throw new ArtifactError("integrity_missing_file", `override for a file that is not staged: ${override.path}`);
   const files = [];
@@ -8656,7 +9217,12 @@ async function verifyArtifactFile(filePath, options2) {
       support: options2.support,
       ...options2.devTrust === void 0 ? {} : { devTrust: options2.devTrust },
       findInstalled: async () => null,
-      ...options2.limits === void 0 ? {} : { limits: options2.limits }
+      refuseUnverifiedKey: true,
+      ...options2.limits === void 0 ? {} : { limits: options2.limits },
+      ...options2.delegation === void 0 ? {} : { delegation: options2.delegation },
+      ...options2.now === void 0 ? {} : { now: options2.now },
+      ...options2.isReservedId === void 0 ? {} : { isReservedId: options2.isReservedId },
+      ...options2.isOfficialId === void 0 ? {} : { isOfficialId: options2.isOfficialId }
     });
     return {
       manifest: staged.manifest,
@@ -8672,18 +9238,21 @@ async function verifyArtifactFile(filePath, options2) {
 // packages/platform/plugin-artifact/src/authoring/packArtifact.ts
 async function packArtifact(options2) {
   if (path6.extname(options2.outFile).toLowerCase() !== PLUGIN_FILE_EXTENSION) throw new ArtifactError("extension_not_allowed", path6.extname(options2.outFile));
+  if (options2.delegation !== void 0 && (options2.delegation.length === 0 || options2.delegation.length > MAX_DELEGATION_BYTES)) throw new ArtifactError("delegation_invalid", "delegation.json is empty or too large");
+  if (options2.signer === null && options2.delegation !== void 0) throw new ArtifactError("delegation_invalid", "an unsigned package must not carry delegation.json");
   const staged = await collectStage(options2.stageDir, options2.files ?? []);
   const integrityBytes = Buffer.from(JSON.stringify({ algorithm: "sha256", files: staged.map((file) => file.entry) }, null, 2));
-  const signatureBytes = signIntegrity(integrityBytes, options2.signer);
+  const signature = options2.signer === null ? [] : [{ name: SIGNATURE_FILE, data: signIntegrity(integrityBytes, options2.signer) }];
   const container = writeZip([
     ...staged.map((file) => ({ name: file.path, data: file.data })),
     { name: INTEGRITY_FILE, data: integrityBytes },
-    { name: SIGNATURE_FILE, data: signatureBytes }
+    ...signature,
+    ...options2.delegation === void 0 ? [] : [{ name: DELEGATION_FILE, data: options2.delegation }]
   ]);
   const verified = await withWorkDir(options2.review.workDir, async (directory) => {
     const candidate = path6.join(directory, `candidate${PLUGIN_FILE_EXTENSION}`);
     await fs7.writeFile(candidate, container);
-    return verifyArtifactFile(candidate, { ...options2.review, workDir: directory });
+    return verifyArtifactFile(candidate, { ...options2.review, workDir: directory, ...options2.delegation === void 0 ? {} : { delegation: "accept" } });
   });
   const destination = path6.resolve(options2.outFile);
   await fs7.mkdir(path6.dirname(destination), { recursive: true });
@@ -8711,22 +9280,31 @@ var DetachedSignatureFileSchema = external_exports.object({
 }).strict();
 
 // .teamuq/scripts/plugin-tools/keyTools.mjs
-import { createHash as createHash7, createPrivateKey as createPrivateKey2, createPublicKey as createPublicKey3, generateKeyPairSync, randomBytes as randomBytes4, sign as sign2, verify as verify3 } from "node:crypto";
+import { createHash as createHash7, createPrivateKey as createPrivateKey2, createPublicKey as createPublicKey4, generateKeyPairSync, randomBytes as randomBytes4, sign as sign2, verify as verify4 } from "node:crypto";
 import fs8 from "node:fs";
 import path7 from "node:path";
 var KEY_ID_PATTERN2 = /^[a-z0-9][a-z0-9-]{2,62}$/;
 var PASSPHRASE_ENV_FOR_TESTS = "TEAMUQ_KEY_PASSPHRASE_FOR_TESTS";
 var MIN_PASSPHRASE_LENGTH = 16;
 var ENCRYPTED_PEM_HEADER = ["-----BEGIN", "ENCRYPTED", "PRIVATE KEY-----"].join(" ");
-var SPKI_ED25519_PREFIX2 = Buffer.from("302a300506032b6570032100", "hex");
-var RAW_KEY_BYTES2 = 32;
+var SPKI_ED25519_PREFIX3 = Buffer.from("302a300506032b6570032100", "hex");
+var RAW_KEY_BYTES3 = 32;
 var MAX_KEY_FILE_BYTES = 16 * 1024;
 function assertReleaseKeyId(keyId2) {
   if (typeof keyId2 !== "string" || !KEY_ID_PATTERN2.test(keyId2)) throw new Error(`keyId must match ${KEY_ID_PATTERN2}`);
   if (keyId2.startsWith("dev-")) throw new Error('keyId must not start with "dev-": that prefix is reserved for local development keys');
 }
+var RELEASE_KEY_PREFIX2 = "teamuq-release-";
+var RELEASE_KEY_ID_PATTERN = /^teamuq-release-[a-z0-9][a-z0-9-]{0,46}$/;
+function assertDelegatedKeyId(keyId2) {
+  if (typeof keyId2 !== "string" || !RELEASE_KEY_ID_PATTERN.test(keyId2)) throw new Error(`a release keyId must match ${RELEASE_KEY_ID_PATTERN}`);
+}
+function assertNoPassphraseEnv(command) {
+  const injected = process.env[PASSPHRASE_ENV_FOR_TESTS];
+  if (injected !== void 0 && injected !== "") throw new Error(`${command} never takes a passphrase from the environment: unset ${PASSPHRASE_ENV_FOR_TESTS} and type the passphrase at the prompt`);
+}
 function devKeyIdOf2(raw) {
-  if (!Buffer.isBuffer(raw) || raw.length !== RAW_KEY_BYTES2) throw new Error("public key must be 32 raw bytes");
+  if (!Buffer.isBuffer(raw) || raw.length !== RAW_KEY_BYTES3) throw new Error("public key must be 32 raw bytes");
   return `dev-${createHash7("sha256").update(raw).digest("hex").slice(0, 16)}`;
 }
 function assertDevKeyId(keyId2, raw) {
@@ -8739,7 +9317,7 @@ function generateEncryptedDevKeyPair(passphrase) {
     privateKeyEncoding: { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase },
     publicKeyEncoding: { type: "spki", format: "der" }
   });
-  const raw = Buffer.from(pair.publicKey.subarray(pair.publicKey.length - RAW_KEY_BYTES2));
+  const raw = Buffer.from(pair.publicKey.subarray(pair.publicKey.length - RAW_KEY_BYTES3));
   return { privatePem: pair.privateKey, raw, keyId: devKeyIdOf2(raw) };
 }
 function findGitWorkTree(target) {
@@ -8805,13 +9383,57 @@ async function readNewPassphrase() {
   }
   return first;
 }
+async function readInteractivePassphrase(question) {
+  assertNoPassphraseEnv("this command");
+  if (!canPrompt()) throw new Error("an interactive terminal is required to type the passphrase (it is never accepted on the command line or from the environment)");
+  return promptHidden(question);
+}
+async function readNewInteractivePassphrase() {
+  const first = await readInteractivePassphrase(`New passphrase (at least ${MIN_PASSPHRASE_LENGTH} characters): `);
+  if (first.length < MIN_PASSPHRASE_LENGTH) throw new Error(`passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters`);
+  const again = await readInteractivePassphrase("Repeat passphrase: ");
+  if (again !== first) throw new Error("passphrases do not match");
+  return first;
+}
+function writeEncryptedKeyFiles({ keyId: keyId2, directory, passphrase }) {
+  if (typeof passphrase !== "string" || passphrase.length < MIN_PASSPHRASE_LENGTH) throw new Error(`passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters`);
+  const keyFile = path7.join(directory, `${keyId2}.key.pem`);
+  const publicFile = path7.join(directory, `${keyId2}.pub.json`);
+  if (fs8.existsSync(keyFile) || fs8.existsSync(publicFile)) throw new Error(`${keyId2} already exists in ${directory}; refusing to overwrite a key`);
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const description = describePublicKey(publicKey);
+  const pem = privateKey.export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase });
+  fs8.mkdirSync(directory, { recursive: true, mode: 448 });
+  const written = [];
+  try {
+    fs8.writeFileSync(keyFile, pem, { flag: "wx", mode: 384 });
+    written.push(keyFile);
+    fs8.writeFileSync(publicFile, `${JSON.stringify({ keyId: keyId2, publicKey: description.publicKey }, null, 2)}
+`, { flag: "wx" });
+    written.push(publicFile);
+    const reloaded = loadEncryptedPrivateKey(fs8.readFileSync(keyFile, "utf8"), passphrase);
+    const stored = JSON.parse(fs8.readFileSync(publicFile, "utf8"));
+    selfCheck(reloaded, Buffer.from(stored.publicKey, "base64"));
+    let wrongPassphraseRejected = false;
+    try {
+      createPrivateKey2({ key: pem, format: "pem", passphrase: `${passphrase}x` });
+    } catch {
+      wrongPassphraseRejected = true;
+    }
+    if (!wrongPassphraseRejected) throw new Error("the stored private key opened with a wrong passphrase; the file was not encrypted");
+  } catch (error) {
+    for (const file of written) fs8.rmSync(file, { force: true });
+    throw error;
+  }
+  return { keyId: keyId2, keyFile, publicFile, ...description };
+}
 function rawToPublicKey(raw) {
-  if (!Buffer.isBuffer(raw) || raw.length !== RAW_KEY_BYTES2) throw new Error("public key must be 32 raw bytes");
-  return createPublicKey3({ key: Buffer.concat([SPKI_ED25519_PREFIX2, raw]), format: "der", type: "spki" });
+  if (!Buffer.isBuffer(raw) || raw.length !== RAW_KEY_BYTES3) throw new Error("public key must be 32 raw bytes");
+  return createPublicKey4({ key: Buffer.concat([SPKI_ED25519_PREFIX3, raw]), format: "der", type: "spki" });
 }
 function describePublicKey(publicKey) {
   const der = publicKey.export({ type: "spki", format: "der" });
-  const raw = Buffer.from(der.subarray(der.length - RAW_KEY_BYTES2));
+  const raw = Buffer.from(der.subarray(der.length - RAW_KEY_BYTES3));
   return {
     raw,
     publicKey: raw.toString("base64"),
@@ -8839,28 +9461,904 @@ function selfCheck(privateKey, raw) {
   const message = randomBytes4(32);
   const signature = sign2(null, message, privateKey);
   if (signature.length !== 64) throw new Error("unexpected signature length");
-  if (!verify3(null, message, rawToPublicKey(raw), signature)) throw new Error("the signature made by the private key does not verify with the public key");
-  if (verify3(null, randomBytes4(32), rawToPublicKey(raw), signature)) throw new Error("signature verified against a different message");
+  if (!verify4(null, message, rawToPublicKey(raw), signature)) throw new Error("the signature made by the private key does not verify with the public key");
+  if (verify4(null, randomBytes4(32), rawToPublicKey(raw), signature)) throw new Error("signature verified against a different message");
+}
+
+// .teamuq/scripts/plugin-tools/releaseUnlock.mjs
+import { randomBytes as randomBytes5 } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import fs9 from "node:fs";
+import path8 from "node:path";
+var UNLOCK_FILE_SUFFIX = ".unlock.dpapi";
+var UNLOCK_SCHEME = "windows-dpapi-current-user";
+var UNLOCK_ENTROPY_PREFIX = "TeamUQ-Release-Unlock-v1\0";
+var MAX_UNLOCK_FILE_BYTES = 4 * 1024;
+var POWERSHELL_TIMEOUT_MS = 3e4;
+var BASE64 = /^[A-Za-z0-9+/]+={0,2}$/u;
+var SYNCED_FOLDER_HINTS = Object.freeze(["onedrive", "dropbox", "google drive", "googledrive", "共用雲端硬碟", "icloud", "box sync"]);
+var UnlockRefused = class extends Error {
+};
+function unlockFileName(keyId2) {
+  return `${keyId2}${UNLOCK_FILE_SUFFIX}`;
+}
+function assertUnlockAllowedFor(keyId2) {
+  if (typeof keyId2 !== "string" || !RELEASE_KEY_ID_PATTERN.test(keyId2)) {
+    throw new UnlockRefused(`a non-interactive unlock source is only for release keys (${RELEASE_KEY_ID_PATTERN}); ${typeof keyId2 === "string" ? keyId2 : "this key"} is refused: root keys are typed at the prompt, always`);
+  }
+}
+function assertNotSyncedFolder(target, label) {
+  const lowered = path8.resolve(target).toLowerCase();
+  const hint = SYNCED_FOLDER_HINTS.find((name) => lowered.includes(name));
+  if (hint !== void 0) throw new UnlockRefused(`${label} ${path8.resolve(target)} looks like a synced or cloud folder ("${hint}"); keep release key material on the local disk only`);
+}
+function assertWindows() {
+  if (process.platform !== "win32") throw new UnlockRefused("Windows DPAPI unlock exists only on Windows (the release signing machine); there is no other non-interactive unlock source");
+}
+var PROTECT_SCRIPT = [
+  "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'",
+  "Add-Type -AssemblyName System.Security",
+  "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json",
+  "$p=[System.Security.Cryptography.ProtectedData]::Protect([Convert]::FromBase64String($in.data),[Convert]::FromBase64String($in.entropy),[System.Security.Cryptography.DataProtectionScope]::CurrentUser)",
+  "[Console]::Out.Write([Convert]::ToBase64String($p))"
+].join(";");
+var UNPROTECT_SCRIPT = [
+  "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'",
+  "Add-Type -AssemblyName System.Security",
+  "$in=[Console]::In.ReadToEnd()|ConvertFrom-Json",
+  "$b=[System.Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String($in.data),[Convert]::FromBase64String($in.entropy),[System.Security.Cryptography.DataProtectionScope]::CurrentUser)",
+  "[Console]::Out.Write([Convert]::ToBase64String($b))"
+].join(";");
+function powershellPath() {
+  const root = process.env.SystemRoot ?? "C:\\Windows";
+  return path8.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+}
+function runPowerShell(script, payload) {
+  const child = spawnSync(powershellPath(), ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], {
+    input: JSON.stringify(payload),
+    encoding: "utf8",
+    timeout: POWERSHELL_TIMEOUT_MS,
+    windowsHide: true,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  if (child.error !== void 0 || child.status !== 0) throw new UnlockRefused("Windows DPAPI (PowerShell) could not complete; check that PowerShell is available and not in a restricted language mode, and that this blob was made by this Windows user on this computer");
+  return child.stdout.trim();
+}
+function entropyFor(keyId2) {
+  return Buffer.from(`${UNLOCK_ENTROPY_PREFIX}${keyId2}`, "utf8").toString("base64");
+}
+function dpapiProtect(keyId2, secret) {
+  assertUnlockAllowedFor(keyId2);
+  assertWindows();
+  const blob = runPowerShell(PROTECT_SCRIPT, { entropy: entropyFor(keyId2), data: Buffer.from(secret, "utf8").toString("base64") });
+  if (!BASE64.test(blob)) throw new UnlockRefused("DPAPI returned something that is not a protected blob");
+  return blob;
+}
+function unlockEnvelope(keyId2, blob) {
+  return `${JSON.stringify({ format: 1, scheme: UNLOCK_SCHEME, keyId: keyId2, protected: blob }, null, 2)}
+`;
+}
+function readUnlockEnvelope(file, keyId2) {
+  const stat = fs9.statSync(file);
+  if (!stat.isFile() || stat.size === 0 || stat.size > MAX_UNLOCK_FILE_BYTES) throw new UnlockRefused(`${file} is not an unlock file`);
+  let parsed;
+  try {
+    parsed = JSON.parse(fs9.readFileSync(file, "utf8"));
+  } catch {
+    throw new UnlockRefused(`${file} is not an unlock file (not JSON)`);
+  }
+  const keys = parsed !== null && typeof parsed === "object" ? Object.keys(parsed).sort().join(",") : "";
+  if (keys !== "format,keyId,protected,scheme" || parsed.format !== 1 || parsed.scheme !== UNLOCK_SCHEME || typeof parsed.keyId !== "string" || typeof parsed.protected !== "string" || !BASE64.test(parsed.protected)) throw new UnlockRefused(`${file} is not an unlock file for this tool`);
+  if (parsed.keyId !== keyId2) throw new UnlockRefused(`${file} belongs to ${parsed.keyId}, not to ${keyId2}`);
+  return parsed.protected;
+}
+function readDpapiPassphrase(file, keyId2) {
+  assertUnlockAllowedFor(keyId2);
+  assertWindows();
+  const blob = readUnlockEnvelope(file, keyId2);
+  const raw = runPowerShell(UNPROTECT_SCRIPT, { entropy: entropyFor(keyId2), data: blob });
+  if (!BASE64.test(raw)) throw new UnlockRefused("DPAPI returned something that is not a passphrase");
+  return Buffer.from(raw, "base64").toString("utf8");
+}
+function initReleaseKey({ keyId: keyId2, directory }) {
+  assertDelegatedKeyId(keyId2);
+  assertWindows();
+  const target = path8.resolve(directory);
+  assertOutsideGitWorkTree(target, "release key directory");
+  assertNotSyncedFolder(target, "release key directory");
+  const unlockFile = path8.join(target, unlockFileName(keyId2));
+  if (fs9.existsSync(unlockFile)) throw new UnlockRefused(`${unlockFile} already exists; refusing to overwrite`);
+  const passphrase = randomBytes5(33).toString("base64url");
+  const blob = dpapiProtect(keyId2, passphrase);
+  const written = writeEncryptedKeyFiles({ keyId: keyId2, directory: target, passphrase });
+  try {
+    fs9.writeFileSync(unlockFile, unlockEnvelope(keyId2, blob), { flag: "wx" });
+    if (readDpapiPassphrase(unlockFile, keyId2) !== passphrase) throw new Error("the DPAPI blob did not return the passphrase it was given");
+    const key2 = loadEncryptedPrivateKey(readKeyFile(written.keyFile), readDpapiPassphrase(unlockFile, keyId2));
+    selfCheck(key2, written.raw);
+  } catch (error) {
+    for (const file of [written.keyFile, written.publicFile, unlockFile]) fs9.rmSync(file, { force: true });
+    throw error;
+  }
+  return { keyId: keyId2, keyFile: written.keyFile, publicFile: written.publicFile, unlockFile, publicKey: written.publicKey, fingerprint: written.fingerprint };
+}
+var OFFICIAL_KEY_ID = /^teamuq-/u;
+async function obtainSigningPassphrase({ keyId: keyId2, question, unlockFile, injected }) {
+  if (unlockFile !== void 0) return { passphrase: readDpapiPassphrase(unlockFile, keyId2), source: "dpapi" };
+  if (injected !== void 0) return { passphrase: await injected(question), source: "injected" };
+  const fromEnv = process.env[PASSPHRASE_ENV_FOR_TESTS];
+  if (fromEnv !== void 0 && fromEnv !== "" && OFFICIAL_KEY_ID.test(keyId2)) {
+    const hint = RELEASE_KEY_ID_PATTERN.test(keyId2) ? "a release key is unlocked from its DPAPI file (--unlock-dpapi) or at the prompt" : "a root key (any teamuq-* key) is unlocked only by typing the passphrase at the prompt";
+    throw new UnlockRefused(`${keyId2} never takes its passphrase from the environment (${PASSPHRASE_ENV_FOR_TESTS} is set): ${hint}`);
+  }
+  const passphrase = await readPassphrase(question);
+  return { passphrase, source: fromEnv !== void 0 && fromEnv !== "" ? "env" : "interactive" };
+}
+
+// .teamuq/scripts/plugin-tools/delegationTools.mjs
+import { createHash as createHash8, createPublicKey as createPublicKey5, sign as sign3, verify as verify5 } from "node:crypto";
+import fs10 from "node:fs";
+import path9 from "node:path";
+import { isDeepStrictEqual } from "node:util";
+var DELEGATION_DOMAIN_PREFIX2 = Buffer.from("TeamUQ-Release-Delegation-v1\0", "utf8");
+var MAX_DELEGATION_BYTES2 = 8 * 1024;
+var MAX_LIFETIME_DAYS = 400;
+var DEFAULT_LIFETIME_DAYS = 180;
+var MAX_ENTRIES2 = 64;
+var MAX_STRING2 = 200;
+var DAY_MS = 24 * 60 * 60 * 1e3;
+var CLOCK_SKEW_MS = DAY_MS;
+var MAX_SMALL_FILE_BYTES = 64 * 1024;
+var MAX_NOT_BEFORE_AHEAD_DAYS = 30;
+var PUBLISHER_MIN = 2;
+var PUBLISHER_MAX = 48;
+var MAX_SERIAL_DIGITS = 16;
+var BUILT_IN_RESERVED_IDS = Object.freeze(["core", "teamuq.core", "teamuq.memory"]);
+var isDevkitReservedId = (id) => BUILT_IN_RESERVED_IDS.includes(id);
+var IDENTIFIER = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+var PERMISSION = /^[a-z0-9]+(?:-[a-z0-9]+)*(?::[a-z0-9]+(?:-[a-z0-9]+)*)+$/;
+var CAPABILITY2 = /^[a-z0-9]+(?:[.-][a-z0-9]+)*@[1-9][0-9]*$/;
+var ASSET_PREFIX = /^[a-z0-9]+(?:[.-][a-z0-9]+)*-$/;
+var TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+var TIERS = Object.freeze(["sandboxed", "full-trust"]);
+var NATIVE_LEVELS = Object.freeze(["none", "libraries", "addons"]);
+var PLUGIN_KEYS = Object.freeze(["id", "publisher", "trustTier", "native", "permissions", "networkAllow", "provides", "assetPackRefs", "assetPackPrefixes"]);
+var DELEGATION_USAGE = [
+  "  release-keygen --key-id teamuq-release-<name> --out-dir <directory outside git work trees>  (makes an encrypted release signing key; the passphrase is typed at the prompt)",
+  "  delegate --root-key <file> --release-pub <file.pub.json> --scope <scope.json> --bundled-index <bundled-plugins.json> (--previous <delegation.json> | --first) --out <delegation.json> [--days n] [--serial n] [--not-before YYYY-MM-DDTHH:MM:SSZ] [--root-key-id id] [--anchors core|self] [--root-pub-file file.pub.json]  (ROOT key signs a delegation certificate; every check runs before the passphrase prompt; --bundled-index is resources/bundled-plugins/bundled-plugins.json of the TeamUQ checkout and has no default, so the pre-installed id check cannot silently turn off)",
+  "  delegation-inspect <delegation.json> [--anchors core|self] [--root-pub-file file.pub.json] [--at YYYY-MM-DDTHH:MM:SSZ]  (verifies the signature and prints the scope and validity in plain words)"
+].join("\n");
+var UsageProblem = class extends Error {
+};
+var SCREEN_CONTROL_RANGES = Object.freeze([[0, 31], [127, 159], [173, 173], [1564, 1564], [6158, 6158], [8203, 8207], [8232, 8238], [8288, 8303], [65279, 65279], [65529, 65531]]);
+var isScreenControl = (code) => SCREEN_CONTROL_RANGES.some(([low, high]) => code >= low && code <= high);
+function neutralize(text2, keep = "") {
+  return Array.from(String(text2), (character) => {
+    const code = character.codePointAt(0);
+    return keep.includes(character) || !isScreenControl(code) ? character : `\\u${code.toString(16).padStart(4, "0")}`;
+  }).join("");
+}
+function asciiOnly(text2) {
+  return Array.from(String(text2), (character) => {
+    const code = character.codePointAt(0);
+    if (code >= 32 && code <= 126) return character;
+    return code > 65535 ? `\\u{${code.toString(16)}}` : `\\u${code.toString(16).padStart(4, "0")}`;
+  }).join("");
+}
+function screen(text2) {
+  return neutralize(text2, "\n");
+}
+function parseFlags(argv, allowed, booleanFlags = []) {
+  const positional = [];
+  const flags = /* @__PURE__ */ new Map();
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (!token.startsWith("--")) {
+      positional.push(token);
+      continue;
+    }
+    if (/pass/iu.test(token)) throw new UsageProblem("the passphrase is never accepted on the command line");
+    if (!allowed.includes(token)) throw new UsageProblem(`unknown option ${token}`);
+    if (flags.has(token)) throw new UsageProblem(`${token} was given twice`);
+    if (booleanFlags.includes(token)) {
+      flags.set(token, "true");
+      continue;
+    }
+    const value = argv[index + 1];
+    if (value === void 0 || value.startsWith("--")) throw new UsageProblem(`${token} needs a value`);
+    flags.set(token, value);
+    index += 1;
+  }
+  return { positional, flags };
+}
+function sinks(deps) {
+  return {
+    out: deps.stdout ?? ((text2) => process.stdout.write(text2)),
+    err: deps.stderr ?? ((text2) => process.stderr.write(text2))
+  };
+}
+async function guarded(label, deps, body) {
+  const { err } = sinks(deps);
+  try {
+    return await body();
+  } catch (error) {
+    if (error instanceof UsageProblem) {
+      err(screen(`usage: ${label}: ${error.message}
+${DELEGATION_USAGE}
+`));
+      return 2;
+    }
+    err(screen(`${label}: ${error instanceof Error ? error.message : String(error)}
+`));
+    return 1;
+  }
+}
+function formatUtc(ms) {
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/u, "Z");
+}
+function parseUtc(value, label) {
+  if (typeof value !== "string" || !TIMESTAMP.test(value)) throw new UsageProblem(`${label} must look like 2026-10-15T00:00:00Z (UTC, whole seconds)`);
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms) || formatUtc(ms) !== value) throw new UsageProblem(`${label} is not a real UTC time`);
+  return ms;
+}
+function wholeSecond(ms) {
+  return Math.floor(ms / 1e3) * 1e3;
+}
+function problemsOf(list2) {
+  return `the scope is not acceptable:
+${list2.map((line2) => `  - ${neutralize(line2)}`).join("\n")}`;
+}
+function checkText(value, where, problems, { pattern, patternName, min = 1, max = MAX_STRING2 } = {}) {
+  if (typeof value !== "string") {
+    problems.push(`${where} must be a string`);
+    return false;
+  }
+  if (/[*?]/u.test(value)) {
+    problems.push(`${where} contains a wildcard (${JSON.stringify(value)}); a certificate lists exact names only`);
+    return false;
+  }
+  if (value.length < min || value.length > max) {
+    problems.push(`${where} must be ${min} to ${max} characters (${JSON.stringify(value.length > 40 ? `${value.slice(0, 40)}...` : value)} has ${value.length})`);
+    return false;
+  }
+  if (pattern !== void 0 && !pattern.test(value)) {
+    problems.push(`${where} is not a valid ${patternName} (${JSON.stringify(value)})`);
+    return false;
+  }
+  return true;
+}
+function checkList(value, where, problems, options2) {
+  if (value === void 0) return [];
+  if (!Array.isArray(value)) {
+    problems.push(`${where} must be an array`);
+    return [];
+  }
+  if (value.length > MAX_ENTRIES2) {
+    problems.push(`${where} has ${value.length} entries; the limit is ${MAX_ENTRIES2}`);
+    return [];
+  }
+  const kept = [];
+  for (const [index, item] of value.entries()) {
+    if (checkText(item, `${where}[${index}]`, problems, options2)) kept.push(item);
+  }
+  if (new Set(kept).size !== kept.length) problems.push(`${where} lists the same entry twice`);
+  return kept;
+}
+function isAssetPackPrefixOf2(pluginId8, prefix) {
+  const dot = pluginId8.indexOf(".");
+  if (dot <= 0 || dot === pluginId8.length - 1 || !IDENTIFIER.test(pluginId8)) return false;
+  return prefix.length <= 90 && ASSET_PREFIX.test(prefix) && prefix.startsWith(`${pluginId8.slice(0, dot)}.asset.${pluginId8.slice(dot + 1)}-`);
+}
+function normalizeScope(raw, { reservedIds = BUILT_IN_RESERVED_IDS, parseOrigin } = {}) {
+  const problems = [];
+  const reserved = new Set(reservedIds);
+  const origin = { test: (value) => typeof parseOrigin === "function" && parseOrigin(value) === value };
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) throw new Error(problemsOf(['the scope must be a JSON object with "plugins" and "assetPacks"']));
+  for (const key2 of Object.keys(raw)) {
+    if (key2 !== "plugins" && key2 !== "assetPacks") problems.push(`unknown field "${key2}" in the scope`);
+  }
+  const plugins = [];
+  if (raw.plugins !== void 0 && !Array.isArray(raw.plugins)) problems.push("plugins must be an array");
+  const rawPlugins = Array.isArray(raw.plugins) ? raw.plugins : [];
+  if (rawPlugins.length > MAX_ENTRIES2) problems.push(`plugins has ${rawPlugins.length} entries; the limit is ${MAX_ENTRIES2}`);
+  const seenIds = /* @__PURE__ */ new Set();
+  for (const [index, entry] of (rawPlugins.length > MAX_ENTRIES2 ? [] : rawPlugins).entries()) {
+    const where = `plugins[${index}]`;
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      problems.push(`${where} must be an object`);
+      continue;
+    }
+    for (const key2 of Object.keys(entry)) {
+      if (!PLUGIN_KEYS.includes(key2)) problems.push(`${where} has an unknown field "${key2}"`);
+    }
+    const idOk = checkText(entry.id, `${where}.id`, problems, { pattern: IDENTIFIER, patternName: "plugin id", min: 3, max: 96 });
+    if (idOk) {
+      if (reserved.has(entry.id)) problems.push(`${where}.id ${entry.id} is reserved (Core id or pre-installed plugin); a release key can never sign it`);
+      if (seenIds.has(entry.id)) problems.push(`${where}.id ${entry.id} is listed twice`);
+      seenIds.add(entry.id);
+    }
+    const publisherOk = checkText(entry.publisher, `${where}.publisher`, problems, { pattern: IDENTIFIER, patternName: "publisher id", min: PUBLISHER_MIN, max: PUBLISHER_MAX });
+    if (idOk && publisherOk && entry.publisher === "teamuq" && !entry.id.startsWith("teamuq.")) problems.push(`${where}: publisher "teamuq" is only allowed for ids that start with "teamuq." (Core would refuse the plugin)`);
+    const trustTier = entry.trustTier ?? "sandboxed";
+    if (!TIERS.includes(trustTier)) problems.push(`${where}.trustTier must be one of ${TIERS.join(", ")}`);
+    const native = entry.native ?? "none";
+    if (!NATIVE_LEVELS.includes(native)) problems.push(`${where}.native must be one of ${NATIVE_LEVELS.join(", ")}`);
+    const permissions = checkList(entry.permissions, `${where}.permissions`, problems, { pattern: PERMISSION, patternName: "permission name" });
+    if (entry.networkAllow !== void 0 && Array.isArray(entry.networkAllow) && entry.networkAllow.length > 0 && typeof parseOrigin !== "function") throw new Error("internal error: no network origin parser was given to this tool, so networkAllow cannot be checked; nothing was signed");
+    const networkAllow = checkList(entry.networkAllow, `${where}.networkAllow`, problems, { pattern: origin, patternName: "public https or wss origin in the exact form Core accepts in a manifest (no IP address, no local name, no port 443, no path)" });
+    const provides = checkList(entry.provides, `${where}.provides`, problems, { pattern: CAPABILITY2, patternName: "capability id such as teamuq.text-input@1" });
+    const assetPackRefs = checkList(entry.assetPackRefs, `${where}.assetPackRefs`, problems, { pattern: IDENTIFIER, patternName: "asset pack id", min: 3, max: 96 });
+    const assetPackPrefixes = checkList(entry.assetPackPrefixes, `${where}.assetPackPrefixes`, problems, { pattern: ASSET_PREFIX, patternName: "asset pack prefix such as teamuq.asset.name-", max: 90 });
+    for (const prefix of assetPackPrefixes) {
+      if (idOk && !isAssetPackPrefixOf2(entry.id, prefix)) problems.push(`${where}.assetPackPrefixes: ${prefix} is not inside the namespace of ${entry.id} (${entry.id.slice(0, entry.id.indexOf("."))}.asset.${entry.id.slice(entry.id.indexOf(".") + 1)}-...)`);
+    }
+    for (const ref of assetPackRefs) {
+      if (reserved.has(ref)) problems.push(`${where}.assetPackRefs ${ref} is reserved`);
+    }
+    plugins.push({ id: entry.id, publisher: entry.publisher, trustTier, native, permissions, networkAllow, provides, assetPackRefs, assetPackPrefixes });
+  }
+  const assetPacks = checkList(raw.assetPacks, "assetPacks", problems, { pattern: IDENTIFIER, patternName: "asset pack id", min: 3, max: 96 });
+  for (const id of assetPacks) {
+    if (reserved.has(id)) problems.push(`assetPacks ${id} is reserved`);
+  }
+  if (problems.length > 0) throw new Error(problemsOf(problems));
+  return { plugins, assetPacks };
+}
+var rank = (levels, value) => levels.indexOf(value);
+function narrowingProblems(previous, next) {
+  const problems = [];
+  const nextById = new Map(next.plugins.map((plugin) => [plugin.id, plugin]));
+  for (const old of previous.plugins) {
+    const now = nextById.get(old.id);
+    if (now === void 0) {
+      problems.push(`plugin ${old.id} is in the previous certificate but not in the new scope`);
+      continue;
+    }
+    if (rank(TIERS, now.trustTier) < rank(TIERS, old.trustTier)) problems.push(`${old.id}: trust level drops from ${old.trustTier} to ${now.trustTier}`);
+    if (rank(NATIVE_LEVELS, now.native) < rank(NATIVE_LEVELS, old.native)) problems.push(`${old.id}: native level drops from ${old.native} to ${now.native}`);
+    if (now.publisher !== old.publisher) problems.push(`${old.id}: publisher changes from ${old.publisher} to ${now.publisher}`);
+    for (const field of ["permissions", "networkAllow", "provides", "assetPackRefs", "assetPackPrefixes"]) {
+      const lost = old[field].filter((item) => !now[field].includes(item));
+      if (lost.length > 0) problems.push(`${old.id}.${field} loses: ${lost.join(", ")}`);
+    }
+  }
+  const lostPacks = previous.assetPacks.filter((id) => !next.assetPacks.includes(id));
+  if (lostPacks.length > 0) problems.push(`assetPacks loses: ${lostPacks.join(", ")}`);
+  return problems;
+}
+var TIER_TEXT = {
+  sandboxed: "sandboxed (runs only inside its own window)",
+  "full-trust": "full trust (also runs its own background program on the user's computer)"
+};
+var NATIVE_TEXT = {
+  none: "none (no native libraries and no add-ons)",
+  libraries: "native libraries allowed",
+  addons: "native libraries and add-ons allowed (code that runs directly on the user's computer)"
+};
+function listOrNone(items, none) {
+  return items.length === 0 ? none : items.map(asciiOnly).join(", ");
+}
+function describeScope(scope) {
+  const lines = [];
+  if (scope.plugins.length === 0) lines.push("No plugin may be signed.");
+  for (const [index, plugin] of scope.plugins.entries()) {
+    lines.push(`${index + 1}. Plugin ${asciiOnly(plugin.id)} (publisher ${asciiOnly(plugin.publisher)})`);
+    lines.push(`   - runs as: ${TIER_TEXT[plugin.trustTier] ?? asciiOnly(plugin.trustTier)}`);
+    lines.push(`   - native files: ${NATIVE_TEXT[plugin.native] ?? asciiOnly(plugin.native)}`);
+    lines.push(`   - may ask for these permissions: ${listOrNone(plugin.permissions, "none")}`);
+    lines.push(`   - may connect to: ${listOrNone(plugin.networkAllow, "nowhere (no network address)")}`);
+    lines.push(`   - may offer these services to other plugins: ${listOrNone(plugin.provides, "none")}`);
+    lines.push(`   - may use these asset packs: ${listOrNone(plugin.assetPackRefs, "none")}`);
+    lines.push(`   - owns store packs whose id starts with: ${listOrNone(plugin.assetPackPrefixes, "nothing")}`);
+  }
+  lines.push(`Asset packs this key may sign itself (exact ids only): ${listOrNone(scope.assetPacks, "none")}`);
+  return lines;
+}
+function validityState({ notBefore, notAfter }, nowMs) {
+  if (nowMs > Date.parse(notAfter)) return "expired";
+  if (Date.parse(notBefore) - CLOCK_SKEW_MS > nowMs) return "not-yet-valid";
+  return "valid";
+}
+function describeValidity({ notBefore, notAfter }, nowMs) {
+  const from = Date.parse(notBefore);
+  const to = Date.parse(notAfter);
+  const total = Math.round((to - from) / DAY_MS);
+  const shown = (iso) => `${asciiOnly(iso.slice(0, 10))} ${asciiOnly(iso.slice(11, 16))} UTC`;
+  const state = validityState({ notBefore, notAfter }, nowMs);
+  const lines = [`Valid from ${shown(notBefore)} until ${shown(notAfter)} (${total} days in total).`];
+  if (state === "expired") lines.push(`Status: EXPIRED ${Math.max(1, Math.floor((nowMs - to) / DAY_MS))} day(s) ago. TeamUQ refuses new installs and updates signed under this certificate; plugins that are already installed keep working.`);
+  else if (state === "not-yet-valid") lines.push(`Status: NOT VALID YET (starts in ${Math.ceil((from - nowMs) / DAY_MS)} day(s)).`);
+  else {
+    const left = Math.floor((to - nowMs) / DAY_MS);
+    lines.push(`Status: valid now, ${left} day(s) left.`);
+    if (left < 30) lines.push("Warning: less than 30 days left. Issue the next certificate at least 30 days before this one ends, so the two overlap.");
+  }
+  return lines;
+}
+function describeChange(previous, next) {
+  const lines = [];
+  const previousById = new Map(previous.plugins.map((plugin) => [plugin.id, plugin]));
+  for (const plugin of next.plugins) {
+    const old = previousById.get(plugin.id);
+    const id = asciiOnly(plugin.id);
+    if (old === void 0) {
+      lines.push(`+ NEW plugin ${id}`);
+      continue;
+    }
+    if (rank(TIERS, plugin.trustTier) > rank(TIERS, old.trustTier)) lines.push(`+ ${id}: trust level raised from ${asciiOnly(old.trustTier)} to ${asciiOnly(plugin.trustTier)}`);
+    if (rank(NATIVE_LEVELS, plugin.native) > rank(NATIVE_LEVELS, old.native)) lines.push(`+ ${id}: native level raised from ${asciiOnly(old.native)} to ${asciiOnly(plugin.native)}`);
+    for (const field of ["permissions", "networkAllow", "provides", "assetPackRefs", "assetPackPrefixes"]) {
+      const added = plugin[field].filter((item) => !old[field].includes(item));
+      if (added.length > 0) lines.push(`+ ${id}.${field}: adds ${added.map(asciiOnly).join(", ")}`);
+    }
+  }
+  const addedPacks = next.assetPacks.filter((id) => !previous.assetPacks.includes(id));
+  if (addedPacks.length > 0) lines.push(`+ assetPacks: adds ${addedPacks.map(asciiOnly).join(", ")}`);
+  if (lines.length === 0) lines.push("(no change to the scope: this certificate only renews the validity)");
+  return lines;
+}
+function certificateBytes({ serial, issuer, release, notBefore, notAfter, scope }) {
+  return Buffer.from(JSON.stringify({
+    schema: 1,
+    serial,
+    issuer,
+    release: { keyId: release.keyId, algorithm: "ed25519", publicKey: release.publicKey },
+    notBefore,
+    notAfter,
+    scope: { plugins: scope.plugins.map((plugin) => ({ id: plugin.id, publisher: plugin.publisher, trustTier: plugin.trustTier, native: plugin.native, permissions: plugin.permissions, networkAllow: plugin.networkAllow, provides: plugin.provides, assetPackRefs: plugin.assetPackRefs, assetPackPrefixes: plugin.assetPackPrefixes })), assetPacks: scope.assetPacks }
+  }), "utf8");
+}
+function delegationSigningInput2(certBytes) {
+  return Buffer.concat([DELEGATION_DOMAIN_PREFIX2, certBytes]);
+}
+function delegationFileBytes({ issuerKeyId, certBytes, signature }) {
+  return Buffer.from(JSON.stringify({ format: 1, issuerKeyId, cert: certBytes.toString("base64"), signature: signature.toString("base64") }), "utf8");
+}
+function readSmallFile(file, label, limit = MAX_SMALL_FILE_BYTES) {
+  let stat;
+  try {
+    stat = fs10.statSync(file);
+  } catch {
+    throw new Error(`${label} ${file} cannot be read`);
+  }
+  if (!stat.isFile() || stat.size > limit) throw new Error(`${label} ${file} is not a regular file of at most ${limit} bytes`);
+  return fs10.readFileSync(file);
+}
+function readJsonFile(file, label, limit) {
+  try {
+    return JSON.parse(readSmallFile(file, label, limit).toString("utf8"));
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new Error(`${label} ${file} is not valid JSON`);
+    throw error;
+  }
+}
+function canonicalRaw(base642, label) {
+  const raw = Buffer.from(String(base642), "base64");
+  if (raw.toString("base64") !== base642 || raw.length !== 32) throw new Error(`${label} must be the canonical base64 of 32 raw bytes`);
+  try {
+    rawToPublicKey(raw);
+  } catch {
+    throw new Error(`${label} is not a valid Ed25519 public key`);
+  }
+  return raw;
+}
+function readPublicKeyFile(file, label) {
+  const stored = readJsonFile(file, label, 4096);
+  if (stored === null || typeof stored !== "object" || Array.isArray(stored) || typeof stored.keyId !== "string" || typeof stored.publicKey !== "string" || Object.keys(stored).some((key2) => key2 !== "keyId" && key2 !== "publicKey")) throw new Error(`${label} ${file} must contain exactly { keyId, publicKey }`);
+  canonicalRaw(stored.publicKey, `${label} publicKey`);
+  return { keyId: stored.keyId, publicKey: stored.publicKey };
+}
+function keyIdFromFile(keyFile, explicit) {
+  const base = path9.basename(keyFile);
+  const keyId2 = explicit ?? (base.endsWith(".key.pem") ? base.slice(0, -".key.pem".length) : void 0);
+  if (keyId2 === void 0) throw new UsageProblem("--root-key-id is required when the key file is not named <keyId>.key.pem");
+  return keyId2;
+}
+function loadBundledIds(flags) {
+  const file = path9.resolve(flags.get("--bundled-index"));
+  const index = readJsonFile(file, "bundled plugin index");
+  if (index === null || typeof index !== "object" || !Array.isArray(index.plugins) || index.plugins.some((entry) => typeof entry?.id !== "string")) throw new Error(`bundled plugin index ${file} does not look like bundled-plugins.json`);
+  if (index.plugins.length === 0) throw new Error(`bundled plugin index ${file} lists no plugin; the real one lists at least teamuq.memory, so this is the wrong file or a cut-off copy`);
+  return { file, ids: index.plugins.map((entry) => entry.id) };
+}
+function anchorsFor(flags, deps) {
+  const mode = flags.get("--anchors") ?? "core";
+  if (mode !== "core" && mode !== "self") throw new UsageProblem("--anchors must be core or self");
+  const pubFile = flags.get("--root-pub-file");
+  if (mode === "core") {
+    if (pubFile !== void 0) throw new UsageProblem("--root-pub-file is only for --anchors self");
+    if (deps.coreAnchors === void 0) throw new Error("no built-in TEAMUQ_TRUST_ANCHORS were given to this tool");
+    return { mode, anchors: deps.coreAnchors };
+  }
+  if (pubFile === void 0) throw new UsageProblem("--anchors self needs --root-pub-file <file.pub.json> (the public file of the root key you test with)");
+  const stored = readPublicKeyFile(pubFile, "root public key file");
+  if (!KEY_ID_PATTERN2.test(stored.keyId) || stored.keyId.startsWith("dev-") || stored.keyId.startsWith(RELEASE_KEY_PREFIX2)) throw new Error(`${stored.keyId} cannot be a root key id (not dev- and not ${RELEASE_KEY_PREFIX2}*)`);
+  if (deps.coreAnchors === void 0) throw new Error("no built-in TEAMUQ_TRUST_ANCHORS were given to this tool, so the name of --root-pub-file cannot be checked against them");
+  const impersonated = deps.coreAnchors.rootKeys.find((candidate) => candidate.keyId === stored.keyId && candidate.publicKey !== stored.publicKey);
+  if (impersonated !== void 0) throw new Error(`refused: ${stored.keyId} in --root-pub-file is the id of a built-in key but holds a different public key; a test root key must not borrow the name of a TeamUQ key`);
+  return { mode, anchors: { rootKeys: [{ keyId: stored.keyId, publicKey: stored.publicKey, role: "package" }], revokedKeyIds: [] } };
+}
+function resolveRootAnchor(rootKeyId, anchors) {
+  if (!KEY_ID_PATTERN2.test(rootKeyId)) throw new Error(`root keyId ${rootKeyId} does not match ${KEY_ID_PATTERN2}`);
+  if (rootKeyId.startsWith("dev-")) throw new Error(`refused: ${rootKeyId} is a development key; only a TeamUQ root key can sign a delegation certificate`);
+  if (rootKeyId.startsWith(RELEASE_KEY_PREFIX2)) throw new Error(`refused: ${rootKeyId} is a release key; a release key can never sign a delegation certificate (only a root key does)`);
+  const anchor = anchors.rootKeys.find((candidate) => candidate.keyId === rootKeyId);
+  if (anchor === void 0) throw new Error(`refused: ${rootKeyId} is not one of the ${anchors.rootKeys.length} root keys built into this tool, so Core would not accept a certificate it signs (use --anchors self only for tests)`);
+  if ((anchor.role ?? "package") !== "package") throw new Error(`refused: ${rootKeyId} is registered for the store catalog (role ${anchor.role}), not for packages; it cannot issue delegations`);
+  if (anchors.revokedKeyIds.includes(rootKeyId)) throw new Error(`refused: ${rootKeyId} is revoked`);
+  return anchor;
+}
+function untrustedCertificate(bytes4) {
+  try {
+    const outer = JSON.parse(bytes4.toString("utf8"));
+    const cert = JSON.parse(Buffer.from(outer.cert, "base64").toString("utf8"));
+    if (typeof cert?.release?.keyId !== "string" || typeof cert.notBefore !== "string") throw new Error("shape");
+    return cert;
+  } catch {
+    throw new Error("this file is not a delegation certificate (delegation.json)");
+  }
+}
+function reasonOf(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return typeof error?.code === "string" && !message.startsWith(error.code) ? `${error.code}: ${message}` : message;
+}
+function requireVerifier(deps) {
+  if (typeof deps.verifyDelegation !== "function") throw new Error("internal error: no Core delegation verifier was given to this tool");
+  return deps.verifyDelegation;
+}
+function verifyWithCore(bytes4, anchors, deps, nowMs) {
+  const cert = untrustedCertificate(bytes4);
+  const notBefore = Date.parse(cert.notBefore);
+  const verified = requireVerifier(deps)(cert.release.keyId, anchors, { delegationBytes: bytes4, now: Number.isFinite(notBefore) ? Math.max(nowMs, notBefore) : nowMs, expiry: "ignore" });
+  return { releaseKeyId: cert.release.keyId, publicKey: verified.publicKey, grant: verified.grant };
+}
+async function runReleaseKeygen(argv, deps = {}) {
+  return guarded("release-keygen", deps, async () => {
+    const { out } = sinks(deps);
+    const { positional, flags } = parseFlags(argv, ["--key-id", "--out-dir"]);
+    if (positional.length !== 0) throw new UsageProblem("release-keygen takes no positional argument");
+    const keyId2 = flags.get("--key-id");
+    const outDir = flags.get("--out-dir");
+    if (keyId2 === void 0 || outDir === void 0) throw new UsageProblem("--key-id and --out-dir are both required (where a release key lives is decided by the release process, so there is no default directory)");
+    assertNoPassphraseEnv("release-keygen");
+    try {
+      assertDelegatedKeyId(keyId2);
+    } catch (error) {
+      throw new UsageProblem(error.message);
+    }
+    const directory = path9.resolve(outDir);
+    assertOutsideGitWorkTree(directory, "output directory");
+    if (fs10.existsSync(path9.join(directory, `${keyId2}.key.pem`)) || fs10.existsSync(path9.join(directory, `${keyId2}.pub.json`))) throw new Error(`${keyId2} already exists in ${directory}; refusing to overwrite a key`);
+    const passphrase = await (deps.readNewPassphrase ?? readNewInteractivePassphrase)();
+    const result = writeEncryptedKeyFiles({ keyId: keyId2, directory, passphrase });
+    out([
+      `keyId        : ${result.keyId}`,
+      `private key  : ${result.keyFile} (encrypted PKCS8 PEM; never commit, upload or share it)`,
+      `public file  : ${result.publicFile}`,
+      `publicKey    : ${result.publicKey}`,
+      `fingerprint  : ${result.fingerprint}`,
+      "self-check   : ok (signed and verified once with the stored files; a wrong passphrase is rejected)",
+      "",
+      `This key signs nothing yet. Do NOT paste it into TEAMUQ_TRUST_ANCHORS: a release key is trusted only through a certificate that a root key issues with "delegate --release-pub ${result.publicFile}".`,
+      ""
+    ].join("\n"));
+    return 0;
+  });
+}
+var DELEGATE_REQUIRED = ["--root-key", "--release-pub", "--scope", "--bundled-index", "--out"];
+var DELEGATE_FLAGS = ["--root-key", "--root-key-id", "--release-pub", "--scope", "--previous", "--first", "--out", "--days", "--serial", "--not-before", "--anchors", "--root-pub-file", "--bundled-index"];
+function planDelegation(argv, deps) {
+  const { positional, flags } = parseFlags(argv, DELEGATE_FLAGS, ["--first"]);
+  if (positional.length !== 0) throw new UsageProblem("delegate takes no positional argument");
+  assertNoPassphraseEnv("delegate");
+  for (const required of DELEGATE_REQUIRED) {
+    if (!flags.has(required)) throw new UsageProblem(`${required} is required`);
+  }
+  if (flags.has("--first") === flags.has("--previous")) throw new UsageProblem("give exactly one of --previous <the newest delegation.json of this release key> or --first (no certificate exists for this key id yet)");
+  const now = wholeSecond((deps.now ?? Date.now)());
+  const { mode, anchors } = anchorsFor(flags, deps);
+  const keyFile = path9.resolve(flags.get("--root-key"));
+  assertOutsideGitWorkTree(keyFile, "root key file");
+  const rootKeyId = keyIdFromFile(keyFile, flags.get("--root-key-id"));
+  const rootAnchor = resolveRootAnchor(rootKeyId, anchors);
+  const keyStat = fs10.existsSync(keyFile) ? fs10.statSync(keyFile) : null;
+  if (keyStat === null || !keyStat.isFile()) throw new Error(`root key file ${keyFile} does not exist`);
+  const releaseStored = readPublicKeyFile(flags.get("--release-pub"), "release public key file");
+  try {
+    assertDelegatedKeyId(releaseStored.keyId);
+  } catch (error) {
+    throw new Error(`release public key file: ${error.message}`);
+  }
+  if (anchors.rootKeys.some((candidate) => candidate.keyId === releaseStored.keyId)) throw new Error(`refused: ${releaseStored.keyId} is the id of a built-in key`);
+  const sameKey = anchors.rootKeys.find((candidate) => candidate.publicKey === releaseStored.publicKey);
+  if (sameKey !== void 0) throw new Error(`refused: the public key in the release public key file is the public key of the built-in key ${sameKey.keyId}; a release key must be a key pair of its own (release-keygen)`);
+  if (anchors.revokedKeyIds.includes(releaseStored.keyId)) throw new Error(`refused: ${releaseStored.keyId} is on the revoked key list; TeamUQ refuses everything it signs, so it gets no new certificate (make a new key with release-keygen)`);
+  const release = { keyId: releaseStored.keyId, publicKey: releaseStored.publicKey };
+  const bundled = loadBundledIds(flags);
+  const scope = normalizeScope(readJsonFile(flags.get("--scope"), "scope file"), { reservedIds: [...BUILT_IN_RESERVED_IDS, ...bundled.ids], parseOrigin: deps.parseDeclaredNetworkOrigin });
+  const daysText = flags.get("--days");
+  const days = daysText === void 0 ? DEFAULT_LIFETIME_DAYS : Number(daysText);
+  if (daysText !== void 0 && !/^[0-9]+$/u.test(daysText)) throw new UsageProblem("--days must be a whole number of days");
+  if (days < 1) throw new UsageProblem("--days must be at least 1");
+  if (days > MAX_LIFETIME_DAYS) throw new Error(`refused: ${days} days is longer than the ${MAX_LIFETIME_DAYS} day limit Core enforces; default is ${DEFAULT_LIFETIME_DAYS} days`);
+  const notBeforeMs = flags.has("--not-before") ? parseUtc(flags.get("--not-before"), "--not-before") : now;
+  if (notBeforeMs > now + MAX_NOT_BEFORE_AHEAD_DAYS * DAY_MS) throw new Error(`refused: --not-before ${flags.get("--not-before")} is more than ${MAX_NOT_BEFORE_AHEAD_DAYS} days away; a certificate may start at most ${MAX_NOT_BEFORE_AHEAD_DAYS} days after it is issued (issue it later instead)`);
+  const notAfterMs = notBeforeMs + days * DAY_MS;
+  if (notAfterMs <= now) throw new Error("refused: the certificate would already be expired when it is issued");
+  const serialText = flags.get("--serial");
+  if (serialText !== void 0 && (!new RegExp(`^[1-9][0-9]{0,${MAX_SERIAL_DIGITS - 1}}$`, "u").test(serialText) || !Number.isSafeInteger(Number(serialText)))) throw new UsageProblem(`--serial must be a positive whole number of at most ${Number.MAX_SAFE_INTEGER}`);
+  const requestedSerial = serialText === void 0 ? void 0 : Number(serialText);
+  let serial = 1;
+  let previous = null;
+  if (flags.has("--first") && requestedSerial !== void 0 && requestedSerial !== 1) throw new Error(`refused: --first makes certificate number 1; --serial ${requestedSerial} would start a series in the middle. A later certificate needs --previous <the newest delegation.json of this key>`);
+  if (flags.has("--previous")) {
+    const previousFile = flags.get("--previous");
+    const bytes4 = readSmallFile(previousFile, "previous certificate", MAX_DELEGATION_BYTES2);
+    let checked;
+    try {
+      checked = verifyWithCore(bytes4, anchors, deps, now);
+    } catch (error) {
+      throw new Error(`the previous certificate ${previousFile} does not verify: ${reasonOf(error)}`);
+    }
+    if (checked.releaseKeyId !== release.keyId) throw new Error(`the previous certificate is for ${checked.releaseKeyId}, not ${release.keyId}; a different key id starts its own series (use --first)`);
+    if (checked.publicKey.toString("base64") !== release.publicKey) throw new Error(`the previous certificate holds a different public key for ${release.keyId}; a key id must never be reused for another key`);
+    const narrowed = narrowingProblems(JSON.parse(JSON.stringify(checked.grant.scope)), scope);
+    if (narrowed.length > 0) throw new Error(`refused: the new scope is narrower than the previous certificate (same key id may only widen; to narrow, use a new key id and revoke the old one):
+${narrowed.map((line2) => `  - ${line2}`).join("\n")}`);
+    serial = checked.grant.serial + 1;
+    if (!Number.isSafeInteger(serial)) throw new Error(`refused: the previous certificate already has the largest number Core accepts (${checked.grant.serial}); start a new key id`);
+    if (requestedSerial !== void 0 && requestedSerial !== serial) throw new Error(`refused: --serial ${requestedSerial} is not the previous certificate's number ${checked.grant.serial} plus 1 (${serial}); numbers are never skipped or reused, so that a missing or duplicate number shows a certificate that was lost or forged`);
+    previous = { serial: checked.grant.serial, scope: JSON.parse(JSON.stringify(checked.grant.scope)), notAfter: checked.grant.notAfter };
+  }
+  const notBefore = formatUtc(notBeforeMs);
+  const notAfter = formatUtc(notAfterMs);
+  const certBytes = certificateBytes({ serial, issuer: rootKeyId, release, notBefore, notAfter, scope });
+  const sizeEstimate = delegationFileBytes({ issuerKeyId: rootKeyId, certBytes, signature: Buffer.alloc(64) }).length;
+  if (sizeEstimate > MAX_DELEGATION_BYTES2) throw new Error(`refused: the certificate file would be ${sizeEstimate} bytes; Core accepts at most ${MAX_DELEGATION_BYTES2}. Shorten the scope.`);
+  const outFile = path9.resolve(flags.get("--out"));
+  if (fs10.existsSync(outFile)) throw new Error(`${outFile} already exists; refusing to overwrite a certificate`);
+  if (!fs10.existsSync(path9.dirname(outFile))) throw new Error(`the folder ${path9.dirname(outFile)} does not exist`);
+  return { mode, anchors, bundled: { file: bundled.file, count: bundled.ids.length }, keyFile, rootKeyId, rootAnchor, release, scope, previous, serial, notBefore, notAfter, notBeforeMs, notAfterMs, days, certBytes, outFile, now };
+}
+function reviewText(plan) {
+  const lines = [
+    "",
+    "=== Please check this before you type the ROOT passphrase ===",
+    `Root key that signs  : ${plan.rootKeyId}${plan.mode === "self" ? "  (TEST MODE: --anchors self, Core will not accept this)" : ""}`,
+    `Release key it trusts: ${plan.release.keyId}`,
+    `Certificate number   : ${plan.serial}${plan.previous === null ? " (first certificate for this key id)" : ` (follows number ${plan.previous.serial})`}`,
+    ...describeValidity({ notBefore: plan.notBefore, notAfter: plan.notAfter }, plan.now),
+    `Pre-installed ids   : checked against ${plan.bundled.count} id(s) in ${plan.bundled.file}`,
+    "",
+    "This release key will be allowed to sign:",
+    ...describeScope(plan.scope).map((line2) => `  ${line2}`),
+    "",
+    plan.previous === null ? "There is no earlier certificate to compare with, so everything above is new." : `Changes compared with certificate number ${plan.previous.serial}:`,
+    ...plan.previous === null ? [] : describeChange(plan.previous.scope, plan.scope).map((line2) => `  ${line2}`),
+    ""
+  ];
+  return screen(`${lines.join("\n")}
+`);
+}
+async function runDelegate(argv, deps = {}) {
+  return guarded("delegate", deps, async () => {
+    const { out, err } = sinks(deps);
+    const plan = planDelegation(argv, deps);
+    err(reviewText(plan));
+    const passphrase = await (deps.readPassphrase ?? readInteractivePassphrase)(`Passphrase for ROOT key ${plan.rootKeyId}: `);
+    const key2 = loadEncryptedPrivateKey(readKeyFile(plan.keyFile), passphrase);
+    const description = describePublicKey(createPublicKey5(key2));
+    if (description.publicKey !== plan.rootAnchor.publicKey) throw new Error(`refused: the key in ${plan.keyFile} is not the public key that ${plan.rootKeyId} has in the trust anchors (wrong file, or a key that only carries that name)`);
+    selfCheck(key2, description.raw);
+    const signature = sign3(null, delegationSigningInput2(plan.certBytes), key2);
+    const bytes4 = delegationFileBytes({ issuerKeyId: plan.rootKeyId, certBytes: plan.certBytes, signature });
+    if (!verify5(null, delegationSigningInput2(plan.certBytes), rawToPublicKey(description.raw), signature)) throw new Error("internal error: the new signature does not verify");
+    const checked = requireVerifier(deps)(plan.release.keyId, plan.anchors, { delegationBytes: bytes4, now: Math.max(plan.now, plan.notBeforeMs), expiry: "enforce" });
+    if (checked.publicKey.toString("base64") !== plan.release.publicKey || !isDeepStrictEqual(JSON.parse(JSON.stringify(checked.grant.scope)), plan.scope)) throw new Error("internal error: the certificate Core reads back differs from the one that was requested; nothing was written");
+    fs10.writeFileSync(plan.outFile, bytes4, { flag: "wx" });
+    out(`${JSON.stringify({ file: plan.outFile, issuer: plan.rootKeyId, releaseKeyId: plan.release.keyId, serial: plan.serial, notBefore: plan.notBefore, notAfter: plan.notAfter, bytes: bytes4.length, sha256: createHash8("sha256").update(bytes4).digest("hex"), verifiedBy: "Core delegation verifier (trust/delegation.ts)", anchors: plan.mode }, null, 2)}
+`);
+    return 0;
+  });
+}
+async function runDelegationInspect(argv, deps = {}) {
+  return guarded("delegation-inspect", deps, async () => {
+    const { out } = sinks(deps);
+    const { positional, flags } = parseFlags(argv, ["--anchors", "--root-pub-file", "--at"]);
+    if (positional.length !== 1) throw new UsageProblem("delegation-inspect needs exactly one delegation.json file");
+    const { mode, anchors } = anchorsFor(flags, deps);
+    const nowMs = flags.has("--at") ? parseUtc(flags.get("--at"), "--at") : wholeSecond((deps.now ?? Date.now)());
+    const file = path9.resolve(positional[0]);
+    const bytes4 = readSmallFile(file, "certificate file", MAX_DELEGATION_BYTES2);
+    let checked;
+    try {
+      checked = verifyWithCore(bytes4, anchors, deps, nowMs);
+    } catch (error) {
+      out(screen([
+        `Certificate file : ${file}`,
+        `Signature check  : FAILED (${reasonOf(error)})`,
+        "Do not trust this file. Nothing in it is shown because none of it is proven.",
+        ""
+      ].join("\n")));
+      return 1;
+    }
+    const { grant } = checked;
+    const revoked = anchors.revokedKeyIds.includes(checked.releaseKeyId);
+    const validity = describeValidity(grant, nowMs);
+    const shownValidity = revoked ? [validity[0], "Status: REVOKED. This release key id is on the revoked key list: TeamUQ refuses everything it signs, whatever the dates above say. Do not use this certificate."] : validity;
+    const usable = !revoked && validityState(grant, nowMs) === "valid";
+    const raw = checked.publicKey;
+    out(screen([
+      `Certificate file : ${file}`,
+      `Signature check  : OK - signed by TeamUQ root key ${grant.issuer}${mode === "self" ? " (TEST MODE: --anchors self; real TeamUQ would not accept it)" : ""}`,
+      `Release key      : ${checked.releaseKeyId} (fingerprint sha256:${createHash8("sha256").update(raw).digest("hex")})`,
+      `Certificate no.  : ${grant.serial}`,
+      ...shownValidity,
+      "",
+      "This release key may sign:",
+      ...describeScope(JSON.parse(JSON.stringify(grant.scope))).map((line2) => `  ${line2}`),
+      "",
+      "Not covered: any plugin id or asset pack id that is not listed above, pre-installed plugins, store packs and the store catalog, and new certificates. This certificate is a permission list only; it contains no secret.",
+      ""
+    ].join("\n")));
+    return usable ? 0 : 1;
+  });
+}
+
+// .teamuq/scripts/plugin-tools/pluginStarter.mjs
+import { promises as fs11 } from "node:fs";
+import path10 from "node:path";
+
+// .teamuq/scripts/plugin-tools/starter-template/ui/index.html.tpl
+var index_html_default = '<!doctype html>\n<!--\n  這是外掛畫面的骨架，你看到的文字都可以直接改成自己的。\n  注意：TeamUQ 不允許在 HTML 裡直接寫 <script>…</script> 程式，\n  所有 JavaScript 都要放在獨立檔案（這裡是 app.js），再用下面的 <script src="app.js"> 引用。\n-->\n<html lang="zh-Hant">\n<head>\n<meta charset="utf-8">\n<title>__PLUGIN_NAME__</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<main>\n  <h1>__PLUGIN_NAME__</h1>\n  <p class="hint">這是你的第一個 TeamUQ 外掛。在下面寫點東西、按「儲存」，關掉外掛再打開，內容還會在。</p>\n\n  <label for="note">我的筆記</label>\n  <textarea id="note" rows="6" placeholder="在這裡輸入…"></textarea>\n\n  <div class="row">\n    <button id="save" type="button">儲存</button>\n    <output id="status" aria-live="polite"></output>\n  </div>\n</main>\n<script src="app.js" defer></script>\n</body>\n</html>\n';
+
+// .teamuq/scripts/plugin-tools/starter-template/ui/app.js.tpl
+var app_js_default = "// 這個檔案是外掛畫面的程式。你可以直接改它，改完重新打包（見 README.md）就會生效。\n//\n// TeamUQ 給外掛畫面的唯一入口是 window.tuqPlugin。\n// 這個範本只用到其中的 storage（外掛自己的資料資料夾，其他外掛看不到），\n// 它需要 manifest.json 的 permissions 裡有 \"storage:plugin-data\"。\n// 如果你刪掉這個權限，下面的讀寫會失敗。\n\nconst NOTE_FILE = 'note.txt'\n\nconst noteBox = document.querySelector('#note')\nconst saveButton = document.querySelector('#save')\nconst statusText = document.querySelector('#status')\n\nfunction say(message) {\n  statusText.textContent = message\n}\n\nasync function loadNote() {\n  try {\n    noteBox.value = await window.tuqPlugin.storage.readText(NOTE_FILE)\n  } catch {\n    // 第一次打開還沒有這個檔案，保持空白就好\n    noteBox.value = ''\n  }\n}\n\nasync function saveNote() {\n  say('儲存中…')\n  try {\n    await window.tuqPlugin.storage.write(NOTE_FILE, noteBox.value)\n    say('已儲存')\n  } catch (error) {\n    say(`儲存失敗：${error instanceof Error ? error.message : String(error)}`)\n  }\n}\n\nif (window.tuqPlugin === undefined) {\n  // 直接用瀏覽器打開這個檔案時沒有 window.tuqPlugin；請在 TeamUQ 裡安裝後再試\n  say('請在 TeamUQ 裡安裝這個外掛後使用。')\n  saveButton.disabled = true\n} else {\n  saveButton.addEventListener('click', saveNote)\n  loadNote()\n}\n";
+
+// .teamuq/scripts/plugin-tools/starter-template/ui/style.css.tpl
+var style_css_default = '/* 外觀設定：想改顏色、字體大小就改這裡。 */\n:root {\n  color-scheme: light dark;\n  --accent: #2f6fed;\n}\n\nbody {\n  margin: 0;\n  padding: 24px;\n  font: 15px/1.6 system-ui, "Noto Sans TC", "Microsoft JhengHei", sans-serif;\n}\n\nmain {\n  max-width: 560px;\n  margin: 0 auto;\n}\n\nh1 {\n  margin: 0 0 8px;\n  font-size: 22px;\n}\n\n.hint {\n  margin: 0 0 20px;\n  opacity: 0.75;\n}\n\nlabel {\n  display: block;\n  margin-bottom: 6px;\n  font-weight: 600;\n}\n\ntextarea {\n  box-sizing: border-box;\n  width: 100%;\n  padding: 10px;\n  font: inherit;\n  resize: vertical;\n}\n\n.row {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  margin-top: 12px;\n}\n\nbutton {\n  padding: 8px 20px;\n  border: 0;\n  border-radius: 6px;\n  background: var(--accent);\n  color: #fff;\n  font: inherit;\n  cursor: pointer;\n}\n\nbutton:disabled {\n  opacity: 0.5;\n  cursor: default;\n}\n';
+
+// .teamuq/scripts/plugin-tools/starter-template/README.md.tpl
+var README_md_default = "# __PLUGIN_NAME__\n\n這是用 `tuq-plugin-tool init` 產生的 TeamUQ 外掛範本。它是「沙盒級」外掛：只在自己的畫面裡執行，不能碰你電腦上的其他檔案，也不能連網。\n\n## 檔案說明\n\n| 檔案 | 作用 | 想改的話 |\n|---|---|---|\n| `manifest.json` | 外掛的身分證：名稱、版本、需要哪些權限 | 見下方「manifest.json 哪裡可以改」 |\n| `ui/index.html` | 畫面的文字與按鈕 | 直接改裡面的中文 |\n| `ui/app.js` | 按鈕按下去要做什麼 | 改裡面的程式；檔案內有中文說明 |\n| `ui/style.css` | 顏色、字體、間距 | 直接改 |\n| `README.md` | 就是這份說明 | 可以刪掉或改成你自己的介紹 |\n\n## manifest.json 哪裡可以改\n\n| 欄位 | 說明 |\n|---|---|\n| `name` | 外掛在 TeamUQ 裡顯示的名字，可以改成任何文字 |\n| `description` | 一句話介紹 |\n| `version` | 版本號。改過外掛內容、要更新已安裝的外掛時，請把它加大（例如 `0.1.0` 改成 `0.1.1`） |\n| `publisher` 與 `id` | 你的名字（小寫英文、數字、`-`）與外掛的唯一識別。`id` 必須是「`publisher` 加上一個點再加名稱」。**不能用 `teamuq.` 開頭**，這個名稱保留給 TeamUQ 官方 |\n| `permissions` | 外掛需要的權限。這個範本只要 `ui:view`（顯示畫面）與 `storage:plugin-data`（讀寫自己的資料）。只列你真的用到的，用不到就刪掉 |\n| `contributes.views[0].title` | 外掛頁籤上顯示的標題 |\n\n其他欄位（`schemaVersion`、`kind`、`pluginApi`、`minCoreVersion`、`trustTier`、`entry`）請先不要動。\n\n## 打包與安裝\n\n1. 在你放 `tuq-plugin-tool.mjs` 的資料夾執行（把路徑換成這個資料夾的位置）：\n\n   ```powershell\n   node .\\tuq-plugin-tool.mjs validate <這個資料夾>\n   node .\\tuq-plugin-tool.mjs pack <這個資料夾> --unsigned\n   ```\n\n   `validate` 會檢查有沒有寫錯；`pack --unsigned` 會在這個資料夾的旁邊產生 `<id>-<version>.tuqplugin`，不需要金鑰或密碼。\n2. 在 TeamUQ 的「設定 > 外掛」按「新增外掛…」，選這個 `.tuqplugin` 檔，就會直接安裝並啟用。\n3. 改了內容之後，把 `version` 加大、重新打包、再選一次同一個檔名的新檔案，就會更新。\n\n未簽章的外掛，TeamUQ 會標示「未簽章」，代表沒有人能保證它是誰做的；自己用或給同事試用沒有問題。\n";
+
+// .teamuq/scripts/plugin-tools/pluginStarter.mjs
+var STARTER_DEFAULT_NAME = "我的第一個外掛";
+var STARTER_DEFAULT_PUBLISHER = "myname";
+var STARTER_FALLBACK_SLUG = "my-plugin";
+var STARTER_VERSION = "0.1.0";
+var STARTER_PERMISSIONS = Object.freeze(["ui:view", "storage:plugin-data"]);
+var STARTER_BUTTON_LABEL = "新增外掛…";
+var INIT_USAGE = "  init <newFolder> [--name <display name>] [--publisher <your name>] [--id <publisher.name>]  (creates a small working sandboxed plugin to start from; the folder must not exist or must be empty)";
+var MAX_SLUG_LENGTH = 40;
+var MAX_VIEW_TITLE_CHARACTERS = 48;
+function slugOf(text2) {
+  const slug = String(text2).toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, MAX_SLUG_LENGTH).replace(/-+$/u, "");
+  return slug === "" ? STARTER_FALLBACK_SLUG : slug;
+}
+function escapeHtml(text2) {
+  return text2.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
+}
+function fill(template, name, escape) {
+  return template.replaceAll("__PLUGIN_NAME__", () => escape(name));
+}
+function starterManifest({ id, publisher, name, coreVersionRange }) {
+  const description = `${name}（範本外掛，請改成你自己的說明）`;
+  return {
+    schemaVersion: 2,
+    kind: "plugin",
+    id,
+    name,
+    version: STARTER_VERSION,
+    publisher,
+    description,
+    pluginApi: "^2.0.0",
+    minCoreVersion: coreVersionRange,
+    trustTier: "sandboxed",
+    entry: { ui: "ui/index.html" },
+    permissions: [...STARTER_PERMISSIONS],
+    contributes: { views: [{ id: "main", title: [...name].slice(0, MAX_VIEW_TITLE_CHARACTERS).join(""), entry: "ui/index.html", presentations: ["tab"], defaultPresentation: "tab" }] }
+  };
+}
+function starterFiles(manifest) {
+  return /* @__PURE__ */ new Map([
+    ["manifest.json", `${JSON.stringify(manifest, null, 2)}
+`],
+    ["README.md", fill(README_md_default, manifest.name, (text2) => text2)],
+    ["ui/index.html", fill(index_html_default, manifest.name, escapeHtml)],
+    ["ui/app.js", app_js_default],
+    ["ui/style.css", style_css_default]
+  ]);
+}
+function starterIdentity(directory, flags, UsageError2) {
+  const explicitId = flags.get("--id");
+  const explicitPublisher = flags.get("--publisher");
+  if (explicitId === void 0) {
+    const publisher = explicitPublisher ?? STARTER_DEFAULT_PUBLISHER;
+    return { id: `${publisher}.${slugOf(path10.basename(directory))}`, publisher };
+  }
+  const dot = explicitId.indexOf(".");
+  if (dot <= 0) throw new UsageError2("--id must look like <publisher>.<name>, for example alice.my-notes");
+  return { id: explicitId, publisher: explicitPublisher ?? explicitId.slice(0, dot) };
+}
+function reservedIdMessage(id, publisher) {
+  if (!id.startsWith("teamuq.") && publisher !== "teamuq" && !isDevkitReservedId(id)) return null;
+  return `the id ${id} and the publisher teamuq are reserved for official TeamUQ plugins (id_reserved); use your own publisher name. This tool checks only the names it can know offline: when you install, Core also refuses any id that ships with TeamUQ itself (the pre-installed plugins and the items of the bundled kits), so pick an id of your own`;
+}
+async function assertEmptyOrMissing(directory, UsageError2) {
+  const stat = await fs11.stat(directory).catch(() => null);
+  if (stat === null) return;
+  if (!stat.isDirectory()) throw new UsageError2(`${directory} exists and is not a folder`);
+  if ((await fs11.readdir(directory)).length > 0) throw new UsageError2(`${directory} is not empty; init never overwrites, so pick a new folder`);
+}
+async function writeStarterFiles(directory, files, validate) {
+  const written = [];
+  const createdDirectories = [];
+  try {
+    for (const [relative, text2] of files) {
+      const target = path10.join(directory, ...relative.split("/"));
+      const created = await fs11.mkdir(path10.dirname(target), { recursive: true });
+      if (created !== void 0) createdDirectories.push(created);
+      await fs11.writeFile(target, text2, { encoding: "utf8", flag: "wx" });
+      written.push(target);
+    }
+    const { problems } = await validate(directory);
+    if (problems.length > 0) throw new Error(`the starter did not pass validate: ${problems.join("; ")}`);
+  } catch (error) {
+    for (const file of written) await fs11.rm(file, { force: true }).catch(() => void 0);
+    for (const created of createdDirectories.reverse()) await fs11.rmdir(created).catch(() => void 0);
+    throw error;
+  }
+}
+async function runInit(argv, { parse: parse2, UsageError: UsageError2, show: show2, schema, validate }) {
+  const { positional, flags } = parse2(argv, ["--name", "--id", "--publisher"]);
+  if (positional.length !== 1) throw new UsageError2("init needs exactly one new folder: init <newFolder> [--name <display name>] [--publisher <your name>] [--id <publisher.name>]");
+  const directory = path10.resolve(positional[0]);
+  const { id, publisher } = starterIdentity(directory, flags, UsageError2);
+  const refusal = reservedIdMessage(id, publisher);
+  if (refusal !== null) throw new UsageError2(refusal);
+  const manifest = starterManifest({ id, publisher, name: flags.get("--name") ?? STARTER_DEFAULT_NAME, coreVersionRange: ">=1.6.0" });
+  const checked = schema.safeParse(manifest);
+  if (!checked.success) throw new UsageError2(`these names cannot be used in a manifest: ${checked.error.issues.map((issue2) => `${issue2.path.join(".") || "(root)"}: ${issue2.message}`).join("; ")}`);
+  await assertEmptyOrMissing(directory, UsageError2);
+  const files = starterFiles(manifest);
+  await writeStarterFiles(directory, files, validate);
+  show2({ folder: directory, id, publisher, name: manifest.name, version: manifest.version, trustTier: manifest.trustTier, permissions: manifest.permissions, files: [...files.keys()] });
+  console.error([
+    `created ${directory}`,
+    "next:",
+    "  1. edit the files (README.md inside the folder says what each one does; the text is in Traditional Chinese)",
+    `  2. node tuq-plugin-tool.mjs validate ${positional[0]}`,
+    `  3. node tuq-plugin-tool.mjs pack ${positional[0]} --unsigned`,
+    `  4. in TeamUQ open 設定 > 外掛, press ${STARTER_BUTTON_LABEL}, then pick the .tuqplugin file that pack wrote next to the folder`
+  ].join("\n"));
+  return 0;
 }
 
 // .teamuq/scripts/plugin-tools/tuq-plugin-tool.entry.ts
-var CORE_VERSION = "1.7.0";
+var CORE_VERSION = "1.7.1";
 var MAX_MANIFEST_BYTES2 = 256 * 1024;
 var MAX_OVERRIDE_BYTES = 256 * 1024;
 var KEY_FILE_SUFFIX = ".key.pem";
 var PLUGIN_EXTENSION = ".tuqplugin";
 var FILE_KINDS = ["code", "asset", "native", "payload"];
 var USAGE = [
-  `tuq-plugin-tool (built from TeamUQ Core ${CORE_VERSION})`,
+  `tuq-plugin-tool (built from TeamUQ Core ${CORE_VERSION})
+${INIT_USAGE}`,
   "  validate <stageDir> [--core-version v] [--platform id] [--os-version v]",
-  "  pack <stageDir> --key <file> [--key-id id] [--out file] [--anchors core|self] [--overrides file.json] [--core-version v] [--platform id] [--os-version v]",
-  "  pack-batch --jobs <jobs.json> --key <file> [--key-id id] [--anchors core|self] [--core-version v] [--platform id] [--os-version v]  (signs every job with ONE passphrase prompt; jobs.json is a JSON array of { stage, out, overrides? }; relative paths in it are relative to the folder of jobs.json, not to the current directory)",
-  "  verify <file.tuqplugin> [--anchors core|self] [--pub-file file.pub.json | --key-id id --public-key base64] [--preplanted-id teamuq.<name>] [--core-version v] [--platform id] [--os-version v]",
+  "  pack <stageDir> --unsigned [--out file] [--overrides file.json] [--core-version v] [--platform id] [--os-version v]  (no key and no passphrase: the package carries no signature.json, Core installs it and labels it unsigned)",
+  "  pack <stageDir> --key <file> [--key-id id] [--out file] [--anchors core|self] [--overrides file.json] [--delegation delegation.json [--root-pub-file file.pub.json] [--unlock-dpapi <keyId>.unlock.dpapi]] [--core-version v] [--platform id] [--os-version v]",
+  "  pack-batch --jobs <jobs.json> --key <file> [--key-id id] [--anchors core|self] [--delegation delegation.json [--root-pub-file file.pub.json] [--unlock-dpapi <keyId>.unlock.dpapi]] [--core-version v] [--platform id] [--os-version v]  (signs every job with ONE passphrase prompt; jobs.json is a JSON array of { stage, out, overrides?, delegation? }; relative paths in it are relative to the folder of jobs.json, not to the current directory)",
+  "  verify <file.tuqplugin> [--anchors core|self] [--pub-file file.pub.json | --key-id id --public-key base64 | --root-pub-file file.pub.json] [--preplanted-id teamuq.<name>] [--core-version v] [--platform id] [--os-version v]",
+  "delegation: with --delegation the package is signed by a teamuq-release-* key and carries that certificate; the certificate and the stage manifest are checked (expiry, window, scope) before the passphrase is asked. With --anchors self the certificate is judged against the test root key in --root-pub-file.",
+  "unlock-dpapi: a release key (teamuq-release-*) can be unlocked without a prompt from its Windows DPAPI file (made by release-key-init); no other key can. A teamuq-* key (root or release) never takes its passphrase from the environment; the test variable works only for keys that are not teamuq-*.",
+  "  release-key-init --key-id teamuq-release-<name> --out-dir <directory outside git work trees and cloud folders>  (Windows only: random passphrase kept in a DPAPI file next to the key; nothing is typed or printed)",
   "  dev-keygen --out-dir <directory outside git work trees>",
   "  dev-pack <stageDir> --key <encrypted-dev-key.pem> --out <file.tuqplugin> --bump-patch [--preplanted-id teamuq.<name>]",
   "preplanted-id lets a development key sign a TeamUQ pre-planted plugin id for the isolated Core dev profile; a packaged or non-isolated Core rejects the result with id_reserved.",
   "  types --out <plugin-repo/types>",
   "  selftest-key --key <file> [--key-id id]",
+  DELEGATION_USAGE,
   "anchors core (default) trusts only the TEAMUQ_TRUST_ANCHORS embedded in this tool; anchors self trusts only your own key and is for development.",
   "The key passphrase is typed at an interactive prompt and is never accepted as an argument."
 ].join("\n");
@@ -8901,22 +10399,22 @@ function show(value) {
 }
 async function isRegularFile(file) {
   try {
-    return (await fs9.lstat(file)).isFile();
+    return (await fs12.lstat(file)).isFile();
   } catch {
     return false;
   }
 }
 async function validateStage(stageDir, support) {
   const problems = [];
-  const stat = await fs9.stat(stageDir).catch(() => null);
+  const stat = await fs12.stat(stageDir).catch(() => null);
   if (stat === null || !stat.isDirectory()) return { problems: [`${stageDir} is not a directory`] };
-  const manifestFile = path8.join(stageDir, "manifest.json");
+  const manifestFile = path11.join(stageDir, "manifest.json");
   if (!await isRegularFile(manifestFile)) return { problems: ["manifest.json is missing from the stage directory"] };
-  const bytes3 = await fs9.readFile(manifestFile);
-  if (bytes3.length > MAX_MANIFEST_BYTES2) return { problems: [`manifest.json is larger than ${MAX_MANIFEST_BYTES2} bytes`] };
+  const bytes4 = await fs12.readFile(manifestFile);
+  if (bytes4.length > MAX_MANIFEST_BYTES2) return { problems: [`manifest.json is larger than ${MAX_MANIFEST_BYTES2} bytes`] };
   let json;
   try {
-    json = JSON.parse(bytes3.toString("utf8"));
+    json = JSON.parse(bytes4.toString("utf8"));
   } catch {
     return { problems: ["manifest.json is not valid JSON"] };
   }
@@ -8931,20 +10429,20 @@ async function validateStage(stageDir, support) {
     ...manifest.native?.files.map((file) => file.path) ?? []
   ];
   for (const relative of new Set(referenced)) {
-    if (!await isRegularFile(path8.join(stageDir, ...relative.split("/")))) problems.push(`manifest references ${relative}, which is not a regular file in the stage directory`);
+    if (!await isRegularFile(path11.join(stageDir, ...relative.split("/")))) problems.push(`manifest references ${relative}, which is not a regular file in the stage directory`);
   }
   return { manifest, problems };
 }
 async function nearestRealPath(target) {
-  let current = path8.resolve(target);
+  let current = path11.resolve(target);
   const tail = [];
   for (; ; ) {
     try {
-      return path8.join(await fs9.realpath(current), ...tail);
+      return path11.join(await fs12.realpath(current), ...tail);
     } catch {
-      const parent = path8.dirname(current);
-      if (parent === current) return path8.resolve(target);
-      tail.unshift(path8.basename(current));
+      const parent = path11.dirname(current);
+      if (parent === current) return path11.resolve(target);
+      tail.unshift(path11.basename(current));
       current = parent;
     }
   }
@@ -8952,14 +10450,14 @@ async function nearestRealPath(target) {
 async function assertOutsideStage(stageDir, outFile) {
   const stage = await nearestRealPath(stageDir);
   const out = await nearestRealPath(outFile);
-  const relative = path8.relative(stage, out);
-  if (relative === "" || !relative.startsWith("..") && !path8.isAbsolute(relative)) throw new UsageError(`the output ${outFile} is inside the stage directory ${stageDir}; the next pack would ship the old .tuqplugin as a file of the plugin`);
+  const relative = path11.relative(stage, out);
+  if (relative === "" || !relative.startsWith("..") && !path11.isAbsolute(relative)) throw new UsageError(`the output ${outFile} is inside the stage directory ${stageDir}; the next pack would ship the old .tuqplugin as a file of the plugin`);
 }
 async function readOverrides(file) {
   if (file === void 0) return void 0;
-  const stat = await fs9.stat(file);
+  const stat = await fs12.stat(file);
   if (!stat.isFile() || stat.size > MAX_OVERRIDE_BYTES) throw new UsageError(`${file} is not an overrides file`);
-  const parsed = JSON.parse(await fs9.readFile(file, "utf8"));
+  const parsed = JSON.parse(await fs12.readFile(file, "utf8"));
   if (!Array.isArray(parsed)) throw new UsageError("overrides must be a JSON array of { path, kind, platform? }");
   return parsed.map((item) => {
     const entry = item;
@@ -8970,7 +10468,7 @@ async function readOverrides(file) {
 }
 function keyIdFrom(flags, keyFile) {
   const explicit = flags.get("--key-id");
-  const base = path8.basename(keyFile);
+  const base = path11.basename(keyFile);
   const keyId2 = explicit ?? (base.endsWith(KEY_FILE_SUFFIX) ? base.slice(0, -KEY_FILE_SUFFIX.length) : void 0);
   if (keyId2 === void 0) throw new UsageError("--key-id is required when the key file is not named <keyId>.key.pem");
   try {
@@ -8990,46 +10488,92 @@ function preplantedPolicy(flags) {
 function selfAnchors(keyId2, publicKey) {
   return { rootKeys: [{ keyId: keyId2, publicKey }], revokedKeyIds: [] };
 }
+async function readDelegationFile(file) {
+  const stat = await fs12.stat(file).catch(() => null);
+  if (stat === null || !stat.isFile() || stat.size === 0 || stat.size > MAX_DELEGATION_BYTES2) throw new UsageError(`${file} is not a delegation.json (a regular file of 1 to ${MAX_DELEGATION_BYTES2} bytes)`);
+  return fs12.readFile(file);
+}
+function certificateAnchors(flags) {
+  try {
+    return anchorsFor(flags, { coreAnchors: TEAMUQ_TRUST_ANCHORS }).anchors;
+  } catch (error) {
+    if (error instanceof UsageProblem) throw new UsageError(error.message);
+    throw error;
+  }
+}
+function assertKeyMatchesMode(keyId2, delegated) {
+  if (delegated) {
+    try {
+      assertDelegatedKeyId(keyId2);
+    } catch (error) {
+      throw new UsageError(`--delegation needs a release key: ${error.message}`);
+    }
+  } else if (keyId2.startsWith(RELEASE_KEY_PREFIX2)) throw new UsageError(`${keyId2} is a release key and signs only together with its certificate: add --delegation <delegation.json>`);
+}
+function assertNotRootKeyUnlockedSilently(source, publicKey) {
+  if ((source === "env" || source === "dpapi") && TEAMUQ_TRUST_ANCHORS.rootKeys.some((root) => root.publicKey === publicKey)) throw new UnlockRefused("refused: this private key is one of the TeamUQ root keys embedded in this tool, and a root key is unlocked only by typing its passphrase at the prompt; nothing was signed");
+}
+function unlockFileFlag(flags, keyId2, keyFile, delegated) {
+  const given = flags.get("--unlock-dpapi");
+  if (given === void 0) return void 0;
+  if (!delegated) throw new UsageError("--unlock-dpapi is only for a release key signing with --delegation");
+  assertUnlockAllowedFor(keyId2);
+  const file = path11.resolve(given);
+  assertNotSyncedFolder(file, "unlock file");
+  assertNotSyncedFolder(keyFile, "key file");
+  return file;
+}
+async function checkDelegation(file, keyId2, anchors, manifest, stageDir) {
+  if (await pathExists(path11.join(stageDir, "delegation.json"))) throw new UsageError(`delegation.json is generated and must not be in the stage directory ${stageDir}`);
+  const bytes4 = await readDelegationFile(file);
+  if (anchors.revokedKeyIds.includes(keyId2)) throw new ArtifactError("signer_revoked", `${keyId2} is in the revokedKeyIds of the trust anchors this tool uses; it must not sign again`);
+  const verified = verifyDelegation(keyId2, anchors, { delegationBytes: bytes4, now: delegationNow(() => /* @__PURE__ */ new Date()), expiry: "enforce" });
+  assertDelegationScope({ kind: "teamuq", keyId: keyId2, delegation: verified.grant }, manifest);
+  return { bytes: bytes4, publicKey: verified.publicKey.toString("base64") };
+}
+function assertKeyIsCertified(keyFile, keyId2, actual, certified) {
+  if (actual !== certified) throw new Error(`refused: the private key in ${keyFile} is not the ${keyId2} key that the certificate names (the public keys differ); nothing was written`);
+}
 async function withSelfDevKey(publicKey, run) {
-  const root = await fs9.mkdtemp(path8.join(os3.tmpdir(), "tuq-plugin-self-trust-"));
+  const root = await fs12.mkdtemp(path11.join(os3.tmpdir(), "tuq-plugin-self-trust-"));
   const store = createDevKeyStore({ pluginsRoot: root });
   try {
     await store.add({ publicKey, label: "Local self verification" });
     return await run(store);
   } finally {
-    await fs9.rm(root, { recursive: true, force: true });
+    await fs12.rm(root, { recursive: true, force: true });
   }
 }
 async function commandDevKeygen(argv) {
   const { positional, flags } = parse(argv, ["--out-dir"]);
   const output = flags.get("--out-dir");
   if (positional.length !== 0 || output === void 0) throw new UsageError("dev-keygen needs --out-dir <directory>");
-  const directory = path8.resolve(output);
+  const directory = path11.resolve(output);
   assertOutsideGitWorkTree(directory, "development key directory");
-  await fs9.mkdir(directory, { recursive: true });
+  await fs12.mkdir(directory, { recursive: true });
   const passphrase = await readNewPassphrase();
   const pair = generateEncryptedDevKeyPair(passphrase);
-  const publicKey = describePublicKey(createPublicKey4({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), pair.raw]), format: "der", type: "spki" })).publicKey;
-  const keyFile = path8.join(directory, `${pair.keyId}.key.pem`);
-  const publicFile = path8.join(directory, `${pair.keyId}.pub.json`);
+  const publicKey = describePublicKey(createPublicKey6({ key: Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), pair.raw]), format: "der", type: "spki" })).publicKey;
+  const keyFile = path11.join(directory, `${pair.keyId}.key.pem`);
+  const publicFile = path11.join(directory, `${pair.keyId}.pub.json`);
   let privateCreated = false;
   try {
-    const privateHandle = await fs9.open(keyFile, "wx", 384);
+    const privateHandle = await fs12.open(keyFile, "wx", 384);
     privateCreated = true;
     await privateHandle.writeFile(pair.privatePem, "utf8");
     await privateHandle.close();
-    const publicHandle = await fs9.open(publicFile, "wx", 384);
+    const publicHandle = await fs12.open(publicFile, "wx", 384);
     await publicHandle.writeFile(`${JSON.stringify({ keyId: pair.keyId, publicKey }, null, 2)}
 `, "utf8");
     await publicHandle.close();
   } catch (error) {
-    if (privateCreated) await fs9.rm(keyFile, { force: true }).catch(() => void 0);
+    if (privateCreated) await fs12.rm(keyFile, { force: true }).catch(() => void 0);
     throw error;
   }
   selfCheck(loadEncryptedPrivateKey(pair.privatePem, passphrase), pair.raw);
-  const fingerprint = createHash8("sha256").update(pair.raw).digest("hex");
+  const fingerprint = createHash9("sha256").update(pair.raw).digest("hex");
   const identity = deriveKeyIdentity(fingerprint);
-  const identityFile = path8.join(directory, `${pair.keyId}.identity.txt`);
+  const identityFile = path11.join(directory, `${pair.keyId}.identity.txt`);
   const identityText = [
     "開發者識別（請放進你的外掛說明檔，讓使用者安裝時核對）",
     `短代碼：${identity.shortCode}`,
@@ -9039,7 +10583,7 @@ async function commandDevKeygen(argv) {
     `完整指紋（SHA-256）：${fingerprint}`,
     ""
   ].join("\n");
-  await fs9.writeFile(identityFile, identityText, { encoding: "utf8", flag: "wx", mode: 420 });
+  await fs12.writeFile(identityFile, identityText, { encoding: "utf8", flag: "wx", mode: 420 });
   show({ keyId: pair.keyId, privateKey: keyFile, publicKey: publicFile, identityFile, shortCode: identity.shortCode, fingerprint, passphrase: "interactive only" });
   return 0;
 }
@@ -9056,8 +10600,8 @@ async function commandDevPack(argv) {
   const keyFile = flags.get("--key");
   const outArg = flags.get("--out");
   if (keyFile === void 0 || outArg === void 0) throw new UsageError("dev-pack needs --key and --out");
-  const stageDir = path8.resolve(positional[0]);
-  const outFile = path8.resolve(outArg);
+  const stageDir = path11.resolve(positional[0]);
+  const outFile = path11.resolve(outArg);
   assertOutsideGitWorkTree(keyFile, "development signing key");
   await assertOutsideStage(stageDir, outFile);
   const support = supportContext(flags);
@@ -9068,10 +10612,10 @@ async function commandDevPack(argv) {
     return 1;
   }
   const key2 = loadEncryptedPrivateKey(readKeyFile(keyFile), await readPassphrase("Passphrase for local development key: "));
-  const description = describePublicKey(createPublicKey4(key2));
-  const keyId2 = assertDevKeyId(`dev-${createHash8("sha256").update(description.raw).digest("hex").slice(0, 16)}`, description.raw);
+  const description = describePublicKey(createPublicKey6(key2));
+  const keyId2 = assertDevKeyId(`dev-${createHash9("sha256").update(description.raw).digest("hex").slice(0, 16)}`, description.raw);
   selfCheck(key2, description.raw);
-  const identity = path8.basename(keyFile);
+  const identity = path11.basename(keyFile);
   if (identity !== `${keyId2}.key.pem`) throw new UsageError(`development key id mismatch: file name must be ${keyId2}.key.pem`);
   let version2 = bumpedPatch(staged.manifest.version);
   if (await isRegularFile(outFile)) {
@@ -9081,14 +10625,14 @@ async function commandDevPack(argv) {
       version2 = bumpedPatch(previous.manifest.version);
     });
   }
-  const scratch = await fs9.mkdtemp(path8.join(os3.tmpdir(), "tuq-plugin-dev-pack-"));
-  const copiedStage = path8.join(scratch, "stage");
+  const scratch = await fs12.mkdtemp(path11.join(os3.tmpdir(), "tuq-plugin-dev-pack-"));
+  const copiedStage = path11.join(scratch, "stage");
   try {
-    await fs9.cp(stageDir, copiedStage, { recursive: true, errorOnExist: true, force: false });
-    const manifestFile = path8.join(copiedStage, "manifest.json");
-    const manifest = JSON.parse(await fs9.readFile(manifestFile, "utf8"));
+    await fs12.cp(stageDir, copiedStage, { recursive: true, errorOnExist: true, force: false });
+    const manifestFile = path11.join(copiedStage, "manifest.json");
+    const manifest = JSON.parse(await fs12.readFile(manifestFile, "utf8"));
     manifest.version = version2;
-    await fs9.writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}
+    await fs12.writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
     const packed = await withSelfDevKey(description.publicKey, (devKeys) => packArtifact({
       stageDir: copiedStage,
@@ -9098,22 +10642,22 @@ async function commandDevPack(argv) {
     }));
     show({ file: packed.file, id: packed.verified.manifest.id, version: packed.verified.manifest.version, signer: packed.verified.signer, anchors: "self", sha256: packed.sha256, integritySha256: packed.verified.integritySha256, stageChanged: false });
   } finally {
-    await fs9.rm(scratch, { recursive: true, force: true });
+    await fs12.rm(scratch, { recursive: true, force: true });
   }
   return 0;
 }
-var SDK_TYPES = "declare module '@teamuq/plugin-sdk' {\nexport type JsonValue = null | boolean | number | string | JsonValue[] | {\n    [key: string]: JsonValue;\n};\nexport interface PluginBackendApiV1 {\n    call(method: string, params: JsonValue): Promise<JsonValue>;\n}\nexport type PluginAgentAvatarResultV1 = Readonly<{\n    protocolVersion: 1;\n    image: Readonly<{\n        mimeType: 'image/png' | 'image/jpeg' | 'image/webp';\n        bytes: Uint8Array;\n    }> | null;\n}>;\nexport interface PluginAgentAvatarApiV1 {\n    read(agentId: string): Promise<PluginAgentAvatarResultV1['image']>;\n}\nexport interface PluginStoreStatusViewV1 {\n    readonly state: 'disabled' | 'fresh' | 'stale' | 'offline' | 'untrusted';\n    readonly ageSec: number | null;\n    readonly acquirable: boolean;\n}\nexport interface PluginStorePreviewViewV1 {\n    readonly role: 'cover' | 'video' | 'voice';\n    readonly mime: string;\n    readonly sizeBytes: number;\n    readonly width: number | null;\n    readonly height: number | null;\n    readonly durationMs: number | null;\n    readonly url: string;\n}\nexport interface PluginStoreEntryViewV1 {\n    readonly entryId: string;\n    readonly packId: string;\n    readonly version: string;\n    readonly name: string;\n    readonly summary: string;\n    readonly tags: readonly string[];\n    readonly creator: string;\n    readonly downloadBytes: number;\n    readonly installedBytes: number;\n    readonly consentLabel: string | null;\n}\nexport interface PluginStoreEntryDetailViewV1 extends PluginStoreEntryViewV1 {\n    readonly description: string;\n    readonly previews: readonly PluginStorePreviewViewV1[];\n}\nexport interface PluginStoreListViewV1 {\n    readonly entries: readonly PluginStoreEntryViewV1[];\n    readonly nextCursor: string | null;\n}\nexport interface PluginStoreListQueryV1 {\n    readonly text?: string;\n    readonly tags?: readonly string[];\n    readonly cursor?: string | null;\n    readonly limit?: number;\n}\nexport interface PluginStoreNoticeV1 {\n    readonly title: string;\n    readonly body: string;\n}\nexport interface PluginStoreInstalledViewV1 {\n    readonly entryId: string;\n    readonly packId: string;\n    readonly version: string;\n    readonly state: 'ready' | 'hidden' | 'disabled' | 'removed';\n    readonly withdrawnReason: string | null;\n    readonly notice: PluginStoreNoticeV1 | null;\n    readonly previousVersion: string | null;\n}\nexport interface PluginStorePendingViewV1 {\n    readonly entryId: string;\n    readonly version: string;\n    readonly bytesReceived: number;\n    readonly bytesTotal: number | null;\n    readonly stale: boolean;\n    readonly active: boolean;\n}\nexport interface PluginStoreUpdateViewV1 {\n    readonly entryId: string;\n    readonly packId: string;\n    readonly installedVersion: string;\n    readonly version: string;\n}\nexport interface PluginStorePreflightViewV1 {\n    readonly downloadBytes: number;\n    readonly installedBytes: number;\n    readonly neededBytes: number;\n    readonly reserveBytes: number;\n    readonly freeBytes: number;\n    readonly enough: boolean;\n}\nexport interface PluginStoreErrorTextViewV1 {\n    readonly title: string;\n    readonly body: string;\n    readonly steps: readonly string[];\n    readonly named: boolean;\n}\nexport type PluginStoreAcquireOutcomeV1 = Readonly<{\n    status: 'installed' | 'updated';\n    packId: string;\n    version: string;\n    name: string;\n}> | Readonly<{\n    status: 'cancelled';\n}>;\nexport interface PluginStoreProgressViewV1 {\n    readonly entryId: string;\n    readonly stage: 'downloading' | 'verifying' | 'installing';\n    readonly bytesReceived: number;\n    readonly bytesTotal: number | null;\n    readonly retry: Readonly<{\n        attempt: number;\n        max: number;\n    }> | null;\n}\nexport interface PluginStoreChangeViewV1 {\n    readonly entryId: string;\n    readonly state: 'installed' | 'updated' | 'hidden' | 'disabled' | 'removed';\n    readonly withdrawnReason: string | null;\n    readonly notice: PluginStoreNoticeV1 | null;\n}\nexport type PluginStoreRollbackOutcomeV1 = Readonly<{\n    status: 'rolled_back';\n    packId: string;\n    version: string;\n    name: string;\n}> | Readonly<{\n    status: 'cancelled';\n}> | Readonly<{\n    status: 'no_previous';\n}>;\nexport interface PluginStoreApiV1 {\n    status(options?: Readonly<{\n        refresh?: boolean;\n    }>): Promise<PluginStoreStatusViewV1>;\n    list(query?: PluginStoreListQueryV1): Promise<PluginStoreListViewV1>;\n    get(entryId: string): Promise<PluginStoreEntryDetailViewV1 | null>;\n    installed(): Promise<readonly PluginStoreInstalledViewV1[]>;\n    pending(): Promise<readonly PluginStorePendingViewV1[]>;\n    updates(): Promise<readonly PluginStoreUpdateViewV1[]>;\n    preflight(entryId: string): Promise<PluginStorePreflightViewV1>;\n    acquire(entryId: string): Promise<PluginStoreAcquireOutcomeV1>;\n    cancel(entryId: string): Promise<void>;\n    discard(entryId: string): Promise<void>;\n    rollback(entryId: string): Promise<PluginStoreRollbackOutcomeV1>;\n    errorText(code: string): Promise<PluginStoreErrorTextViewV1 | null>;\n    onProgress(listener: (progress: PluginStoreProgressViewV1) => void): () => void;\n    onChange(listener: (change: PluginStoreChangeViewV1) => void): () => void;\n}\n}\ninterface Window { tuqPlugin: { backend: import('@teamuq/plugin-sdk').PluginBackendApiV1; store: import('@teamuq/plugin-sdk').PluginStoreApiV1; agentAvatar: import('@teamuq/plugin-sdk').PluginAgentAvatarApiV1 } }\ndeclare module '@teamuq/plugin-sdk/external' {\nexport type PluginBackendContextV1 = Readonly<{\n    readonly pluginId: string;\n    readonly dataDir: string;\n    readonly assetPacks: Readonly<Record<string, string>>;\n    readonly allowAddons: boolean;\n    readonly settings: Readonly<{\n        all(): Readonly<Record<string, boolean | number | string>>;\n        get(key: string): boolean | number | string | undefined;\n        onChange(listener: (values: Readonly<Record<string, boolean | number | string>>) => void): () => void;\n    }>;\n}>;\n}\n";
+var SDK_TYPES = "declare module '@teamuq/plugin-sdk' {\nexport type JsonValue = null | boolean | number | string | JsonValue[] | {\n    [key: string]: JsonValue;\n};\nexport interface PluginBackendApiV1 {\n    call(method: string, params: JsonValue): Promise<JsonValue>;\n}\nexport type PluginAgentAvatarResultV1 = Readonly<{\n    protocolVersion: 1;\n    image: Readonly<{\n        mimeType: 'image/png' | 'image/jpeg' | 'image/webp';\n        bytes: Uint8Array;\n    }> | null;\n}>;\nexport interface PluginAgentAvatarApiV1 {\n    read(agentId: string): Promise<PluginAgentAvatarResultV1['image']>;\n}\nexport interface PluginStoreStatusViewV1 {\n    readonly state: 'disabled' | 'fresh' | 'stale' | 'offline' | 'untrusted';\n    readonly ageSec: number | null;\n    readonly acquirable: boolean;\n}\nexport interface PluginStorePreviewViewV1 {\n    readonly role: 'cover' | 'video' | 'voice';\n    readonly mime: string;\n    readonly sizeBytes: number;\n    readonly width: number | null;\n    readonly height: number | null;\n    readonly durationMs: number | null;\n    readonly url: string;\n}\nexport interface PluginStoreEntryViewV1 {\n    readonly entryId: string;\n    readonly packId: string;\n    readonly version: string;\n    readonly name: string;\n    readonly summary: string;\n    readonly tags: readonly string[];\n    readonly creator: string;\n    readonly downloadBytes: number;\n    readonly installedBytes: number;\n    readonly consentLabel: string | null;\n}\nexport interface PluginStoreEntryDetailViewV1 extends PluginStoreEntryViewV1 {\n    readonly description: string;\n    readonly previews: readonly PluginStorePreviewViewV1[];\n}\nexport interface PluginStoreListViewV1 {\n    readonly entries: readonly PluginStoreEntryViewV1[];\n    readonly nextCursor: string | null;\n}\nexport interface PluginStoreListQueryV1 {\n    readonly text?: string;\n    readonly tags?: readonly string[];\n    readonly cursor?: string | null;\n    readonly limit?: number;\n}\nexport interface PluginStoreNoticeV1 {\n    readonly title: string;\n    readonly body: string;\n}\nexport interface PluginStoreInstalledViewV1 {\n    readonly entryId: string;\n    readonly packId: string;\n    readonly version: string;\n    readonly state: 'ready' | 'hidden' | 'disabled' | 'removed';\n    readonly withdrawnReason: string | null;\n    readonly notice: PluginStoreNoticeV1 | null;\n    readonly previousVersion: string | null;\n}\nexport interface PluginStorePendingViewV1 {\n    readonly entryId: string;\n    readonly version: string;\n    readonly bytesReceived: number;\n    readonly bytesTotal: number | null;\n    readonly stale: boolean;\n    readonly active: boolean;\n}\nexport interface PluginStoreUpdateViewV1 {\n    readonly entryId: string;\n    readonly packId: string;\n    readonly installedVersion: string;\n    readonly version: string;\n}\nexport interface PluginStorePreflightViewV1 {\n    readonly downloadBytes: number;\n    readonly installedBytes: number;\n    readonly neededBytes: number;\n    readonly reserveBytes: number;\n    readonly freeBytes: number;\n    readonly enough: boolean;\n}\nexport interface PluginStoreErrorTextViewV1 {\n    readonly title: string;\n    readonly body: string;\n    readonly steps: readonly string[];\n    readonly named: boolean;\n}\nexport type PluginStoreAcquireOutcomeV1 = Readonly<{\n    status: 'installed' | 'updated';\n    packId: string;\n    version: string;\n    name: string;\n}> | Readonly<{\n    status: 'cancelled';\n}>;\nexport interface PluginStoreProgressViewV1 {\n    readonly entryId: string;\n    readonly stage: 'downloading' | 'verifying' | 'installing';\n    readonly bytesReceived: number;\n    readonly bytesTotal: number | null;\n    readonly retry: Readonly<{\n        attempt: number;\n        max: number;\n    }> | null;\n}\nexport interface PluginStoreChangeViewV1 {\n    readonly entryId: string;\n    readonly state: 'installed' | 'updated' | 'hidden' | 'disabled' | 'removed';\n    readonly withdrawnReason: string | null;\n    readonly notice: PluginStoreNoticeV1 | null;\n}\nexport type PluginStoreRollbackOutcomeV1 = Readonly<{\n    status: 'rolled_back';\n    packId: string;\n    version: string;\n    name: string;\n}> | Readonly<{\n    status: 'cancelled';\n}> | Readonly<{\n    status: 'no_previous';\n}>;\nexport interface PluginStoreApiV1 {\n    status(options?: Readonly<{\n        refresh?: boolean;\n    }>): Promise<PluginStoreStatusViewV1>;\n    list(query?: PluginStoreListQueryV1): Promise<PluginStoreListViewV1>;\n    get(entryId: string): Promise<PluginStoreEntryDetailViewV1 | null>;\n    installed(): Promise<readonly PluginStoreInstalledViewV1[]>;\n    pending(): Promise<readonly PluginStorePendingViewV1[]>;\n    updates(): Promise<readonly PluginStoreUpdateViewV1[]>;\n    preflight(entryId: string): Promise<PluginStorePreflightViewV1>;\n    acquire(entryId: string): Promise<PluginStoreAcquireOutcomeV1>;\n    cancel(entryId: string): Promise<void>;\n    discard(entryId: string): Promise<void>;\n    rollback(entryId: string): Promise<PluginStoreRollbackOutcomeV1>;\n    errorText(code: string): Promise<PluginStoreErrorTextViewV1 | null>;\n    onProgress(listener: (progress: PluginStoreProgressViewV1) => void): () => void;\n    onChange(listener: (change: PluginStoreChangeViewV1) => void): () => void;\n}\n}\ninterface Window { tuqPlugin: { backend: import('@teamuq/plugin-sdk').PluginBackendApiV1; store: import('@teamuq/plugin-sdk').PluginStoreApiV1; agentAvatar: import('@teamuq/plugin-sdk').PluginAgentAvatarApiV1 } }\ndeclare module '@teamuq/plugin-sdk/external' {\nexport interface PluginHostApiV1 {\n    readonly workRecords: Readonly<{\n        openSettledSnapshot(): Promise<{\n            snapshotId: string;\n            generation: string;\n            highWatermark: string | null;\n        }>;\n        readSettledPage(request: {\n            snapshotId: string;\n            cursor: string | null;\n            limit: number;\n        }): Promise<{\n            snapshot: {\n                snapshotId: string;\n                generation: string;\n                highWatermark: string | null;\n            };\n            records: Array<{\n                id: string;\n                agentId: string;\n                projectId: string | null;\n                sessionId: string | null;\n                providerId: string | null;\n                punchId: string;\n                punchType: 'main' | 'subagent';\n                startedAtMs: number;\n                endedAtMs: number;\n                model: string | null;\n                name: string | null;\n                description: string | null;\n            }>;\n            nextCursor: string | null;\n        }>;\n        subscribeSettledChanges(listener: (event: {\n            protocolVersion: 1;\n            kind: 'ext-capability-event';\n            capabilityId: 'teamuq.work-records@1';\n            event: 'settled-changed';\n            generation: string;\n            highWatermark: string | null;\n        }) => void): () => void;\n    }>;\n    readonly agentDirectory: Readonly<{\n        openSnapshot(): Promise<{\n            snapshotId: string;\n            generation: string;\n            highWatermark: string | null;\n        }>;\n        readPage(request: {\n            snapshotId: string;\n            cursor: string | null;\n            limit: number;\n        }): Promise<{\n            snapshot: {\n                snapshotId: string;\n                generation: string;\n                highWatermark: string | null;\n            };\n            entries: Array<{\n                id: string;\n                name: string;\n                teamKey: string;\n                teamName: string | null;\n                title: string;\n                enabled: boolean;\n            }>;\n            nextCursor: string | null;\n        }>;\n    }>;\n    readonly projectDirectory: Readonly<{\n        openSnapshot(): Promise<{\n            snapshotId: string;\n            generation: string;\n            highWatermark: string | null;\n        }>;\n        readPage(request: {\n            snapshotId: string;\n            cursor: string | null;\n            limit: number;\n        }): Promise<{\n            snapshot: {\n                snapshotId: string;\n                generation: string;\n                highWatermark: string | null;\n            };\n            entries: Array<{\n                id: string;\n                name: string;\n                archived: boolean;\n            }>;\n            nextCursor: string | null;\n        }>;\n    }>;\n    readonly pluginState: Readonly<{\n        readPage(namespace: string, cursor: string | null, limit: number): Promise<{\n            records: Array<{\n                key: string;\n                value: unknown;\n                sourceKind?: string | null;\n                sourceId?: string | null;\n                revision: number;\n            }>;\n            nextCursor: string | null;\n        }>;\n        writeBatch(namespace: string, records: readonly {\n            key: string;\n            value: unknown;\n            sourceKind?: string | null;\n            sourceId?: string | null;\n            expectedRevision?: number | null;\n        }[]): Promise<void>;\n        deleteBatch(namespace: string, keys: readonly string[]): Promise<void>;\n    }>;\n}\nexport type PluginBackendContextV1 = Readonly<{\n    readonly pluginId: string;\n    readonly dataDir: string;\n    readonly assetPacks: Readonly<Record<string, string>>;\n    readonly allowAddons: boolean;\n    readonly host: PluginHostApiV1;\n    readonly settings: Readonly<{\n        all(): Readonly<Record<string, boolean | number | string>>;\n        get(key: string): boolean | number | string | undefined;\n        onChange(listener: (values: Readonly<Record<string, boolean | number | string>>) => void): () => void;\n    }>;\n}>;\n}\n";
 async function commandTypes(argv) {
   const { positional, flags } = parse(argv, ["--out"]);
   const output = flags.get("--out");
   if (positional.length !== 0 || output === void 0) throw new UsageError("types needs --out <plugin-repo/types>");
-  const directory = path8.resolve(output);
+  const directory = path11.resolve(output);
   const declaration = SDK_TYPES.replace(/\r\n/gu, "\n");
-  const sha2562 = createHash8("sha256").update(declaration).digest("hex");
-  await fs9.mkdir(directory, { recursive: true });
-  await fs9.writeFile(path8.join(directory, "tuq-plugin-sdk.d.ts"), declaration, "utf8");
+  const sha2562 = createHash9("sha256").update(declaration).digest("hex");
+  await fs12.mkdir(directory, { recursive: true });
+  await fs12.writeFile(path11.join(directory, "tuq-plugin-sdk.d.ts"), declaration, "utf8");
   const metadata = { contractVersion: "1", coreVersion: CORE_VERSION, file: "tuq-plugin-sdk.d.ts", sha256: sha2562 };
-  await fs9.writeFile(path8.join(directory, "tuq-plugin-sdk.version.json"), `${JSON.stringify(metadata, null, 2)}
+  await fs12.writeFile(path11.join(directory, "tuq-plugin-sdk.version.json"), `${JSON.stringify(metadata, null, 2)}
 `, "utf8");
   show(metadata);
   return 0;
@@ -9127,7 +10671,7 @@ async function commandValidate(argv) {
   const { positional, flags } = parse(argv, ["--core-version", "--platform", "--os-version"]);
   if (positional.length !== 1) throw new UsageError("validate needs exactly one stage directory");
   const support = supportContext(flags);
-  const result = await validateStage(path8.resolve(positional[0]), support);
+  const result = await validateStage(path11.resolve(positional[0]), support);
   if (result.manifest === void 0 || result.problems.length > 0) {
     for (const problem of result.problems) console.error(`invalid: ${problem}`);
     return 1;
@@ -9135,55 +10679,77 @@ async function commandValidate(argv) {
   show({ ok: true, id: result.manifest.id, version: result.manifest.version, kind: result.manifest.kind, trustTier: result.manifest.trustTier, coreVersion: support.coreVersion, platform: support.platform.id });
   return 0;
 }
-async function commandPack(argv) {
-  const { positional, flags } = parse(argv, ["--key", "--key-id", "--out", "--anchors", "--overrides", "--core-version", "--platform", "--os-version"]);
+async function commandPack(argv, deps) {
+  const { positional, flags } = parse(argv, ["--key", "--key-id", "--out", "--anchors", "--overrides", "--delegation", "--root-pub-file", "--unlock-dpapi", "--core-version", "--platform", "--os-version", "--unsigned"], ["--unsigned"]);
   if (positional.length !== 1) throw new UsageError("pack needs exactly one stage directory");
+  const unsigned = flags.get("--unsigned") === "true";
   const keyFile = flags.get("--key");
-  if (keyFile === void 0) throw new UsageError("--key is required");
-  const stageDir = path8.resolve(positional[0]);
+  if (unsigned && ["--key", "--key-id", "--anchors", "--delegation", "--root-pub-file", "--unlock-dpapi"].some((flag) => flags.has(flag))) throw new UsageError("--unsigned takes no key and no certificate: leave out --key, --key-id, --anchors, --delegation, --root-pub-file and --unlock-dpapi");
+  if (!unsigned && keyFile === void 0) throw new UsageError("--key is required (or pass --unsigned to pack without a key)");
+  const stageDir = path11.resolve(positional[0]);
   const support = supportContext(flags);
   const staged = await validateStage(stageDir, support);
   if (staged.manifest === void 0 || staged.problems.length > 0) {
     for (const problem of staged.problems) console.error(`invalid: ${problem}`);
     return 1;
   }
+  if (unsigned) return packUnsigned(stageDir, staged.manifest, flags, support);
+  if (keyFile === void 0) throw new UsageError("--key is required");
   const mode = anchorMode(flags);
   const keyId2 = keyIdFrom(flags, keyFile);
-  if (mode === "core" && !TEAMUQ_TRUST_ANCHORS.rootKeys.some((root) => root.keyId === keyId2)) {
+  const delegationFile = flags.get("--delegation");
+  if (delegationFile === void 0 && flags.has("--root-pub-file")) throw new UsageError("--root-pub-file is only for --delegation");
+  assertKeyMatchesMode(keyId2, delegationFile !== void 0);
+  const unlockFile = unlockFileFlag(flags, keyId2, keyFile, delegationFile !== void 0);
+  if (delegationFile === void 0 && mode === "core" && !TEAMUQ_TRUST_ANCHORS.rootKeys.some((root) => root.keyId === keyId2)) {
     console.error(`refused: keyId ${keyId2} is not one of the ${TEAMUQ_TRUST_ANCHORS.rootKeys.length} TEAMUQ_TRUST_ANCHORS embedded in this tool; the Core would reject the package. Use --anchors self while developing.`);
     return 1;
   }
   assertOutsideGitWorkTree(keyFile, "key file");
-  const outFile = path8.resolve(flags.get("--out") ?? path8.join(path8.dirname(stageDir), `${staged.manifest.id}-${staged.manifest.version}${PLUGIN_EXTENSION}`));
+  const outFile = path11.resolve(flags.get("--out") ?? path11.join(path11.dirname(stageDir), `${staged.manifest.id}-${staged.manifest.version}${PLUGIN_EXTENSION}`));
   await assertOutsideStage(stageDir, outFile);
   const overrides = await readOverrides(flags.get("--overrides"));
+  const delegatedAnchors = delegationFile === void 0 ? void 0 : certificateAnchors(flags);
+  const certificate = delegationFile === void 0 || delegatedAnchors === void 0 ? void 0 : await checkDelegation(delegationFile, keyId2, delegatedAnchors, staged.manifest, stageDir);
   const pem = readKeyFile(keyFile);
-  const key2 = loadEncryptedPrivateKey(pem, await readPassphrase(`Passphrase for ${keyId2}: `));
-  const description = describePublicKey(createPublicKey4(key2));
-  const anchors = mode === "self" ? selfAnchors(keyId2, description.publicKey) : TEAMUQ_TRUST_ANCHORS;
-  const packed = await packArtifact({ stageDir, outFile, signer: { keyId: keyId2, key: key2 }, ...overrides === void 0 ? {} : { files: overrides }, review: { anchors, support } });
-  if (mode === "self") console.error("warning: verified against your own key only (--anchors self); the Core accepts this package only if the keyId is in its TEAMUQ_TRUST_ANCHORS.");
+  const unlocked = await obtainSigningPassphrase({ keyId: keyId2, question: `Passphrase for ${keyId2}: `, unlockFile, injected: deps.readPassphrase });
+  const key2 = loadEncryptedPrivateKey(pem, unlocked.passphrase);
+  const description = describePublicKey(createPublicKey6(key2));
+  assertNotRootKeyUnlockedSilently(unlocked.source, description.publicKey);
+  if (certificate !== void 0) assertKeyIsCertified(keyFile, keyId2, description.publicKey, certificate.publicKey);
+  const anchors = delegatedAnchors ?? (mode === "self" ? selfAnchors(keyId2, description.publicKey) : TEAMUQ_TRUST_ANCHORS);
+  const packed = await packArtifact({ stageDir, outFile, signer: { keyId: keyId2, key: key2 }, ...overrides === void 0 ? {} : { files: overrides }, ...certificate === void 0 ? {} : { delegation: certificate.bytes }, review: { anchors, support, isReservedId: isDevkitReservedId } });
+  if (mode === "self") console.error(certificate === void 0 ? "warning: verified against your own key only (--anchors self); the Core accepts this package only if the keyId is in its TEAMUQ_TRUST_ANCHORS." : "warning: verified against the test root key of --root-pub-file (--anchors self); the Core accepts this package only if the certificate was signed by one of its TEAMUQ_TRUST_ANCHORS.");
   show({ file: packed.file, size: packed.size, sha256: packed.sha256, id: packed.verified.manifest.id, version: packed.verified.manifest.version, signer: packed.verified.signer, anchors: mode, fileCount: packed.verified.fileCount, totalBytes: packed.verified.totalBytes, integritySha256: packed.verified.integritySha256 });
+  return 0;
+}
+async function packUnsigned(stageDir, manifest, flags, support) {
+  const outFile = path11.resolve(flags.get("--out") ?? path11.join(path11.dirname(stageDir), `${manifest.id}-${manifest.version}${PLUGIN_EXTENSION}`));
+  await assertOutsideStage(stageDir, outFile);
+  const overrides = await readOverrides(flags.get("--overrides"));
+  const packed = await packArtifact({ stageDir, outFile, signer: null, ...overrides === void 0 ? {} : { files: overrides }, review: { anchors: TEAMUQ_TRUST_ANCHORS, support, isOfficialId: isDevkitReservedId } });
+  console.error("note: this package is unsigned; Core installs it and labels it unsigned, so nobody can tell who made it or whether it was changed after it left you. Pass --key to sign it.");
+  show({ file: packed.file, size: packed.size, sha256: packed.sha256, id: packed.verified.manifest.id, version: packed.verified.manifest.version, signer: packed.verified.signer, anchors: "none", fileCount: packed.verified.fileCount, totalBytes: packed.verified.totalBytes, integritySha256: packed.verified.integritySha256 });
   return 0;
 }
 var MAX_BATCH_JOBS = 64;
 async function readBatchJobs(file) {
-  const stat = await fs9.stat(file);
+  const stat = await fs12.stat(file);
   if (!stat.isFile() || stat.size > MAX_OVERRIDE_BYTES) throw new UsageError(`${file} is not a jobs file`);
-  const parsed = JSON.parse(await fs9.readFile(file, "utf8"));
-  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAX_BATCH_JOBS) throw new UsageError(`jobs must be a JSON array of 1 to ${MAX_BATCH_JOBS} items { stage, out, overrides? }`);
-  const base = path8.dirname(path8.resolve(file));
+  const parsed = JSON.parse(await fs12.readFile(file, "utf8"));
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAX_BATCH_JOBS) throw new UsageError(`jobs must be a JSON array of 1 to ${MAX_BATCH_JOBS} items { stage, out, overrides?, delegation? }`);
+  const base = path11.dirname(path11.resolve(file));
   return parsed.map((item) => {
     const entry = item;
-    if (typeof entry?.stage !== "string" || typeof entry.out !== "string" || entry.overrides !== void 0 && typeof entry.overrides !== "string") throw new UsageError(`bad job ${JSON.stringify(item)}: stage and out must be strings, overrides an optional string`);
-    return { stageDir: path8.resolve(base, entry.stage), outFile: path8.resolve(base, entry.out), overridesFile: entry.overrides === void 0 ? void 0 : path8.resolve(base, entry.overrides) };
+    if (typeof entry?.stage !== "string" || typeof entry.out !== "string" || entry.overrides !== void 0 && typeof entry.overrides !== "string" || entry.delegation !== void 0 && typeof entry.delegation !== "string") throw new UsageError(`bad job ${JSON.stringify(item)}: stage and out must be strings, overrides and delegation optional strings`);
+    return { stageDir: path11.resolve(base, entry.stage), outFile: path11.resolve(base, entry.out), overridesFile: entry.overrides === void 0 ? void 0 : path11.resolve(base, entry.overrides), delegationFile: entry.delegation === void 0 ? void 0 : path11.resolve(base, entry.delegation) };
   });
 }
 async function pathExists(file) {
-  return fs9.lstat(file).then(() => true, () => false);
+  return fs12.lstat(file).then(() => true, () => false);
 }
 async function outputIdentity(outFile) {
-  return path8.join(await nearestRealPath(path8.dirname(outFile)), path8.basename(outFile)).toLowerCase();
+  return path11.join(await nearestRealPath(path11.dirname(outFile)), path11.basename(outFile)).toLowerCase();
 }
 async function assertOverridesMatchStage(stageDir, overrides, overridesFile) {
   if (overrides === void 0) return;
@@ -9193,7 +10759,7 @@ async function assertOverridesMatchStage(stageDir, overrides, overridesFile) {
     if (seen.has(override.path)) throw new UsageError(`${overridesFile}: duplicate override for ${override.path}`);
     seen.add(override.path);
     const segments = override.path.split("/");
-    if (segments.some((segment) => segment === "" || segment === "." || segment === "..") || !await isRegularFile(path8.join(stageDir, ...segments))) throw new UsageError(`${overridesFile}: override ${override.path} is not a regular file of the stage directory ${stageDir}`);
+    if (segments.some((segment) => segment === "" || segment === "." || segment === "..") || !await isRegularFile(path11.join(stageDir, ...segments))) throw new UsageError(`${overridesFile}: override ${override.path} is not a regular file of the stage directory ${stageDir}`);
   }
 }
 function removeFiles(files) {
@@ -9211,9 +10777,9 @@ function removeScratches(state) {
   const doomed = [];
   for (const scratch of state.scratches.splice(0)) {
     doomed.push(scratch);
-    const directory = path8.dirname(scratch);
+    const directory = path11.dirname(scratch);
     try {
-      for (const name of readdirSync(directory)) if (name.startsWith(`${path8.basename(scratch)}.`) && name.endsWith(".partial")) doomed.push(path8.join(directory, name));
+      for (const name of readdirSync(directory)) if (name.startsWith(`${path11.basename(scratch)}.`) && name.endsWith(".partial")) doomed.push(path11.join(directory, name));
     } catch {
     }
   }
@@ -9222,15 +10788,15 @@ function removeScratches(state) {
 async function publishWithoutOverwrite(scratch, destination, created) {
   const taken = () => new Error(`the output ${destination} appeared while pack-batch was running; pack-batch never overwrites, so it left that file untouched`);
   try {
-    await fs9.link(scratch, destination);
+    await fs12.link(scratch, destination);
   } catch (error) {
     if (error.code === "EEXIST") throw taken();
-    const handle = await fs9.open(destination, "wx").catch((openError) => {
+    const handle = await fs12.open(destination, "wx").catch((openError) => {
       throw openError.code === "EEXIST" ? taken() : openError;
     });
     created();
     try {
-      await handle.writeFile(await fs9.readFile(scratch));
+      await handle.writeFile(await fs12.readFile(scratch));
     } finally {
       await handle.close();
     }
@@ -9238,23 +10804,24 @@ async function publishWithoutOverwrite(scratch, destination, created) {
   }
   created();
 }
-async function commandPackBatch(argv) {
-  const { positional, flags } = parse(argv, ["--key", "--key-id", "--jobs", "--anchors", "--core-version", "--platform", "--os-version"]);
+async function commandPackBatch(argv, deps) {
+  const { positional, flags } = parse(argv, ["--key", "--key-id", "--jobs", "--anchors", "--delegation", "--root-pub-file", "--unlock-dpapi", "--core-version", "--platform", "--os-version"]);
   if (positional.length !== 0) throw new UsageError("pack-batch takes no positional argument; the stages are listed in the --jobs file");
   const keyFile = flags.get("--key");
   const jobsFile = flags.get("--jobs");
   if (keyFile === void 0 || jobsFile === void 0) throw new UsageError("pack-batch needs --key and --jobs");
-  const jobs = await readBatchJobs(path8.resolve(jobsFile));
+  const jobs = await readBatchJobs(path11.resolve(jobsFile));
   const support = supportContext(flags);
   const outputs = /* @__PURE__ */ new Set();
   const overrideList = [];
+  const manifests = [];
   for (const job of jobs) {
     const result = await validateStage(job.stageDir, support);
     if (result.manifest === void 0 || result.problems.length > 0) {
       for (const problem of result.problems) console.error(`invalid (${job.stageDir}): ${problem}`);
       return 1;
     }
-    if (path8.extname(job.outFile).toLowerCase() !== PLUGIN_EXTENSION) throw new UsageError(`the output ${job.outFile} must end with ${PLUGIN_EXTENSION}`);
+    if (path11.extname(job.outFile).toLowerCase() !== PLUGIN_EXTENSION) throw new UsageError(`the output ${job.outFile} must end with ${PLUGIN_EXTENSION}`);
     const identity = await outputIdentity(job.outFile);
     if (outputs.has(identity)) throw new UsageError(`two jobs write the same output ${job.outFile}`);
     outputs.add(identity);
@@ -9262,18 +10829,43 @@ async function commandPackBatch(argv) {
     const overrides = await readOverrides(job.overridesFile);
     await assertOverridesMatchStage(job.stageDir, overrides, job.overridesFile);
     overrideList.push(overrides);
+    manifests.push(result.manifest);
   }
   for (const job of jobs) for (const other of jobs) await assertOutsideStage(other.stageDir, job.outFile);
   const mode = anchorMode(flags);
   const keyId2 = keyIdFrom(flags, keyFile);
-  if (mode === "core" && !TEAMUQ_TRUST_ANCHORS.rootKeys.some((root) => root.keyId === keyId2)) {
+  const certificateFiles = jobs.map((job) => job.delegationFile ?? (flags.has("--delegation") ? path11.resolve(flags.get("--delegation")) : void 0));
+  const delegated = certificateFiles.some((file) => file !== void 0);
+  if (!delegated && flags.has("--root-pub-file")) throw new UsageError("--root-pub-file is only for --delegation");
+  assertKeyMatchesMode(keyId2, delegated);
+  const unlockFile = unlockFileFlag(flags, keyId2, keyFile, delegated);
+  if (delegated) {
+    const missing = jobs.filter((_job, position) => certificateFiles[position] === void 0);
+    if (missing.length > 0) throw new UsageError(`${keyId2} signs only with a certificate, but no certificate is given for: ${missing.map((job) => job.stageDir).join(", ")} (set "delegation" on the job or pass --delegation)`);
+  } else if (mode === "core" && !TEAMUQ_TRUST_ANCHORS.rootKeys.some((root) => root.keyId === keyId2)) {
     console.error(`refused: keyId ${keyId2} is not one of the ${TEAMUQ_TRUST_ANCHORS.rootKeys.length} TEAMUQ_TRUST_ANCHORS embedded in this tool; the Core would reject the package. Use --anchors self while developing.`);
     return 1;
   }
   assertOutsideGitWorkTree(keyFile, "key file");
-  const key2 = loadEncryptedPrivateKey(readKeyFile(keyFile), await readPassphrase(`Passphrase for ${keyId2} (asked once for all ${jobs.length} packages): `));
-  const description = describePublicKey(createPublicKey4(key2));
-  const anchors = mode === "self" ? selfAnchors(keyId2, description.publicKey) : TEAMUQ_TRUST_ANCHORS;
+  const delegatedAnchors = delegated ? certificateAnchors(flags) : void 0;
+  const certificates = [];
+  if (delegatedAnchors !== void 0) {
+    for (const [position, job] of jobs.entries()) {
+      try {
+        certificates.push(await checkDelegation(certificateFiles[position], keyId2, delegatedAnchors, manifests[position], job.stageDir));
+      } catch (error) {
+        if (!isArtifactError(error)) throw error;
+        console.error(`rejected (${job.stageDir}): ${error.code}: ${error.message}`);
+        return 1;
+      }
+    }
+  }
+  const unlocked = await obtainSigningPassphrase({ keyId: keyId2, question: `Passphrase for ${keyId2} (asked once for all ${jobs.length} packages): `, unlockFile, injected: deps.readPassphrase });
+  const key2 = loadEncryptedPrivateKey(readKeyFile(keyFile), unlocked.passphrase);
+  const description = describePublicKey(createPublicKey6(key2));
+  assertNotRootKeyUnlockedSilently(unlocked.source, description.publicKey);
+  for (const certificate of certificates) assertKeyIsCertified(keyFile, keyId2, description.publicKey, certificate.publicKey);
+  const anchors = delegatedAnchors ?? (mode === "self" ? selfAnchors(keyId2, description.publicKey) : TEAMUQ_TRUST_ANCHORS);
   const state = { written: [], scratches: [] };
   const rollBack = () => [...removeFiles(state.written), ...removeScratches(state)];
   const reportStuck = (stuck) => {
@@ -9293,14 +10885,15 @@ ${stuck.map((file) => `  ${file}`).join("\n")}`);
   const results = [];
   try {
     for (const [position, job] of jobs.entries()) {
-      await fs9.mkdir(path8.dirname(job.outFile), { recursive: true });
+      await fs12.mkdir(path11.dirname(job.outFile), { recursive: true });
       if (await pathExists(job.outFile)) throw new Error(`the output ${job.outFile} appeared after the checks; pack-batch never overwrites, so it left that file untouched`);
-      const scratch = path8.join(path8.dirname(job.outFile), `.pack-batch-${randomBytes5(6).toString("hex")}-${path8.basename(job.outFile)}`);
+      const scratch = path11.join(path11.dirname(job.outFile), `.pack-batch-${randomBytes6(6).toString("hex")}-${path11.basename(job.outFile)}`);
       state.scratches.push(scratch);
       const overrides = overrideList[position];
-      const packed = await packArtifact({ stageDir: job.stageDir, outFile: scratch, signer: { keyId: keyId2, key: key2 }, ...overrides === void 0 ? {} : { files: overrides }, review: { anchors, support } });
+      const certificate = certificates[position];
+      const packed = await packArtifact({ stageDir: job.stageDir, outFile: scratch, signer: { keyId: keyId2, key: key2 }, ...overrides === void 0 ? {} : { files: overrides }, ...certificate === void 0 ? {} : { delegation: certificate.bytes }, review: { anchors, support, isReservedId: isDevkitReservedId } });
       await publishWithoutOverwrite(scratch, job.outFile, () => state.written.push(job.outFile));
-      await fs9.rm(scratch, { force: true }).catch(() => void 0);
+      await fs12.rm(scratch, { force: true }).catch(() => void 0);
       console.error(`[${position + 1}/${jobs.length}] signed ${packed.verified.manifest.id}@${packed.verified.manifest.version}`);
       results.push({ file: job.outFile, size: packed.size, sha256: packed.sha256, id: packed.verified.manifest.id, version: packed.verified.manifest.version, signer: packed.verified.signer, anchors: mode, fileCount: packed.verified.fileCount, totalBytes: packed.verified.totalBytes, integritySha256: packed.verified.integritySha256 });
     }
@@ -9311,7 +10904,7 @@ ${stuck.map((file) => `  ${file}`).join("\n")}`);
     for (const { signal, handler } of handlers) process.removeListener(signal, handler);
   }
   reportStuck(removeScratches(state));
-  if (mode === "self") console.error("warning: verified against your own key only (--anchors self); the Core accepts these packages only if the keyId is in its TEAMUQ_TRUST_ANCHORS.");
+  if (mode === "self") console.error(delegated ? "warning: verified against the test root key of --root-pub-file (--anchors self); the Core accepts these packages only if the certificates were signed by one of its TEAMUQ_TRUST_ANCHORS." : "warning: verified against your own key only (--anchors self); the Core accepts these packages only if the keyId is in its TEAMUQ_TRUST_ANCHORS.");
   show({ results });
   return 0;
 }
@@ -9340,35 +10933,64 @@ function publicKeyAnchors(flags) {
   return selfAnchors(keyId2, publicKey);
 }
 async function commandVerify(argv) {
-  const { positional, flags } = parse(argv, ["--anchors", "--pub-file", "--key-id", "--public-key", "--preplanted-id", "--core-version", "--platform", "--os-version"]);
+  const { positional, flags } = parse(argv, ["--anchors", "--pub-file", "--key-id", "--public-key", "--root-pub-file", "--preplanted-id", "--core-version", "--platform", "--os-version"]);
   if (positional.length !== 1) throw new UsageError("verify needs exactly one .tuqplugin file");
   const devTrust = preplantedPolicy(flags);
   const mode = anchorMode(flags);
-  const anchors = mode === "self" ? publicKeyAnchors(flags) : TEAMUQ_TRUST_ANCHORS;
-  const file = path8.resolve(positional[0]);
+  const rootAnchors = flags.has("--root-pub-file");
+  if (rootAnchors && (flags.has("--pub-file") || flags.has("--key-id") || flags.has("--public-key"))) throw new UsageError("--root-pub-file cannot be combined with --pub-file, --key-id or --public-key");
+  const anchors = rootAnchors ? certificateAnchors(flags) : mode === "self" ? publicKeyAnchors(flags) : TEAMUQ_TRUST_ANCHORS;
+  const file = path11.resolve(positional[0]);
   const support = supportContext(flags);
-  const publicKey = mode === "self" ? anchors.rootKeys[0]?.publicKey : void 0;
-  const verified = mode === "self" && anchors.rootKeys[0]?.keyId.startsWith("dev-") && publicKey !== void 0 ? await withSelfDevKey(publicKey, (devKeys) => verifyArtifactFile(file, { anchors, devKeys, support, ...devTrust === void 0 ? {} : { devTrust } })) : await verifyArtifactFile(file, { anchors, support, ...devTrust === void 0 ? {} : { devTrust } });
+  const publicKey = mode === "self" && !rootAnchors ? anchors.rootKeys[0]?.publicKey : void 0;
+  const verified = mode === "self" && !rootAnchors && anchors.rootKeys[0]?.keyId.startsWith("dev-") && publicKey !== void 0 ? await withSelfDevKey(publicKey, (devKeys) => verifyArtifactFile(file, { anchors, devKeys, support, delegation: "accept", isReservedId: isDevkitReservedId, isOfficialId: isDevkitReservedId, ...devTrust === void 0 ? {} : { devTrust } })) : await verifyArtifactFile(file, { anchors, support, delegation: "accept", isReservedId: isDevkitReservedId, isOfficialId: isDevkitReservedId, ...devTrust === void 0 ? {} : { devTrust } });
+  if (mode === "self") console.error(rootAnchors ? "warning: verified against the test root key of --root-pub-file (--anchors self); the Core accepts this package only if the certificate was signed by one of its TEAMUQ_TRUST_ANCHORS." : "warning: verified against your own key only (--anchors self); the Core accepts this package only if the keyId is in its TEAMUQ_TRUST_ANCHORS.");
   const { manifest } = verified;
   const pinned = manifest.kind === "plugin" ? { trustTier: manifest.trustTier, permissions: manifest.permissions, allowAddons: manifest.native?.allowAddons === true } : {};
   show({ file, id: manifest.id, version: manifest.version, kind: manifest.kind, ...pinned, signer: verified.signer, anchors: mode, fileCount: verified.fileCount, totalBytes: verified.totalBytes, integritySha256: verified.integritySha256 });
   return 0;
 }
-async function commandSelftestKey(argv) {
+async function commandSelftestKey(argv, deps) {
   const { positional, flags } = parse(argv, ["--key", "--key-id"]);
   const keyFile = flags.get("--key");
   if (positional.length !== 0 || keyFile === void 0) throw new UsageError("selftest-key needs --key <file>");
   assertOutsideGitWorkTree(keyFile, "key file");
   const keyId2 = keyIdFrom(flags, keyFile);
-  const key2 = loadEncryptedPrivateKey(readKeyFile(keyFile), await readPassphrase(`Passphrase for ${keyId2}: `));
-  const description = describePublicKey(createPublicKey4(key2));
+  const unlocked = await obtainSigningPassphrase({ keyId: keyId2, question: `Passphrase for ${keyId2}: `, unlockFile: void 0, injected: deps.readPassphrase });
+  const key2 = loadEncryptedPrivateKey(readKeyFile(keyFile), unlocked.passphrase);
+  const description = describePublicKey(createPublicKey6(key2));
+  assertNotRootKeyUnlockedSilently(unlocked.source, description.publicKey);
   selfCheck(key2, description.raw);
   const anchor = TEAMUQ_TRUST_ANCHORS.rootKeys.find((root) => root.keyId === keyId2);
   const embedded = anchor === void 0 ? "not-embedded" : anchor.publicKey === description.publicKey ? "embedded" : "keyId-embedded-with-a-different-public-key";
   show({ ok: embedded !== "keyId-embedded-with-a-different-public-key", keyId: keyId2, publicKey: description.publicKey, spki: description.spki, fingerprint: description.fingerprint, shortCode: deriveKeyIdentity(description.fingerprint).shortCode, embeddedAnchors: embedded });
   return embedded === "keyId-embedded-with-a-different-public-key" ? 1 : 0;
 }
-async function main(argv) {
+async function commandReleaseKeyInit(argv) {
+  const { positional, flags } = parse(argv, ["--key-id", "--out-dir"]);
+  const keyId2 = flags.get("--key-id");
+  const outDir = flags.get("--out-dir");
+  if (positional.length !== 0 || keyId2 === void 0 || outDir === void 0) throw new UsageError("release-key-init needs --key-id teamuq-release-<name> and --out-dir <directory>");
+  try {
+    assertDelegatedKeyId(keyId2);
+  } catch (error) {
+    throw new UsageError(error.message);
+  }
+  if (TEAMUQ_TRUST_ANCHORS.rootKeys.some((root) => root.keyId === keyId2)) throw new UsageError(`${keyId2} is the id of an embedded trust anchor`);
+  const created = initReleaseKey({ keyId: keyId2, directory: outDir });
+  show({ keyId: created.keyId, privateKey: created.keyFile, publicKey: created.publicFile, unlockFile: created.unlockFile, publicKeyBase64: created.publicKey, fingerprint: created.fingerprint, passphrase: "random, kept only in the DPAPI unlock file (Windows current user)" });
+  console.error([
+    "Release key created. It is NOT trusted yet: the TeamUQ root key must sign a delegation certificate for it (delegate, typed root passphrase, once).",
+    "Do NOT paste this public key into TEAMUQ_TRUST_ANCHORS: a release key is trusted only through its certificate.",
+    "Anything that runs as this Windows user can unlock this key and sign inside the certificate scope; that is the accepted limit of automatic signing.",
+    "This key needs no backup: if it is lost, make a new release key and have the root key sign a new certificate."
+  ].join("\n"));
+  return 0;
+}
+function delegationDeps() {
+  return { coreAnchors: TEAMUQ_TRUST_ANCHORS, verifyDelegation, parseDeclaredNetworkOrigin };
+}
+async function main(argv, deps = {}) {
   const [command, ...rest] = argv;
   try {
     if (command === "--version") {
@@ -9377,13 +10999,18 @@ async function main(argv) {
       return 0;
     }
     if (command === "validate") return await commandValidate(rest);
-    if (command === "pack") return await commandPack(rest);
-    if (command === "pack-batch") return await commandPackBatch(rest);
+    if (command === "init") return await runInit(rest, { parse, UsageError, show, schema: PluginManifestV2Schema, validate: (d) => validateStage(d, supportContext(/* @__PURE__ */ new Map())) });
+    if (command === "pack") return await commandPack(rest, deps);
+    if (command === "pack-batch") return await commandPackBatch(rest, deps);
     if (command === "dev-keygen") return await commandDevKeygen(rest);
     if (command === "dev-pack") return await commandDevPack(rest);
     if (command === "types") return await commandTypes(rest);
     if (command === "verify") return await commandVerify(rest);
-    if (command === "selftest-key") return await commandSelftestKey(rest);
+    if (command === "selftest-key") return await commandSelftestKey(rest, deps);
+    if (command === "release-key-init") return await commandReleaseKeyInit(rest);
+    if (command === "release-keygen") return await runReleaseKeygen(rest, delegationDeps());
+    if (command === "delegate") return await runDelegate(rest, delegationDeps());
+    if (command === "delegation-inspect") return await runDelegationInspect(rest, delegationDeps());
     if (command === void 0 || command === "--help" || command === "-h") {
       console.error(USAGE);
       return command === void 0 ? 2 : 0;
@@ -9395,9 +11022,25 @@ async function main(argv) {
 ${USAGE}`);
       return 2;
     }
+    if (error instanceof UnlockRefused) {
+      console.error(`refused: ${error.message}`);
+      return 1;
+    }
     if (isArtifactError(error)) console.error(`rejected: ${error.code}: ${error.message}`);
     else console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
     return 1;
   }
 }
-process.exitCode = await main(process.argv.slice(2));
+function isEntryPoint() {
+  const script = process.argv[1];
+  if (script === void 0) return false;
+  try {
+    return realpathSync(script) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+if (isEntryPoint()) process.exitCode = await main(process.argv.slice(2));
+export {
+  main
+};

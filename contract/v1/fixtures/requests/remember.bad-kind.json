@@ -1,0 +1,21 @@
+{
+  "case": "remember.bad-kind",
+  "method": "memory.remember@1",
+  "valid": false,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex"
+    },
+    "ops": [
+      {
+        "scope": "project",
+        "content": "x",
+        "kind": "note",
+        "operationId": "punch:00000000000000000000000000000005"
+      }
+    ]
+  }
+}

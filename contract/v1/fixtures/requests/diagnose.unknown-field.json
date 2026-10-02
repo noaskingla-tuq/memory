@@ -1,0 +1,8 @@
+{
+  "case": "diagnose.unknown-field",
+  "method": "diagnose",
+  "valid": false,
+  "params": {
+    "verbose": true
+  }
+}

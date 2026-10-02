@@ -151,11 +151,126 @@ export interface PluginStoreApiV1 {
 }
 interface Window { tuqPlugin: { backend: import('@teamuq/plugin-sdk').PluginBackendApiV1; store: import('@teamuq/plugin-sdk').PluginStoreApiV1; agentAvatar: import('@teamuq/plugin-sdk').PluginAgentAvatarApiV1 } }
 declare module '@teamuq/plugin-sdk/external' {
+export interface PluginHostApiV1 {
+    readonly workRecords: Readonly<{
+        openSettledSnapshot(): Promise<{
+            snapshotId: string;
+            generation: string;
+            highWatermark: string | null;
+        }>;
+        readSettledPage(request: {
+            snapshotId: string;
+            cursor: string | null;
+            limit: number;
+        }): Promise<{
+            snapshot: {
+                snapshotId: string;
+                generation: string;
+                highWatermark: string | null;
+            };
+            records: Array<{
+                id: string;
+                agentId: string;
+                projectId: string | null;
+                sessionId: string | null;
+                providerId: string | null;
+                punchId: string;
+                punchType: 'main' | 'subagent';
+                startedAtMs: number;
+                endedAtMs: number;
+                model: string | null;
+                name: string | null;
+                description: string | null;
+            }>;
+            nextCursor: string | null;
+        }>;
+        subscribeSettledChanges(listener: (event: {
+            protocolVersion: 1;
+            kind: 'ext-capability-event';
+            capabilityId: 'teamuq.work-records@1';
+            event: 'settled-changed';
+            generation: string;
+            highWatermark: string | null;
+        }) => void): () => void;
+    }>;
+    readonly agentDirectory: Readonly<{
+        openSnapshot(): Promise<{
+            snapshotId: string;
+            generation: string;
+            highWatermark: string | null;
+        }>;
+        readPage(request: {
+            snapshotId: string;
+            cursor: string | null;
+            limit: number;
+        }): Promise<{
+            snapshot: {
+                snapshotId: string;
+                generation: string;
+                highWatermark: string | null;
+            };
+            entries: Array<{
+                id: string;
+                name: string;
+                teamKey: string;
+                teamName: string | null;
+                title: string;
+                enabled: boolean;
+            }>;
+            nextCursor: string | null;
+        }>;
+    }>;
+    readonly projectDirectory: Readonly<{
+        openSnapshot(): Promise<{
+            snapshotId: string;
+            generation: string;
+            highWatermark: string | null;
+        }>;
+        readPage(request: {
+            snapshotId: string;
+            cursor: string | null;
+            limit: number;
+        }): Promise<{
+            snapshot: {
+                snapshotId: string;
+                generation: string;
+                highWatermark: string | null;
+            };
+            entries: Array<{
+                id: string;
+                name: string;
+                archived: boolean;
+            }>;
+            nextCursor: string | null;
+        }>;
+    }>;
+    readonly pluginState: Readonly<{
+        readPage(namespace: string, cursor: string | null, limit: number): Promise<{
+            records: Array<{
+                key: string;
+                value: unknown;
+                sourceKind?: string | null;
+                sourceId?: string | null;
+                revision: number;
+            }>;
+            nextCursor: string | null;
+        }>;
+        writeBatch(namespace: string, records: readonly {
+            key: string;
+            value: unknown;
+            sourceKind?: string | null;
+            sourceId?: string | null;
+            expectedRevision?: number | null;
+        }[]): Promise<void>;
+        deleteBatch(namespace: string, keys: readonly string[]): Promise<void>;
+    }>;
+}
 export type PluginBackendContextV1 = Readonly<{
     readonly pluginId: string;
     readonly dataDir: string;
     readonly assetPacks: Readonly<Record<string, string>>;
     readonly allowAddons: boolean;
+    readonly host: PluginHostApiV1;
     readonly settings: Readonly<{
         all(): Readonly<Record<string, boolean | number | string>>;
         get(key: string): boolean | number | string | undefined;

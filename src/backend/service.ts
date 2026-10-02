@@ -13,6 +13,7 @@ import {
   MEMORY_LIMITS,
   MEMORY_PLUGIN_METHODS,
   memoryDiagnoseRequestSchema,
+  memoryRememberResponseSchema,
 } from "../../vendor/teamuq-contract/contract.mjs";
 import { CallError, callError } from "./contractErrors.js";
 import { buildDiagnose } from "./diagnose.js";
@@ -20,6 +21,10 @@ import { inspect, inspectStorageFailure, parseInspectRequest } from "./inspectCa
 import { parseRememberRequest, remember, rememberStorageFailure } from "./rememberCall.js";
 import { createProfileSync } from "./profileSync.js";
 import { dispatchUi, isUiMethod } from "./uiDispatch.js";
+import type { PluginHostApiV1 } from "@teamuq/plugin-sdk/external";
+import { createPunchFeed, createPunchReceiptStore, createLegacyPunchState, createProfileDirectory } from "./hostDataAdapter.js";
+import { createPunchCatchupWorker } from "../application/punchCatchup.js";
+import { refreshMemoryProfile } from "../application/profileRefresh.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
@@ -32,6 +37,7 @@ export interface BackendOptions {
   readonly uiReceiptChunk?: number;
   readonly profilePath?: string;
   readonly profileIo?: ProfileIo;
+  readonly host?: PluginHostApiV1;
 }
 
 export interface MemoryBackend {
@@ -40,6 +46,7 @@ export interface MemoryBackend {
   warmUp(): void;
   warmIndex(): Promise<void>;
   openHandles(): number;
+  startWorkers(): void;
 }
 
 interface Ready {
@@ -64,10 +71,41 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   let disposed = false;
   let disposing: Promise<void> | undefined;
   let warming: Promise<void> | undefined;
+  let profileTimer: ReturnType<typeof setInterval> | null = null;
+  let profileRefreshing: Promise<void> | null = null;
+  let workersStarted = false;
   const profilePath = options.profilePath ?? join(dirname(options.dataRoot), PROFILE_DIRECTORY, PROFILE_FILE);
   // why: the name table is independent of Cairn storage, so it loads and accepts pushes even while the Cairn layout is unavailable
   const profile = new ProfileTable(loadProfileFile(profilePath));
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
+
+  const punchWorker = options.host === undefined ? undefined : createPunchCatchupWorker({
+    feed: createPunchFeed(options.host),
+    receipts: createPunchReceiptStore(options.host),
+    legacyReceipts: createLegacyPunchState(options.host),
+    writer: {
+      async rememberMany(inputs) {
+        const request = {
+          actor: { agentId: inputs[0]?.agentId ?? "", projectId: inputs[0]?.projectId ?? null, sessionId: inputs[0]?.sessionId ?? "no-session", providerId: inputs[0]?.providerId ?? "unknown" },
+          ops: inputs.map((input) => ({ scope: input.scope, content: input.content, kind: "context" as const, operationId: input.operationId })),
+        };
+        const response = memoryRememberResponseSchema.parse(await dispatch(MEMORY_PLUGIN_METHODS.remember, request));
+        return response.results.map((result) => {
+          if (result.ok) return { ok: true as const, memoryId: result.value.memory.id, deduplicated: result.value.deduplicated };
+          return { ok: false as const, code: result.error.code, retryable: result.error.retryable };
+        });
+      },
+    },
+  });
+
+  const refreshProfile = (): void => {
+    if (options.host === undefined || profileRefreshing !== null || disposed) return;
+    profileRefreshing = refreshMemoryProfile({
+      directory: createProfileDirectory(options.host),
+      sink: { accept: (request) => profileSync.handle(request) },
+      sinkStatus: () => punchWorker?.status() ?? null,
+    }).then(() => undefined).catch(() => undefined).finally(() => { profileRefreshing = null; });
+  };
 
   const ensure = (): Ready => {
     if (ready !== undefined) return ready;
@@ -178,7 +216,10 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     },
     dispose() {
       disposed = true;
+      if (profileTimer !== null) clearInterval(profileTimer);
       disposing ??= (async () => {
+        await punchWorker?.stop();
+        await profileRefreshing;
         await warming;
         if (ready !== undefined) await ready.application.close();
       })();
@@ -186,6 +227,16 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     },
     warmUp() {
       storageStatus();
+    },
+    startWorkers() {
+      if (workersStarted || disposed) return;
+      workersStarted = true;
+      punchWorker?.start();
+      refreshProfile();
+      if (options.host !== undefined) {
+        profileTimer = setInterval(refreshProfile, 30_000);
+        profileTimer.unref();
+      }
     },
     openHandles: () => ready?.pool.openHandles ?? 0,
   };

@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import {
-  CORE_CONTRACT_DIR,
+  CONTRACT_SOURCE_DIR,
   CORE_LOCK,
   GENERATED_TS,
   HASH_RULE,
@@ -25,82 +24,53 @@ import {
 } from './vendor-lock.mjs'
 
 const problems = []
-const check = (condition, message) => {
-  if (!condition) problems.push(message)
+const check = (condition, message) => { if (!condition) problems.push(message) }
+const readJson = (base, file) => {
+  try { return JSON.parse(readFileSync(join(base, file), 'utf8')) }
+  catch { problems.push(`${file}: missing or unreadable`); return undefined }
 }
 
-function readJson(file) {
-  try {
-    return JSON.parse(readFileSync(join(VENDOR_DIR, file), 'utf8'))
-  } catch {
-    problems.push(`${file}: missing or unreadable`)
-    return undefined
-  }
-}
+const sourceLock = readJson(CONTRACT_SOURCE_DIR, CORE_LOCK)
+const vendorLock = readJson(VENDOR_DIR, VENDOR_LOCK)
+const vendorContractLock = readJson(VENDOR_DIR, CORE_LOCK)
+let sourceLockSha256 = ''
 
-const lock = readJson(CORE_LOCK)
-const vendorLock = readJson(VENDOR_LOCK)
-let lockSha256 = ''
-
-if (lock !== undefined && vendorLock !== undefined) {
-  check(lock.pluginId === PLUGIN_ID && vendorLock.pluginId === PLUGIN_ID, 'pluginId is not teamuq.memory')
-  check(JSON.stringify(lock.methods) === JSON.stringify(METHODS), 'lock methods differ from the four contract methods')
-  check(lock.hashRule === HASH_RULE && vendorLock.hashRule === HASH_RULE, 'hashRule differs')
-  check(lock.contractVersion === vendorLock.contractVersion, 'contractVersion differs between the two locks')
+if (sourceLock !== undefined && vendorLock !== undefined && vendorContractLock !== undefined) {
+  check(sourceLock.pluginId === PLUGIN_ID && sourceLock.methods?.join('|') === METHODS.join('|'), 'plugin-owned contract identity or methods differ')
+  check(sourceLock.hashRule === HASH_RULE && sourceLock.contractVersion === 1, 'plugin-owned contract version or hash rule differs')
+  const sourceFiles = walkFiles(CONTRACT_SOURCE_DIR).filter((file) => file !== CORE_LOCK)
+  check(JSON.stringify(Object.keys(sourceLock.files ?? {}).sort()) === JSON.stringify(sourceFiles), 'plugin-owned contract source files differ from contract/v1/lock.json')
+  for (const file of sourceFiles) check(sourceLock.files?.[file] === hashBytes(readFileSync(join(CONTRACT_SOURCE_DIR, ...file.split('/')))), `${file}: hash differs from contract/v1/lock.json`)
 
   const actual = {}
-  for (const file of walkFiles(VENDOR_DIR)) {
-    if (file !== VENDOR_LOCK) actual[file] = hashBytes(readFileSync(join(VENDOR_DIR, file)))
+  for (const file of walkFiles(VENDOR_DIR)) if (file !== VENDOR_LOCK) actual[file] = hashBytes(readFileSync(join(VENDOR_DIR, ...file.split('/'))))
+  const expectedVendorFiles = [...Object.keys(sourceLock.files ?? {}), CORE_LOCK, SHIM_FILE].sort()
+  check(JSON.stringify(Object.keys(actual).sort()) === JSON.stringify(expectedVendorFiles), 'vendored contract files differ from canonical source plus generated bridge')
+  for (const file of Object.keys(actual)) {
+    const expectedHash = file === SHIM_FILE ? hashBytes(Buffer.from(SHIM_TEXT)) : file === CORE_LOCK ? hashBytes(readFileSync(join(CONTRACT_SOURCE_DIR, CORE_LOCK))) : sourceLock.files?.[file]
+    check(actual[file] === expectedHash, `${file}: hash differs from contract/v1`)
   }
-  lockSha256 = actual[CORE_LOCK] ?? ''
-  const actualNames = Object.keys(actual).sort()
-  const lockedNames = Object.keys(vendorLock.files ?? {}).sort()
-  check(JSON.stringify(actualNames) === JSON.stringify(lockedNames), `vendored file set differs from ${VENDOR_LOCK}`)
-  for (const file of actualNames) check(vendorLock.files?.[file] === actual[file], `${file}: sha256 differs from ${VENDOR_LOCK}`)
-
-  const contractNames = actualNames.filter((file) => file !== CORE_LOCK && !PLUGIN_OWNED.includes(file))
-  check(JSON.stringify(contractNames) === JSON.stringify(Object.keys(lock.files).sort()), `vendored files differ from the files ${CORE_LOCK} lists`)
-  for (const file of contractNames) check(lock.files[file] === actual[file], `${file}: sha256 differs from Core ${CORE_LOCK}`)
-
-  check(vendorLock.coreLockSha256 === lockSha256, `coreLockSha256 differs from the sha256 of ${CORE_LOCK}`)
-  check(/^[0-9a-f]{40}$/.test(vendorLock.source?.coreCommit ?? ''), 'source.coreCommit is not a commit hash')
-  check(/^[0-9a-f]{40}$/.test(vendorLock.source?.contractCommit ?? ''), 'source.contractCommit is not a commit hash')
-  check(vendorLock.source?.contractDir === CORE_CONTRACT_DIR, 'source.contractDir differs')
+  sourceLockSha256 = hashBytes(readFileSync(join(CONTRACT_SOURCE_DIR, CORE_LOCK)))
+  check(vendorLock.source?.repo === 'teamuq-plugin-memory' && vendorLock.source?.contractDir === 'contract/v1', 'vendor provenance is not plugin-owned')
+  check(vendorLock.source?.sourceLockSha256 === sourceLockSha256, 'vendor sourceLockSha256 differs from contract/v1/lock.json')
+  check(vendorLock.pluginId === PLUGIN_ID && vendorLock.contractVersion === sourceLock.contractVersion && vendorLock.hashRule === HASH_RULE, 'vendor identity or contract version differs')
   check(JSON.stringify(vendorLock.pluginOwnedFiles) === JSON.stringify(PLUGIN_OWNED), 'pluginOwnedFiles differs')
-  check(existsSync(join(VENDOR_DIR, SHIM_FILE)) && readFileSync(join(VENDOR_DIR, SHIM_FILE), 'utf8') === SHIM_TEXT, `${SHIM_FILE} is not the expected bridge`)
+  check(JSON.stringify(vendorLock.files) === JSON.stringify(actual), 'vendor.lock.json file hashes differ')
+  check(vendorContractLock.pluginId === sourceLock.pluginId && JSON.stringify(vendorContractLock.files) === JSON.stringify(sourceLock.files), 'generated contract lock differs from plugin-owned source lock')
 
   const generated = existsSync(GENERATED_TS) ? readFileSync(GENERATED_TS, 'utf8').replace(/\r\n/gu, '\n') : ''
-  check(generated === generatedSource(lockSha256), 'src/backend/vendoredContractLock.ts does not carry the lock sha256')
-
-  const coreIndex = process.argv.indexOf('--core')
-  if (coreIndex !== -1) {
-    const coreRoot = resolve(process.argv[coreIndex + 1] ?? '')
-    const coreLock = join(coreRoot, ...CORE_CONTRACT_DIR.split('/'), CORE_LOCK)
-    check(existsSync(coreLock) && hashBytes(readFileSync(coreLock)) === lockSha256, 'vendored lock differs from the Core checkout')
-    try {
-      const known = execFileSync('git', ['rev-parse', '--verify', `${vendorLock.source.contractCommit}^{commit}`], { cwd: coreRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-      check(known === vendorLock.source.contractCommit, 'Core does not know source.contractCommit')
-    } catch {
-      problems.push('Core does not know source.contractCommit')
-    }
-  }
+  check(generated === generatedSource(sourceLockSha256), 'src/backend/vendoredContractLock.ts does not carry the source lock sha256')
 }
 
-let devkitLock
-try {
-  devkitLock = JSON.parse(readFileSync(join(DEVKIT_DIR, DEVKIT_LOCK), 'utf8'))
-} catch {
-  problems.push(`${DEVKIT_LOCK}: missing or unreadable`)
-}
+const devkitLock = readJson(DEVKIT_DIR, DEVKIT_LOCK)
 if (devkitLock !== undefined) {
   check(devkitLock.tool === DEVKIT_TOOL && devkitLock.file === DEVKIT_FILE, `${DEVKIT_LOCK}: tool or file name differs`)
   check(devkitLock.hashRule === HASH_RULE, `${DEVKIT_LOCK}: hashRule differs`)
-  check(/^[0-9a-f]{40}$/.test(devkitLock.source?.coreCommit ?? ''), `${DEVKIT_LOCK}: source.coreCommit is not a commit hash`)
-  check(/^[0-9]+[.][0-9]+[.][0-9]+$/.test(devkitLock.source?.coreVersion ?? ''), `${DEVKIT_LOCK}: source.coreVersion is not a version`)
-  const devkitPath = join(DEVKIT_DIR, DEVKIT_FILE)
-  if (!existsSync(devkitPath)) problems.push(`${DEVKIT_FILE}: missing`)
+  check(/^[0-9a-f]{40}$/u.test(devkitLock.source?.coreCommit ?? ''), `${DEVKIT_LOCK}: source.coreCommit is not a commit hash`)
+  check(/^[0-9]+\.[0-9]+\.[0-9]+$/u.test(devkitLock.source?.coreVersion ?? ''), `${DEVKIT_LOCK}: source.coreVersion is not a version`)
+  const bytes = existsSync(join(DEVKIT_DIR, DEVKIT_FILE)) ? readFileSync(join(DEVKIT_DIR, DEVKIT_FILE)) : undefined
+  if (bytes === undefined) problems.push(`${DEVKIT_FILE}: missing`)
   else {
-    const bytes = readFileSync(devkitPath)
     check(hashBytes(bytes) === devkitLock.sha256, `${DEVKIT_FILE}: sha256 differs from ${DEVKIT_LOCK}`)
     check(normalise(bytes).length === devkitLock.bytes, `${DEVKIT_FILE}: size differs from ${DEVKIT_LOCK}`)
   }
@@ -110,4 +80,4 @@ if (problems.length > 0) {
   console.error(JSON.stringify({ ok: false, problems }, null, 2))
   process.exit(1)
 }
-console.log(JSON.stringify({ ok: true, coreLockSha256: lockSha256, coreCommit: vendorLock.source.coreCommit, contractCommit: vendorLock.source.contractCommit, files: Object.keys(vendorLock.files).length, devkitSha256: devkitLock?.sha256 }))
+console.log(JSON.stringify({ ok: true, source: 'contract/v1', sourceLockSha256, files: Object.keys(vendorLock.files).length, devkitSha256: devkitLock?.sha256 }))

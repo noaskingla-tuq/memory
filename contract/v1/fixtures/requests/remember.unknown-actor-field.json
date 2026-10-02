@@ -1,0 +1,22 @@
+{
+  "case": "remember.unknown-actor-field",
+  "method": "memory.remember@1",
+  "valid": false,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex",
+      "teamId": "t"
+    },
+    "ops": [
+      {
+        "scope": "project",
+        "content": "x",
+        "kind": "context",
+        "operationId": "punch:00000000000000000000000000000006"
+      }
+    ]
+  }
+}

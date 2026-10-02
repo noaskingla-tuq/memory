@@ -1,0 +1,19 @@
+{
+  "case": "inspect.get-with-cursor",
+  "method": "memory.inspect@1",
+  "valid": true,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex"
+    },
+    "input": {
+      "scope": "project",
+      "memoryId": "mem-1",
+      "limit": 2,
+      "cursor": "abc.def"
+    }
+  }
+}

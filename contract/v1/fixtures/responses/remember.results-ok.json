@@ -1,0 +1,53 @@
+{
+  "case": "remember.results-ok",
+  "method": "memory.remember@1",
+  "accept": true,
+  "response": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-1"
+          },
+          "deduplicated": false
+        },
+        "requestId": "req-1"
+      },
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-1"
+          },
+          "deduplicated": true
+        },
+        "requestId": "req-2"
+      }
+    ]
+  },
+  "parsed": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-1"
+          },
+          "deduplicated": false
+        },
+        "requestId": "req-1"
+      },
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-1"
+          },
+          "deduplicated": true
+        },
+        "requestId": "req-2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "case": "profile-sync.already-effective",
+  "method": "memory.profile.sync@1",
+  "accept": true,
+  "note": "same generation already effective: complete on any part, Core stops sending the rest",
+  "response": {
+    "accepted": true,
+    "generation": "783875e41d932603e71850485b428aeae9dfd97a123f0e562d7a65cd931d2ac2",
+    "complete": true,
+    "changed": false,
+    "received": 1,
+    "agents": 4,
+    "teams": 2,
+    "projects": 2
+  },
+  "parsed": {
+    "accepted": true,
+    "generation": "783875e41d932603e71850485b428aeae9dfd97a123f0e562d7a65cd931d2ac2",
+    "complete": true,
+    "changed": false,
+    "received": 1,
+    "agents": 4,
+    "teams": 2,
+    "projects": 2
+  }
+}

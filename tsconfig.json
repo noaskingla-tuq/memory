@@ -10,6 +10,6 @@
     "rootDir": "src",
     "outDir": "out"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "types/**/*.d.ts"],
   "exclude": ["src/ui"]
 }

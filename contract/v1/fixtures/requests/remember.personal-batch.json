@@ -1,0 +1,27 @@
+{
+  "case": "remember.personal-batch",
+  "method": "memory.remember@1",
+  "valid": true,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": null,
+      "sessionId": "session-a",
+      "providerId": "codex"
+    },
+    "ops": [
+      {
+        "scope": "personal",
+        "content": "first",
+        "kind": "context",
+        "operationId": "punch:00000000000000000000000000000002"
+      },
+      {
+        "scope": "personal",
+        "content": "second",
+        "kind": "context",
+        "operationId": "punch:00000000000000000000000000000003"
+      }
+    ]
+  }
+}

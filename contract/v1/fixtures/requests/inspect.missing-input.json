@@ -1,0 +1,13 @@
+{
+  "case": "inspect.missing-input",
+  "method": "memory.inspect@1",
+  "valid": false,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex"
+    }
+  }
+}

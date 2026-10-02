@@ -1,0 +1,39 @@
+{
+  "case": "remember.extra-fields-tolerated",
+  "method": "memory.remember@1",
+  "accept": true,
+  "response": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-1",
+            "revision": 1
+          },
+          "deduplicated": false,
+          "indexRevision": 7
+        },
+        "requestId": "req-1",
+        "trace": "x"
+      }
+    ],
+    "future": {
+      "field": 1
+    }
+  },
+  "parsed": {
+    "results": [
+      {
+        "ok": true,
+        "value": {
+          "memory": {
+            "id": "mem-1"
+          },
+          "deduplicated": false
+        },
+        "requestId": "req-1"
+      }
+    ]
+  }
+}

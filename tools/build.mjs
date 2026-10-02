@@ -111,7 +111,7 @@ export async function buildPlugin({ dist = join(REPO_ROOT, 'dist'), keyFile, key
   const report = { stageDir, id: manifest.id, version: manifest.version, bundleInputs: bundle.inputs, uiInputs: ui.inputs, cairnFiles: staged.files, cairnCommit: staged.commit, validated: validated.ok === true }
   if (stageOnly) return report
 
-  const ephemeral = keyFile === undefined ? createTempKey() : null
+  const ephemeral = keyFile === undefined ? createTempKey({ keyIdPrefix: 'memory-tmp-' }) : null
   try {
     const outFile = join(dist, `${manifest.id}-${manifest.version}.tuqplugin`)
     const mode = anchors ?? (ephemeral === null ? 'core' : 'self')

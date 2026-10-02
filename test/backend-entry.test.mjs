@@ -21,7 +21,7 @@ const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "ut
 const cairnPin = JSON.parse(readFileSync(PIN_PATH, "utf8"));
 const vendorDir = join(REPO_ROOT, "vendor", "teamuq-contract");
 const lockSha256 = createHash("sha256")
-  .update(readFileSync(join(vendorDir, "lock.json"), "utf8").replace(/\r\n/gu, "\n"))
+  .update(readFileSync(join(REPO_ROOT, "contract", "v1", "lock.json"), "utf8").replace(/\r\n/gu, "\n"))
   .digest("hex");
 
 // why: node:test runs t.after hooks in registration order, but open handles must be disposed before their directory is removed
@@ -54,7 +54,7 @@ test("diagnose reports the seven contract fields and matches the vendored schema
   });
   assert.equal(report.contractLockSha256, lockSha256);
   const vendorLock = JSON.parse(readFileSync(join(vendorDir, "vendor.lock.json"), "utf8"));
-  assert.equal(report.contractLockSha256, vendorLock.coreLockSha256);
+  assert.equal(report.contractLockSha256, vendorLock.source.sourceLockSha256);
   const text = JSON.stringify(report);
   for (const secret of [base, dataRoot, base.replaceAll("\\", "/"), base.replaceAll("\\", "\\\\"), REPO_ROOT]) {
     assert.equal(text.includes(secret), false, secret);

@@ -4,19 +4,17 @@
   "contractVersion": 1,
   "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
   "source": {
-    "repo": "teamuq-electron",
-    "coreCommit": "00732fb954d6d8bcebbe3f14f729b8440309a2c9",
-    "contractCommit": "c07ae684f6d440df12a48567f5c90239b8fea385",
-    "contractDir": "packages/features/agent-memory/contract/v1"
+    "repo": "teamuq-plugin-memory",
+    "contractDir": "contract/v1",
+    "sourceLockSha256": "709a39f6e1d54f5c5fb10a814835769394ae7e3826b6832dfbac1569e5c56cbf"
   },
-  "coreLockSha256": "a0f058bc061c5c31092e577d951693684cb018e8bd810fe239496b9c7fdccf9b",
   "pluginOwnedFiles": [
     "contract.d.mts"
   ],
   "files": {
     "contract.d.mts": "07480618432fe5c5ed124b5809b7ed36d3d40a284e3ccb71cbd7d16de6c44605",
     "contract.d.ts": "1ffc5732d5618bfdd653d7a6b674e52746bf44b2f669e9fc8dd48893ebe23386",
-    "contract.mjs": "6e3eba9e240d80f02633f36bc2ca37056d4724c7f0180ae9738afa1dce531174",
+    "contract.mjs": "be39637e75585e32c66101fd7b6b9d7a5cfe378a0bdb213c20bad8b9c562459a",
     "fixtures/requests/diagnose.empty.json": "0cfd283a5ab5a2f5a311e30c7e0be1ec428d8679276c00f7c863422b29e67938",
     "fixtures/requests/diagnose.unknown-field.json": "d63382492d59e765f1ad11ed4eeb043305b0f455d072ab5e5b9578640873235f",
     "fixtures/requests/inspect.get-with-cursor.json": "44acbb4e6459e4febac942832da2513d5b7356e4186305c7bbfee867bc2b3817",
@@ -84,6 +82,6 @@
     "fixtures/responses/remember.results-not-array.json": "250cf0198cd8817ac37d3b66ad45a97d77a5906759a76899786348c4d051cfe3",
     "fixtures/responses/remember.results-ok.json": "f5d9853b055a0c1ce3432fa9920e4f690e7aef13281fdc22239497b63ac36c66",
     "fixtures/responses/remember.unknown-error-code.json": "635810001d95031834c1cb43fc56cb89261aad8acef32f4c714ab0626799b209",
-    "lock.json": "a0f058bc061c5c31092e577d951693684cb018e8bd810fe239496b9c7fdccf9b"
+    "lock.json": "709a39f6e1d54f5c5fb10a814835769394ae7e3826b6832dfbac1569e5c56cbf"
   }
 }

@@ -1,4 +1,3 @@
-// packages/features/agent-memory/src/contracts/memoryPluginContract.ts
 import { z } from "zod";
 var MEMORY_PLUGIN_ID = "teamuq.memory";
 var MEMORY_CONTRACT_VERSION = 1;

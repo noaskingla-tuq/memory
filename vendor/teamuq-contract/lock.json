@@ -11,7 +11,7 @@
   "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
   "files": {
     "contract.d.ts": "1ffc5732d5618bfdd653d7a6b674e52746bf44b2f669e9fc8dd48893ebe23386",
-    "contract.mjs": "6e3eba9e240d80f02633f36bc2ca37056d4724c7f0180ae9738afa1dce531174",
+    "contract.mjs": "be39637e75585e32c66101fd7b6b9d7a5cfe378a0bdb213c20bad8b9c562459a",
     "fixtures/requests/diagnose.empty.json": "0cfd283a5ab5a2f5a311e30c7e0be1ec428d8679276c00f7c863422b29e67938",
     "fixtures/requests/diagnose.unknown-field.json": "d63382492d59e765f1ad11ed4eeb043305b0f455d072ab5e5b9578640873235f",
     "fixtures/requests/inspect.get-with-cursor.json": "44acbb4e6459e4febac942832da2513d5b7356e4186305c7bbfee867bc2b3817",

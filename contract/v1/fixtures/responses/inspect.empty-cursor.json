@@ -1,0 +1,13 @@
+{
+  "case": "inspect.empty-cursor",
+  "method": "memory.inspect@1",
+  "accept": false,
+  "response": {
+    "result": {
+      "ok": true,
+      "value": {},
+      "requestId": "req-12"
+    },
+    "nextCursor": ""
+  }
+}

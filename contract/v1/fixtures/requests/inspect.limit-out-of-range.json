@@ -1,0 +1,17 @@
+{
+  "case": "inspect.limit-out-of-range",
+  "method": "memory.inspect@1",
+  "valid": false,
+  "params": {
+    "actor": {
+      "agentId": "team-a/agent-a",
+      "projectId": "project-a",
+      "sessionId": "session-a",
+      "providerId": "codex"
+    },
+    "input": {
+      "scope": "personal",
+      "limit": 13
+    }
+  }
+}

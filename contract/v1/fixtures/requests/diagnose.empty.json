@@ -1,0 +1,6 @@
+{
+  "case": "diagnose.empty",
+  "method": "diagnose",
+  "valid": true,
+  "params": {}
+}

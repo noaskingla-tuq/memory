@@ -123,11 +123,14 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   } catch {
     manifest = {}
   }
-  check('manifest identity is teamuq.memory / teamuq / full-trust and display name Cairn', manifest.id === 'teamuq.memory' && manifest.publisher === 'teamuq' && manifest.trustTier === 'full-trust' && manifest.name === 'Cairn')
+  check('manifest identity is teamuq.memory / teamuq / full-trust and display name Cairn記憶管理', manifest.id === 'teamuq.memory' && manifest.publisher === 'teamuq' && manifest.trustTier === 'full-trust' && manifest.name === 'Cairn記憶管理')
   check('manifest icon points to the staged Cairn PNG', manifest.icon === 'cairn-icon.png' && manifest.contributes?.views?.[0]?.icon === 'cairn-icon.png' && entries.has('cairn-icon.png') && entries.get('cairn-icon.png')?.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
   check('manifest is composed: entry.backend is backend.mjs and entry.ui is ui/index.html, both files exist', manifest.entry?.backend === 'backend.mjs' && manifest.entry?.ui === UI_ENTRY && entries.has('backend.mjs') && entries.has(UI_ENTRY), JSON.stringify(manifest.entry))
   const views = manifest.contributes?.views ?? []
-  check('manifest declares exactly the Cairn view (tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === 'Cairn' && views[0].icon === 'cairn-icon.png' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
+  check('manifest declares exactly the Cairn記憶管理 view (tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === 'Cairn記憶管理' && views[0].icon === 'cairn-icon.png' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
+  const uiHtml = text(UI_ENTRY)
+  const headerHasBundledLogo = /<header\b[^>]*>[\s\S]*?<img class="hdr-logo" src="\.\.\/cairn-icon\.png" width="24" height="24" alt="">\s*<h1 id="title"><\/h1>[\s\S]*?<\/header>/u.test(uiHtml)
+  check('UI title and decorative header logo use Cairn記憶管理 and the bundled PNG', uiHtml.includes('<title>Cairn記憶管理</title>') && headerHasBundledLogo && entries.has('cairn-icon.png') && text('ui/app.js').includes('Cairn記憶管理'))
   check('manifest permissions are exactly the seven UI methods, host data grants and legacy migration grant, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
   const legacySources = RELEASE_METADATA.legacyDataSources ?? []
   const migrations = manifest.data?.legacyMigrations ?? []

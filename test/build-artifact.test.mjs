@@ -100,13 +100,14 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.doesNotMatch(backend, /from "zod"/u);
   const manifest = JSON.parse(readFileSync(join(dist, "stage", "manifest.json"), "utf8"));
   assert.equal(manifest.version, packageJson.version);
+  assert.equal(manifest.name, "Cairn記憶管理");
   assert.equal(manifest.minCoreVersion, ">=1.7.0");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
     { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "plugin-state:write", "data:legacy-migrate"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
   );
   assert.deepEqual(manifest.contributes.views, [
-    { id: "memory", title: "記憶", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
+    { id: "memory", title: "Cairn記憶管理", icon: "cairn-icon.png", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
   ]);
   assert.equal(manifest.resources.maxSessions, 4);
   assert.deepEqual(manifest.backendMethods, UI_METHOD_NAMES);
@@ -114,6 +115,9 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.equal(manifest.backendMethods.includes("memory.profile.sync@1"), false);
   assert.equal(UI_METHOD_NAMES.some((method) => method.includes("profile")), false);
   const html = readFileSync(join(dist, "stage", "ui", "index.html"), "utf8");
+  assert.match(html, /<title>Cairn記憶管理<\/title>/u);
+  assert.match(html, /<img class="hdr-logo" src="\.\.\/cairn-icon\.png" width="24" height="24" alt="">/u);
+  assert.equal(sha256Bytes(readFileSync(join(dist, "stage", "cairn-icon.png"))), "48a8a8c7b2fbefa172def0acadec39670cc68c4959538d311a9ad0d06519fc02");
   assert.deepEqual(scanUiFile("ui/index.html", html), []);
   assert.deepEqual([...html.matchAll(/<script\b[^>]*>/gu)].map((match) => match[0]), ['<script src="app.js" defer>']);
   for (const name of ["app.js", "app.css"]) assert.ok(readFileSync(join(dist, "stage", "ui", name), "utf8").length > 0, name);
@@ -128,7 +132,7 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.anchors, "self");
   assert.equal(info.signer.kind, "teamuq");
   assert.match(info.signer.keyId, /^memory-tmp-[0-9a-f]{8}$/u);
-  assert.equal(info.file, join(dist, "teamuq.memory-1.2.1.tuqplugin"));
+  assert.equal(info.file, join(dist, "teamuq.memory-1.2.2.tuqplugin"));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
   assert.equal(report.fileCount, 8 + 58);

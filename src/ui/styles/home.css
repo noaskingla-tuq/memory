@@ -11,6 +11,22 @@
   background: var(--surface);
 }
 
+.hdr-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.hdr-logo {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: var(--on-accent);
+  object-fit: contain;
+}
+
 .hdr-status {
   margin-left: auto;
   font-size: 12px;

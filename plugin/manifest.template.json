@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "kind": "plugin",
   "id": "teamuq.memory",
-  "name": "Cairn",
+  "name": "Cairn記憶管理",
   "icon": "cairn-icon.png",
   "version": "@VERSION@",
   "publisher": "teamuq",
@@ -14,7 +14,7 @@
   "entry": { "ui": "ui/index.html", "backend": "backend.mjs" },
   "contributes": {
     "views": [
-      { "id": "memory", "title": "Cairn", "icon": "cairn-icon.png", "entry": "ui/index.html", "presentations": ["tab", "fullpage"], "defaultPresentation": "tab" }
+      { "id": "memory", "title": "Cairn記憶管理", "icon": "cairn-icon.png", "entry": "ui/index.html", "presentations": ["tab", "fullpage"], "defaultPresentation": "tab" }
     ]
   },
   "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 4, "idleUnloadSec": 180, "bootTimeoutSec": 30 },

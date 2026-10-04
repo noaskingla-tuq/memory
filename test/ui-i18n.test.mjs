@@ -29,7 +29,7 @@ test("every string is trimmed, has no doubled spaces, and uses full-width punctu
 test("t fills placeholders, keeps unknown ones, and coerces numbers", () => {
   assert.equal(t("status.detail", { version: "1.2.3", storage: "ready" }), "版本 1.2.3，儲存狀態 ready");
   assert.equal(t("status.detail", { version: 7 }), "版本 7，儲存狀態 {storage}");
-  assert.equal(t("app.title"), "記憶");
+  assert.equal(t("app.title"), "Cairn記憶管理");
   for (const [key, value] of Object.entries(STRINGS)) {
     const names = [...value.matchAll(/\{([A-Za-z0-9_]+)\}/gu)].map((match) => match[1]);
     const params = Object.fromEntries(names.map((name) => [name, "X"]));

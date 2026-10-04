@@ -4,7 +4,7 @@ import { TIMELINE_STRINGS } from "./timelineStrings.js";
 
 export const STRINGS = {
   ...SPACE_STRINGS,
-  "app.title": "Cairn",
+  "app.title": "Cairn記憶管理",
   "status.loading": "讀取中…",
   "status.ok": "記憶服務運作中",
   "status.detail": "版本 {version}，儲存狀態 {storage}",

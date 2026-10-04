@@ -106,6 +106,7 @@ export async function buildPlugin({ dist = join(REPO_ROOT, 'dist'), keyFile, key
   const bundle = await bundleBackend(join(stageDir, 'backend.mjs'))
   const ui = await bundleUi(stageDir)
   const staged = stageCairn(stageDir)
+  copyFileSync(join(REPO_ROOT, 'plugin', 'cairn-icon.png'), join(stageDir, 'cairn-icon.png'))
   const manifest = writeManifest(stageDir)
   const validated = devkitJson(runDevkit(['validate', stageDir]), 'validate')
   const report = { stageDir, id: manifest.id, version: manifest.version, bundleInputs: bundle.inputs, uiInputs: ui.inputs, cairnFiles: staged.files, cairnCommit: staged.commit, validated: validated.ok === true }

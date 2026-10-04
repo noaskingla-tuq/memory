@@ -19,7 +19,7 @@ const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'
 const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metadata.json'), 'utf8'))
 const UI_ENTRY = 'ui/index.html'
-const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css']
+const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css', 'cairn-icon.png']
 const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'plugin-state:write', 'project-directory:read', 'ui:view', 'work-records:read']
 const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
 const EXPECTED_MAX_SESSIONS = 4
@@ -123,10 +123,11 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   } catch {
     manifest = {}
   }
-  check('manifest identity is teamuq.memory / teamuq / full-trust', manifest.id === 'teamuq.memory' && manifest.publisher === 'teamuq' && manifest.trustTier === 'full-trust')
+  check('manifest identity is teamuq.memory / teamuq / full-trust and display name Cairn', manifest.id === 'teamuq.memory' && manifest.publisher === 'teamuq' && manifest.trustTier === 'full-trust' && manifest.name === 'Cairn')
+  check('manifest icon points to the staged Cairn PNG', manifest.icon === 'cairn-icon.png' && manifest.contributes?.views?.[0]?.icon === 'cairn-icon.png' && entries.has('cairn-icon.png') && entries.get('cairn-icon.png')?.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
   check('manifest is composed: entry.backend is backend.mjs and entry.ui is ui/index.html, both files exist', manifest.entry?.backend === 'backend.mjs' && manifest.entry?.ui === UI_ENTRY && entries.has('backend.mjs') && entries.has(UI_ENTRY), JSON.stringify(manifest.entry))
   const views = manifest.contributes?.views ?? []
-  check('manifest declares exactly the memory view (title 記憶, tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === '記憶' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
+  check('manifest declares exactly the Cairn view (tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === 'Cairn' && views[0].icon === 'cairn-icon.png' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
   check('manifest permissions are exactly the seven UI methods, host data grants and legacy migration grant, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
   const legacySources = RELEASE_METADATA.legacyDataSources ?? []
   const migrations = manifest.data?.legacyMigrations ?? []

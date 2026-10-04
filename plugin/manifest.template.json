@@ -2,7 +2,8 @@
   "schemaVersion": 2,
   "kind": "plugin",
   "id": "teamuq.memory",
-  "name": "TeamUQ 記憶",
+  "name": "Cairn",
+  "icon": "cairn-icon.png",
   "version": "@VERSION@",
   "publisher": "teamuq",
   "description": "TeamUQ 對話記憶：為每個 agent 保存可追溯的記憶，資料留在本機。",
@@ -13,7 +14,7 @@
   "entry": { "ui": "ui/index.html", "backend": "backend.mjs" },
   "contributes": {
     "views": [
-      { "id": "memory", "title": "記憶", "entry": "ui/index.html", "presentations": ["tab", "fullpage"], "defaultPresentation": "tab" }
+      { "id": "memory", "title": "Cairn", "icon": "cairn-icon.png", "entry": "ui/index.html", "presentations": ["tab", "fullpage"], "defaultPresentation": "tab" }
     ]
   },
   "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 4, "idleUnloadSec": 180, "bootTimeoutSec": 30 },

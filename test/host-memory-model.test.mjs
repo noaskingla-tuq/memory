@@ -26,7 +26,7 @@ export function mockAi(overrides = {}) {
   };
   return { ai, counters, session, options };
 }
-const enabled = () => readOrganizationSettings({ organizationEnabled: true });
+const enabled = () => readOrganizationSettings();
 const invoke = (port, signal = new AbortController().signal, input = {}) => port.invoke({ agentId: "a", policy: port.resolvePolicy("a"), operation: "extract", system: "JSON please", input, maxOutputTokens: 1024, signal });
 
 test("host model consumes synchronous early terminal events and closes its session", async () => {
@@ -85,7 +85,7 @@ test("cancel during discovery and late opening closes any eventual session", asy
 });
 test("disabled, denied, unavailable and quota settings avoid provider sends", async () => {
   for (const [values, mutate, code] of [
-    [{}, () => {}, "MODEL_NOT_CONFIGURED"],
+    [{ organizationEnabled: false }, () => {}, "MODEL_NOT_CONFIGURED"],
     [{ organizationEnabled: true, organizationModel: "gpt-astra" }, (options) => options.providers[0].models.push({ id: "gpt-astra" }), "MODEL_NOT_CONFIGURED"],
     [{ organizationEnabled: true }, (options) => { options.quota.state = "exhausted"; }, "RESOURCE_BUSY"],
     [{ organizationEnabled: true }, (options) => { options.providers[0].state = "unavailable"; }, "MODEL_NOT_CONFIGURED"],

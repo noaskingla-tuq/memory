@@ -111,7 +111,7 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   ]);
   assert.equal(manifest.resources.maxSessions, 4);
   assert.deepEqual(manifest.hostApis, [{ id: "teamuq.host-data", range: "^1.1.0" }]);
-  assert.equal(manifest.settingsSchema.fields.find((field) => field.key === "organizationEnabled").default, false);
+  assert.equal(manifest.settingsSchema.fields.find((field) => field.key === "organizationEnabled").default, true);
   assert.deepEqual(manifest.backendMethods, UI_METHOD_NAMES);
   assert.equal(manifest.backendMethods.some((method) => method.startsWith("memory.")), false);
   assert.equal(manifest.backendMethods.includes("memory.profile.sync@1"), false);

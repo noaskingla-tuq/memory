@@ -71,10 +71,10 @@ test("source conversion bounds CJK bytes and preserves valid surrogate pairs", (
   assert.ok(messages.every((message) => message.content.isWellFormed()));
 });
 
-function hostRig() {
+function hostRig(initialValues = { organizationEnabled: false }) {
   let events;
   let settingsListener;
-  let values = {};
+  let values = initialValues;
   let aiCalls = 0;
   let closed = 0;
   const snapshot = { snapshotId: "s", generation: "g", highWatermark: "p" };
@@ -101,6 +101,20 @@ function hostRig() {
   const settings = { all: () => values, onChange(listener) { settingsListener = listener; return () => { settingsListener = undefined; }; } };
   return { host, settings, enable() { values = { organizationEnabled: true }; settingsListener?.(values); }, event() { events?.({}); }, get aiCalls() { return aiCalls; }, get closed() { return closed; }, get listeners() { return [events, settingsListener].filter(Boolean).length; } };
 }
+test("production service organizes settled punches by default without toggling a setting", async (t) => {
+  const h = hostRig({});
+  const { backend } = startBackend(t, { host: h.host, settings: h.settings });
+  backend.startWorkers(); await backend.idleWorkers();
+  assert.equal(h.aiCalls, 2);
+  assert.equal(h.closed, 2);
+  const memories = await callInspect(backend, { scope: "project", limit: 12 }, { agentId: "sw/a", projectId: "project" });
+  assert.equal(memories.result.value.memories.length, 2);
+  assert.ok(memories.result.value.memories.some((memory) => memory.origin === "agent-inferred"));
+  const status = await backend.call("ui.status", {});
+  assert.equal(status.organization.completed, 1);
+  assert.equal(status.organization.pending, 0);
+  assert.equal(status.organization.state, "idle");
+});
 test("production service admits raw context with retired host state, then captures through real Cairn and mock host AI", async (t) => {
   const h = hostRig();
   const { backend, dataRoot } = startBackend(t, { host: h.host, settings: h.settings });

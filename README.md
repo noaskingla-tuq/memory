@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.0，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.12，釘選 Cairn v0.3.1（schema 18）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.1，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.12，釘選 Cairn v0.3.1（schema 18）。
 
 > 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
 
@@ -10,7 +10,7 @@ TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.0，fu
 
 原始工作紀錄先以 `context` 儲存，再將整理工作持久化，最後確認同步收據。同步收據/checkpoint 位於 `<dataDir>/punch-state.json`，整理佇列位於 `<dataDir>/punch-organization.json`；兩者拒絕 symlink/junction、檢查 revision，先寫 tmp、fsync 後原子 rename。舊 host pluginState 的收據與 checkpoint 只讀遷移；`plugin_state_retired` 允許直接使用本機狀態，其他讀取失敗或收據衝突會停止並保留資料。相符的舊寫入收據會重建整理工作，已存在的工作保持原始來源不變。
 
-設定 `organizationEnabled` 預設為 false。開啟後，背景 worker 逐筆經 `MemoryApplication.memory_capture`、唯一 Cairn adapter 與公開 host.ai 整理；請求用 user 訊息、成果用 assistant 訊息。原始 context 保留；模型產生的記憶 receipt 指向固定的 punch 來源訊息與原 session。整理前在共用 agent 寫入佇列中確認來源尚未遺忘。整理完成或來源遺忘後清除佇列中的來源文字；等待中的失敗工作保留必要文字以供重試。模型不可用、額度不足、取消或失敗時保留 pending 工作與遞增退避（30 秒至一小時）；修改設定會立即重試 pending 工作。重啟或完成收據寫入失敗後，以 Cairn 的持久 capture 身分避免重複 extraction。擷取已完成但 Cairn 分類失敗時記錄警示，不重播已完成擷取。
+設定 `organizationEnabled` 預設為 true；未設定時自動啟用，使用者明確設定 false 時仍尊重停用選擇。啟用時，背景 worker 逐筆經 `MemoryApplication.memory_capture`、唯一 Cairn adapter 與公開 host.ai 整理；請求用 user 訊息、成果用 assistant 訊息。原始 context 保留；模型產生的記憶 receipt 指向固定的 punch 來源訊息與原 session。整理前在共用 agent 寫入佇列中確認來源尚未遺忘。整理完成或來源遺忘後清除佇列中的來源文字；等待中的失敗工作保留必要文字以供重試。模型不可用、額度不足、取消或失敗時保留 pending 工作與遞增退避（30 秒至一小時）；修改設定會立即重試 pending 工作。重啟或完成收據寫入失敗後，以 Cairn 的持久 capture 身分避免重複 extraction。擷取已完成但 Cairn 分類失敗時記錄警示，不重播已完成擷取。
 
 提供者與模型 ID 可留空使用可用預設值，指定 ID 不可用時暫停，不使用 astra。`organizationContextBudget` 是 UTF-8 bytes 的保守預算（預設 32,768），並非精確 token 數或模型 context window；Cairn 另限制每次模型輸入 6,000、輸出 1,024 個計數單位。整理來源採固定前綴：請求最多 300 UTF-16 units/900 bytes、成果最多 1,200 units/2,400 bytes，保持完整字元；完整的原始工作紀錄仍依既有 3,600 units 規則儲存。真實模型限制與整理品質需另行實測。
 
@@ -63,7 +63,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
 - inspect：以整個回應 `Buffer.byteLength(JSON.stringify(response), "utf8")`、60,000 bytes 為預算；超過就把 limit 對半、重查，直到符合。回 `nextCursor`（list 取 `nextCursor`，get 取 `nextReceiptCursor`）與 `appliedLimit`，呼叫端續頁必須用 `appliedLimit`。`limit` 沒給時明確用 6。降到 1 仍超過拋 `result_too_large`。Cairn cursor 綁定簽發時的 limit，帶 cursor 的續頁超過預算無法對半，同樣拋 `result_too_large`。
 - 每個回應在回傳前都用 vendored 回應 schema 解析（失敗拋 `internal`）；`diagnose` 不含任何路徑，`storage.status` 為 `ready` 或小寫的錯誤碼（如 `storage_unsafe`）。
-- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.3.0`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
+- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.3.1`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
 - 資料層的祖先目錄檢查只從 `dataDir` 往下走（`CairnDataLayout` 的 `trustedBase`）：`--permission` 下外掛讀不到 `dataDir` 以上的任何路徑，往上 lstat 會被拒（實測回 `STORAGE_BUSY`）。`dataDir` 以下仍拒絕 symlink／junction；`dataDir` 以上的重導向（例如 macOS `/var`）視為 host 的事。不傳 `trustedBase` 時維持從根目錄往下檢查。
 
 ## 唯讀讀取器與 agent 目錄（S1）
@@ -215,10 +215,10 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 ## 打包與簽章（P3）
 
 ```powershell
-node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.3.0.tuqplugin
+node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.3.1.tuqplugin
 node tools/build.mjs --stage-only           # 只做 stage 與 devkit validate
 node tools/build.mjs --key <file.key.pem>   # 真金鑰：互動輸入 passphrase，預設 --anchors core
-node tools/verify-artifact.mjs dist/teamuq.memory-1.3.0.tuqplugin --pub-file dist/signer.pub.json
+node tools/verify-artifact.mjs dist/teamuq.memory-1.3.1.tuqplugin --pub-file dist/signer.pub.json
 ```
 
 build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock）→ esbuild 打 `stage/backend.mjs`（zod 內聯；`cairn-memory/core/index.mjs` 改成外部相對路徑 `./cairn/core/index.mjs`，其他 `cairn-memory` import 一律報錯）→ `stage-cairn` → 由 `plugin/manifest.template.json` 產 manifest → devkit `validate` → `release`（devkit `pack`＋`verify`）→ `verify-artifact`。

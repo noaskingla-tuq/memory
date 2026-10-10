@@ -135,7 +135,11 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.file, join(dist, "teamuq.memory-1.2.2.tuqplugin"));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
-  assert.equal(report.fileCount, 8 + 58);
+  const pluginFiles = [
+    "backend.mjs", "cairn-pin.json", "cairn-icon.png", "manifest.json",
+    "ui/index.html", "ui/app.js", "ui/app.css", "integrity.json", "signature.json",
+  ];
+  assert.equal(report.fileCount, pluginFiles.length + pin.stage.files.length);
   assert.equal(report.sha256, info.sha256);
   const publicFile = JSON.parse(readFileSync(info.pubFile, "utf8"));
   assert.deepEqual(Object.keys(publicFile).sort(), ["keyId", "publicKey"]);

@@ -3,12 +3,14 @@ import type { UiStatus } from "../../contracts/uiContract.js";
 import type { ProfilePort } from "./profilePort.js";
 import type { Clock } from "./timeSlice.js";
 import type { UiServices } from "./uiServices.js";
+import type { OrganizationStatus } from "../punchOrganization.js";
 
 export interface StatusFacts {
   readonly version: string;
   readonly storageStatus: string;
   readonly uptimeSec: number;
   readonly profile: ProfilePort;
+  readonly organization?: OrganizationStatus;
 }
 
 async function lastWriteOf(services: UiServices, clock: Clock): Promise<string | null> {
@@ -50,5 +52,6 @@ export async function runStatus(services: UiServices | undefined, clock: Clock, 
     },
     lastWriteAt: services === undefined ? null : await lastWriteOf(services, clock),
     uptimeSec: facts.uptimeSec,
+    ...(facts.organization === undefined ? {} : { organization: facts.organization }),
   };
 }

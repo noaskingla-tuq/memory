@@ -3,19 +3,29 @@
   "tool": "tuq-plugin-tool",
   "file": "tuq-plugin-tool.mjs",
   "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
-  "sha256": "24ae9a5f729d9af4caa906080fba43f1673f057a43464d3211dbafd45edc2adb",
-  "bytes": 521670,
+  "sha256": "2d2e2ecca07176a8f019ddc7338109ece3a246760fe7f5fe5d24c50351ba346a",
+  "bytes": 5463838,
+  "files": [
+    {
+      "path": "tuq-plugin-tool.mjs",
+      "sha256": "2d2e2ecca07176a8f019ddc7338109ece3a246760fe7f5fe5d24c50351ba346a",
+      "bytes": 5463838
+    },
+    {
+      "path": "lib/tuq-capability-client.mjs",
+      "sha256": "44bdce7aa5b5e06f1509cf384fd4f1db3b0481155108401f2e87da6fd029a9f3",
+      "bytes": 79490
+    },
+    {
+      "path": "lib/tuq-capability-client.d.mts",
+      "sha256": "014b85c873f86b531d06ddfb70fe2b738295df4fcc5ce7538ee56eb898ebb2ee",
+      "bytes": 12805
+    }
+  ],
   "source": {
-    "repo": "teamuq-electron",
-    "coreCommit": "9791593fe1aab64f57d3b9f09993a515d07502b1",
-    "coreVersion": "1.7.1",
-    "buildCommand": "npm run build:plugin-devkit -- --out <repo>/vendor/teamuq-devkit/tuq-plugin-tool.mjs",
-    "sources": [
-      ".teamuq/scripts/plugin-tools",
-      "packages/plugin-sdk",
-      "packages/platform/plugin-artifact",
-      "package.json",
-      "tsconfig.node.json"
-    ]
+    "repo": "teamuq-plugin-devkit",
+    "coreVersion": "1.7.12",
+    "kitVersion": "1.7.12",
+    "metadataSha256": "756147e68e705129dd6652cb13e9c066a5a0e8668ba5c8e54d63449ebb0e1fa5"
   }
 }

@@ -13,14 +13,14 @@ const SIDE_EFFECT_IMPORT = /^[ \t]*import\s*(['"])([^'"]+)\1/gmu
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu
 const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
-// why: the plugin needs both the memory sink from 1.6.3 and the agent avatar bridge added in 1.7.0
-const MIN_CORE_VERSION = '>=1.7.0'
+// why: snapshot readPage and host AI/settings are pinned to the public 1.7.12 devkit
+const MIN_CORE_VERSION = '>=1.7.12'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'
 const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metadata.json'), 'utf8'))
 const UI_ENTRY = 'ui/index.html'
 const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css', 'cairn-icon.png']
-const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'plugin-state:write', 'project-directory:read', 'ui:view', 'work-records:read']
+const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'ai:chat', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'project-directory:read', 'settings:plugin', 'ui:view', 'work-records:read']
 const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
 const EXPECTED_MAX_SESSIONS = 4
 // why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin
@@ -134,7 +134,8 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   check('manifest permissions are exactly the seven UI methods, host data grants and legacy migration grant, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
   const legacySources = RELEASE_METADATA.legacyDataSources ?? []
   const migrations = manifest.data?.legacyMigrations ?? []
-  check('manifest requires the supported host data API and declares the opaque Cairn migration source/target bound by release metadata', RELEASE_METADATA.schemaVersion === 1 && RELEASE_METADATA.pluginId === PLUGIN_ID && legacySources.length === 1 && legacySources[0].sourceId === 'memory-cairn-v1' && legacySources[0].relativePath === 'memory-cairn-v1' && JSON.stringify(manifest.hostApis) === JSON.stringify([{ id: 'teamuq.host-data', range: '^1.0.0' }]) && migrations.length === 1 && migrations[0].id === 'cairn-v1' && migrations[0].source === legacySources[0].sourceId && migrations[0].target === legacySources[0].relativePath, JSON.stringify({ hostApis: manifest.hostApis, legacyMigrations: migrations, releaseMetadata: RELEASE_METADATA }))
+  check('manifest requires the supported host data API and declares the opaque Cairn migration source/target bound by release metadata', RELEASE_METADATA.schemaVersion === 1 && RELEASE_METADATA.pluginId === PLUGIN_ID && legacySources.length === 1 && legacySources[0].sourceId === 'memory-cairn-v1' && legacySources[0].relativePath === 'memory-cairn-v1' && JSON.stringify(manifest.hostApis) === JSON.stringify([{ id: 'teamuq.host-data', range: '^1.1.0' }]) && migrations.length === 1 && migrations[0].id === 'cairn-v1' && migrations[0].source === legacySources[0].sourceId && migrations[0].target === legacySources[0].relativePath, JSON.stringify({ hostApis: manifest.hostApis, legacyMigrations: migrations, releaseMetadata: RELEASE_METADATA }))
+  check('manifest organization settings exactly match the repository template', JSON.stringify(manifest.settingsSchema) === JSON.stringify(JSON.parse(readFileSync(join(REPO_ROOT, 'plugin', 'manifest.template.json'), 'utf8')).settingsSchema))
   const methods = Array.isArray(manifest.backendMethods) ? manifest.backendMethods : []
   check('manifest backendMethods are exactly the seven ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
   check('no memory.* method (nor diagnose) is exposed to the view through backendMethods', !methods.some((method) => /^(?:memory\.|diagnose$)/u.test(method)), methods.join(', '))

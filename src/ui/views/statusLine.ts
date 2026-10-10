@@ -48,9 +48,13 @@ function renderResult(target: StatusTarget, result: BackendResult, nowMs: number
   if (result.ok && isStatus(result.value)) {
     const status = result.value;
     const ready = status.storage.status === "ready";
-    target.dataset.state = ready ? "ok" : "warn";
+    const organization = status.organization;
+    const organizationState = organization?.state;
+    const warn = !ready || organizationState === "paused" || organizationState === "error";
+    target.dataset.state = warn ? "warn" : "ok";
     const detail = t("status.detail", { version: status.version, storage: status.storage.status });
-    mount(target, html`<p class="state" data-state="${ready ? "ok" : "warn"}" title="${detail}">${ready ? t("status.ok") : t("status.storageTrouble")}${ready ? html`<span class="muted">・${writeText(status, nowMs)}</span>` : EMPTY_HTML}</p>`);
+    const organizationText = organization !== undefined && ["disabled", "idle", "running", "paused", "error"].includes(organization.state) ? t(`status.organization.${organization.state}`, { n: organization.pending }) : "";
+    mount(target, html`<p class="state" data-state="${warn ? "warn" : "ok"}" title="${detail}">${ready ? t("status.ok") : t("status.storageTrouble")}${ready ? html`<span class="muted">・${writeText(status, nowMs)}</span>` : EMPTY_HTML}${organizationText ? html`<span class="muted">・${organizationText}</span>` : EMPTY_HTML}</p>`);
     return;
   }
   target.dataset.state = "error";

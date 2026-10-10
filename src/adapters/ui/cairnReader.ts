@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { MemoryNamespace } from "../../domain/namespace.js";
 
 export const CAIRN_APPLICATION_ID = 0x43414952;
-export const CAIRN_USER_VERSION = 13;
+export const CAIRN_USER_VERSION = 18;
 
 const BUSY_TIMEOUT_MS = 2_000;
 const SQLITE_BUSY = 5;
@@ -241,7 +241,7 @@ function selectRows(
   const params: SqlParams = [options.headChars, ...boundary(namespace)];
   const receipts = options.withReceipts === false ? "0" : "(SELECT count(*) FROM receipts WHERE memory_id = memories.id)";
   let sql = `SELECT id, kind, revision, updated_at, substr(content, 1, ?) AS head, ${options.withContent === true ? "content" : "NULL"} AS body,
-      ${receipts} AS receipts FROM memories WHERE owner_id = ? AND scope = ? AND project_id = ? AND deleted = 0`;
+      ${receipts} AS receipts FROM memories WHERE owner_id = ? AND scope = ? AND project_id = ? AND deleted = 0 AND review_state != 'awaiting'`;
   sql += rangeClause(options, window.after, window.upTo, params) + contentClause(options, params);
   sql += " ORDER BY updated_at DESC, id ASC LIMIT ?";
   params.push(limit);
@@ -266,7 +266,7 @@ function scanNamespace(db: DatabaseSync, namespace: MemoryNamespace, options: Sc
     let upTo: KeysetAnchor | undefined;
     if (filtered) {
       const params: SqlParams = [...boundary(namespace)];
-      const sql = `SELECT updated_at, id FROM memories WHERE owner_id = ? AND scope = ? AND project_id = ? AND deleted = 0${rangeClause(options, anchor, undefined, params)}
+      const sql = `SELECT updated_at, id FROM memories WHERE owner_id = ? AND scope = ? AND project_id = ? AND deleted = 0 AND review_state != 'awaiting'${rangeClause(options, anchor, undefined, params)}
         ORDER BY updated_at DESC, id ASC LIMIT 1 OFFSET ?`;
       params.push(chunkRows - 1);
       const edge = db.prepare(sql).get(...params) as Row | undefined;
@@ -290,7 +290,7 @@ function createReader(db: DatabaseSync): CairnReader {
       for (const row of epochs) found.set(keyOf(row), { namespace: namespaceOf(row), times: [], first: null, last: null });
       // why: the partial index active_identity also matches this filter and the planner prefers it, which forces a sort of every row; namespace_memories already yields each namespace's rows newest first straight from the index
       const rows = db
-        .prepare("SELECT owner_id, scope, project_id, updated_at FROM memories INDEXED BY namespace_memories WHERE deleted = 0 ORDER BY owner_id, scope, project_id, updated_at DESC")
+        .prepare("SELECT owner_id, scope, project_id, updated_at FROM memories INDEXED BY namespace_memories WHERE deleted = 0 AND review_state != 'awaiting' ORDER BY owner_id, scope, project_id, updated_at DESC")
         .iterate() as Iterable<Row>;
       let owner: unknown;
       let scope: unknown;
@@ -350,7 +350,7 @@ function createReader(db: DatabaseSync): CairnReader {
       const rows = db
         .prepare(
           `SELECT DISTINCT m.id, m.updated_at FROM receipts r JOIN memories m ON m.id = r.memory_id
-           WHERE r.rowid > ? AND r.rowid <= ? AND r.session_id IN (${marks}) AND m.id <> ? AND m.owner_id = ? AND m.deleted = 0`,
+           WHERE r.rowid > ? AND r.rowid <= ? AND r.session_id IN (${marks}) AND m.id <> ? AND m.owner_id = ? AND m.deleted = 0 AND m.review_state != 'awaiting'`,
         )
         .all(lowExclusive, highInclusive, ...sessions, memoryId, ownerId) as Row[];
       return rows.map((row) => ({ id: String(row.id), updatedAt: String(row.updated_at) }));
@@ -363,7 +363,7 @@ function createReader(db: DatabaseSync): CairnReader {
         .prepare(
           `SELECT id, scope, project_id, owner_id, kind, revision, updated_at, substr(content, 1, ?) AS head,
              (SELECT count(*) FROM receipts WHERE memory_id = memories.id) AS receipts
-           FROM memories WHERE owner_id = ? AND deleted = 0 AND id IN (${marks})`,
+           FROM memories WHERE owner_id = ? AND deleted = 0 AND review_state != 'awaiting' AND id IN (${marks})`,
         )
         .all(headChars, ownerId, ...ids) as Row[];
       const byId = new Map(
@@ -387,7 +387,7 @@ function createReader(db: DatabaseSync): CairnReader {
     get(namespace, memoryId, receiptLimit) {
       const row = db
         .prepare(
-          "SELECT * FROM memories WHERE owner_id = ? AND scope = ? AND project_id = ? AND id = ? AND deleted = 0",
+          "SELECT * FROM memories WHERE owner_id = ? AND scope = ? AND project_id = ? AND id = ? AND deleted = 0 AND review_state != 'awaiting'",
         )
         .get(...boundary(namespace), memoryId) as Row | undefined;
       if (row === undefined) return null;

@@ -155,12 +155,12 @@ test("the reader also equals the Cairn API on the legacy fixture of every accept
   }
 });
 
-test("a database whose user_version or application_id is not Cairn v13 is unsupported_schema and is never modified", async (t) => {
+test("a database whose user_version or application_id is not Cairn v18 is unsupported_schema and is never modified", async (t) => {
   const base = scratchDirectory(t, "schema");
   const { databasePath } = installFixture(base);
   assert.equal(readCairn(databasePath, (reader) => reader.namespaces().length).ok, true);
   const digest = () => createHash("sha256").update(readFileSync(databasePath)).digest("hex");
-  for (const version of [12, 14, 0]) {
+  for (const version of [13, 17, 19, 0]) {
     rawWrite(databasePath, (db) => db.exec(`PRAGMA user_version = ${version}`));
     const before = digest();
     assert.deepEqual(readCairn(databasePath, () => 1), { ok: false, code: "unsupported_schema" }, `user_version ${version}`);

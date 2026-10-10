@@ -21,15 +21,21 @@ import { inspect, inspectStorageFailure, parseInspectRequest } from "./inspectCa
 import { parseRememberRequest, remember, rememberStorageFailure } from "./rememberCall.js";
 import { createProfileSync } from "./profileSync.js";
 import { dispatchUi, isUiMethod } from "./uiDispatch.js";
-import type { PluginHostApiV1 } from "@teamuq/plugin-sdk/external";
-import { createPunchFeed, createPunchReceiptStore, createLegacyPunchState, createProfileDirectory } from "./hostDataAdapter.js";
+import type { PluginBackendContextV1, PluginHostApiV1 } from "@teamuq/plugin-sdk/external";
+import { createPunchFeed, createProfileDirectory } from "./hostDataAdapter.js";
 import { createPunchCatchupWorker } from "../application/punchCatchup.js";
 import { refreshMemoryProfile } from "../application/profileRefresh.js";
+import { createHostMemoryModelPort } from "../adapters/model/hostMemoryModelPort.js";
+import { createLocalPunchReceiptStore } from "../adapters/storage/punchStateStore.js";
+import { createPunchOrganizationWorker } from "../application/punchOrganization.js";
+import { createMigratingPunchReceiptStore } from "./punchStateMigration.js";
+import { readOrganizationSettings } from "./organizationSettings.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
   readonly pinPath: string;
   readonly openCore?: (path: string) => MemoryCorePort;
+  readonly openAgentCore?: (path: string, agentId: string) => MemoryCorePort;
   readonly inspectBudget?: number;
   readonly uiClock?: () => Clock;
   readonly uiSampleRows?: number;
@@ -38,6 +44,7 @@ export interface BackendOptions {
   readonly profilePath?: string;
   readonly profileIo?: ProfileIo;
   readonly host?: PluginHostApiV1;
+  readonly settings?: PluginBackendContextV1["settings"];
 }
 
 export interface MemoryBackend {
@@ -47,6 +54,7 @@ export interface MemoryBackend {
   warmIndex(): Promise<void>;
   openHandles(): number;
   startWorkers(): void;
+  idleWorkers(): Promise<void>;
 }
 
 interface Ready {
@@ -74,15 +82,35 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   let profileTimer: ReturnType<typeof setInterval> | null = null;
   let profileRefreshing: Promise<void> | null = null;
   let workersStarted = false;
+  let settingValues: Readonly<Record<string, boolean | number | string>> = {};
+  try { settingValues = options.settings?.all() ?? {}; } catch {}
+  const organizationSettings = () => readOrganizationSettings(settingValues);
+  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings);
   const profilePath = options.profilePath ?? join(dirname(options.dataRoot), PROFILE_DIRECTORY, PROFILE_FILE);
   // why: the name table is independent of Cairn storage, so it loads and accepts pushes even while the Cairn layout is unavailable
   const profile = new ProfileTable(loadProfileFile(profilePath));
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
+  const organization = options.host === undefined ? undefined : createPunchOrganizationWorker({
+    store: createLocalPunchReceiptStore(dirname(options.dataRoot), "punch-organization.json"),
+    enabled: () => organizationSettings().enabled,
+    async capture(job) {
+      const active = ensure();
+      try { return await active.application.execute("memory_capture", job.input, job.actor, job.memoryId); }
+      finally { active.ui.index.markDirty(job.actor.agentId); }
+    },
+  });
+  let unsubscribeSettings: (() => void) | undefined;
+  try { unsubscribeSettings = options.settings?.onChange((values) => {
+    settingValues = values;
+    if (!organizationSettings().enabled) model?.interrupt();
+    organization?.settingsChanged();
+  }); } catch { settingValues = {}; }
+
   const punchWorker = options.host === undefined ? undefined : createPunchCatchupWorker({
     feed: createPunchFeed(options.host),
-    receipts: createPunchReceiptStore(options.host),
-    legacyReceipts: createLegacyPunchState(options.host),
+    receipts: createMigratingPunchReceiptStore(options.host, createLocalPunchReceiptStore(dirname(options.dataRoot))),
+    onAdmitted: (punch, memoryId) => organization!.enqueue(punch, memoryId),
     writer: {
       async rememberMany(inputs) {
         const request = {
@@ -112,7 +140,8 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     try {
       const layout = new CairnDataLayout(options.dataRoot, { pinPath: options.pinPath, trustedBase: dirname(options.dataRoot) });
       layout.preflight();
-      const pool = new CoreHandlePool({ layout, openCore });
+      const openAgentCore = options.openAgentCore ?? (options.openCore === undefined && model !== undefined ? (path: string, agentId: string) => openCairnCore(path, { agentId, port: model }) : undefined);
+      const pool = new CoreHandlePool({ layout, openCore, ...(openAgentCore === undefined ? {} : { openAgentCore }) });
       const application = new MemoryApplication(pool);
       ready = {
         application,
@@ -186,7 +215,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       case MEMORY_PLUGIN_METHODS.profileSync:
         return profileSync.handle(params);
       default:
-        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile });
+        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile, ...(organization === undefined ? {} : { organizationStatus: organization.status, onForgotten: organization.forgetSource }) });
         throw callError("unknown_method", "Unknown method");
     }
   };
@@ -217,8 +246,12 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     dispose() {
       disposed = true;
       if (profileTimer !== null) clearInterval(profileTimer);
+      unsubscribeSettings?.();
+      unsubscribeSettings = undefined;
       disposing ??= (async () => {
+        await model?.cancel();
         await punchWorker?.stop();
+        await organization?.stop();
         await profileRefreshing;
         await warming;
         if (ready !== undefined) await ready.application.close();
@@ -231,6 +264,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     startWorkers() {
       if (workersStarted || disposed) return;
       workersStarted = true;
+      organization?.start();
       punchWorker?.start();
       refreshProfile();
       if (options.host !== undefined) {
@@ -238,6 +272,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
         profileTimer.unref();
       }
     },
+    async idleWorkers() { await punchWorker?.idle(); await organization?.idle(); await profileRefreshing; },
     openHandles: () => ready?.pool.openHandles ?? 0,
   };
 }

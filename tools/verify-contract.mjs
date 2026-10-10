@@ -20,6 +20,7 @@ import {
   generatedSource,
   hashBytes,
   normalise,
+  REPO_ROOT,
   walkFiles,
 } from './vendor-lock.mjs'
 
@@ -66,7 +67,16 @@ const devkitLock = readJson(DEVKIT_DIR, DEVKIT_LOCK)
 if (devkitLock !== undefined) {
   check(devkitLock.tool === DEVKIT_TOOL && devkitLock.file === DEVKIT_FILE, `${DEVKIT_LOCK}: tool or file name differs`)
   check(devkitLock.hashRule === HASH_RULE, `${DEVKIT_LOCK}: hashRule differs`)
-  check(/^[0-9a-f]{40}$/u.test(devkitLock.source?.coreCommit ?? ''), `${DEVKIT_LOCK}: source.coreCommit is not a commit hash`)
+  if (devkitLock.source?.repo === 'teamuq-plugin-devkit') {
+    check(/^[0-9a-f]{64}$/u.test(devkitLock.source.metadataSha256 ?? ''), `${DEVKIT_LOCK}: developer kit metadata hash is missing`)
+    check(devkitLock.source.kitVersion === devkitLock.source.coreVersion, `${DEVKIT_LOCK}: kit and Core versions differ`)
+    check(JSON.stringify(devkitLock.files?.map((file) => file.path)) === JSON.stringify([DEVKIT_FILE, 'lib/tuq-capability-client.mjs', 'lib/tuq-capability-client.d.mts']), `${DEVKIT_LOCK}: portable kit file set differs`)
+    for (const file of devkitLock.files ?? []) {
+      if (![DEVKIT_FILE, 'lib/tuq-capability-client.mjs', 'lib/tuq-capability-client.d.mts'].includes(file.path)) continue
+      const path = join(DEVKIT_DIR, file.path)
+      check(existsSync(path) && hashBytes(readFileSync(path)) === file.sha256 && normalise(readFileSync(path)).length === file.bytes, `${DEVKIT_LOCK}: hash or size differs for ${file.path}`)
+    }
+  } else check(/^[0-9a-f]{40}$/u.test(devkitLock.source?.coreCommit ?? ''), `${DEVKIT_LOCK}: source.coreCommit is not a commit hash`)
   check(/^[0-9]+\.[0-9]+\.[0-9]+$/u.test(devkitLock.source?.coreVersion ?? ''), `${DEVKIT_LOCK}: source.coreVersion is not a version`)
   const bytes = existsSync(join(DEVKIT_DIR, DEVKIT_FILE)) ? readFileSync(join(DEVKIT_DIR, DEVKIT_FILE)) : undefined
   if (bytes === undefined) problems.push(`${DEVKIT_FILE}: missing`)
@@ -74,6 +84,13 @@ if (devkitLock !== undefined) {
     check(hashBytes(bytes) === devkitLock.sha256, `${DEVKIT_FILE}: sha256 differs from ${DEVKIT_LOCK}`)
     check(normalise(bytes).length === devkitLock.bytes, `${DEVKIT_FILE}: size differs from ${DEVKIT_LOCK}`)
   }
+}
+
+const sdkMetadata = readJson(join(REPO_ROOT, 'types'), 'tuq-plugin-sdk.version.json')
+if (sdkMetadata !== undefined) {
+  check(sdkMetadata.coreVersion === devkitLock?.source?.coreVersion, 'SDK types and author CLI versions differ')
+  const sdkFile = join(REPO_ROOT, 'types', 'tuq-plugin-sdk.d.ts')
+  check(existsSync(sdkFile) && hashBytes(readFileSync(sdkFile)) === sdkMetadata.sha256, 'SDK type hash differs from metadata')
 }
 
 if (problems.length > 0) {

@@ -4,6 +4,7 @@ import {
   failure,
   mapCairnError,
   success,
+  MemoryServiceError,
   type MemoryResult,
 } from "../domain/errors.js";
 import { namespaceForScope, recallReadSet } from "../domain/namespace.js";
@@ -61,12 +62,13 @@ export class MemoryApplication {
     name: MemoryToolName,
     input: ToolInput,
     binding: MemoryActor,
+    sourceMemoryId?: string,
   ): Promise<MemoryResult<unknown>> {
     const requestId = randomUUID();
     const startedAt = performance.now();
     try {
       const value = await this.governor.run(binding.sessionId, () =>
-        this.dispatch(name, input, binding),
+        this.dispatch(name, input, binding, sourceMemoryId),
       );
       this.emitCompletion(requestId, name, startedAt, "OK", binding);
       return success(requestId, value);
@@ -87,6 +89,7 @@ export class MemoryApplication {
     name: MemoryToolName,
     input: ToolInput,
     binding: MemoryActor,
+    sourceMemoryId?: string,
   ): Promise<unknown> {
     if (name === "memory_recall")
       return this.recall(input as MemoryRecallInput, binding);
@@ -99,7 +102,7 @@ export class MemoryApplication {
       | MemoryForgetInput;
     // why: 寫入去重只靠 Cairn 內容指紋與 receipt，不設記憶體 registry，回補大量歷史時才不會 RESOURCE_BUSY
     return this.writeLane.run(binding.agentId, () =>
-      this.write(name, writeInput, binding),
+      this.write(name, writeInput, binding, sourceMemoryId),
     );
   }
 
@@ -151,6 +154,7 @@ export class MemoryApplication {
       | MemoryCorrectInput
       | MemoryForgetInput,
     binding: MemoryActor,
+    sourceMemoryId?: string,
   ): Promise<unknown> {
     const namespace = namespaceForScope(binding, input.scope);
     return this.pool.withCore(binding.agentId, async (core) => {
@@ -168,6 +172,14 @@ export class MemoryApplication {
       }
       if (name === "memory_capture") {
         const capture = input as MemoryCaptureInput;
+        // why: checking within the agent write lane prevents a concurrent forget from deleting the source between validation and capture
+        if (sourceMemoryId !== undefined) {
+          const source = core.get({ namespace, memoryId: sourceMemoryId });
+          if (!source.ok) {
+            if (source.error.code === "memory_not_found") throw new MemoryServiceError("MEMORY_SUPPRESSED", "Source memory was forgotten");
+            throw mapCairnError(source.error.code);
+          }
+        }
         return unwrap(
           await core.capture({
             namespace,

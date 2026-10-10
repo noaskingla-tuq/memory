@@ -1,8 +1,20 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust）的外部 plugin（id `teamuq.memory`，版本 1.2.2）。記憶 domain／application 與 Cairn adapter 自 TeamUQ `packages/platform/memory-server` 原樣搬來（P1）；`src/backend/` 是 TeamUQ 外部 full-trust 後端的入口（P2）；`tools/build.mjs` 一鍵產出 `.tuqplugin`（P3）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.0，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.12，釘選 Cairn v0.3.1（schema 18）。
 
-> 狀態：backend 入口、契約 vendor（P2）、identity 相容與備份（P4）、打包／stage／manifest／devkit 簽章（P3）已完成。Core 已內嵌兩把根公鑰（C5），devkit 已同步（Core 1.6.3，切換分支 `task/ext-mem-devtrust` 的 `95956859c`，含 `dev-pack --preplanted-id`；合回 V1 後若 commit 雜湊改變，重跑 `devkit:sync`）。**只有暫時金鑰簽過**：正式簽章要等使用者以真金鑰執行（H2，見「正式簽章（H2）」）。設計依據：TeamUQ repo `output/memory-hook-mcp/external-plugin-design-v3.md`（§1、§8）。
+> 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
+
+## 工作紀錄與 AI 整理
+
+外掛從公開 `host.workRecords.readPage` 讀取已結算 punches。第一頁同時取得 snapshot 並保留資料，後續頁面固定 snapshotId、generation、highWatermark；重複 cursor 或 snapshot 改變會停止該次同步，稍後重試。`punchId` 保留在本機收據與工作來源，並產生固定的原始寫入與 capture 身分；agentId/projectId 決定記憶 scope，sessionId 用於來源關聯。name 是請求，description 是成果，Lexical JSON 沿用既有純文字轉換。
+
+原始工作紀錄先以 `context` 儲存，再將整理工作持久化，最後確認同步收據。同步收據/checkpoint 位於 `<dataDir>/punch-state.json`，整理佇列位於 `<dataDir>/punch-organization.json`；兩者拒絕 symlink/junction、檢查 revision，先寫 tmp、fsync 後原子 rename。舊 host pluginState 的收據與 checkpoint 只讀遷移；`plugin_state_retired` 允許直接使用本機狀態，其他讀取失敗或收據衝突會停止並保留資料。相符的舊寫入收據會重建整理工作，已存在的工作保持原始來源不變。
+
+設定 `organizationEnabled` 預設為 false。開啟後，背景 worker 逐筆經 `MemoryApplication.memory_capture`、唯一 Cairn adapter 與公開 host.ai 整理；請求用 user 訊息、成果用 assistant 訊息。原始 context 保留；模型產生的記憶 receipt 指向固定的 punch 來源訊息與原 session。整理前在共用 agent 寫入佇列中確認來源尚未遺忘。整理完成或來源遺忘後清除佇列中的來源文字；等待中的失敗工作保留必要文字以供重試。模型不可用、額度不足、取消或失敗時保留 pending 工作與遞增退避（30 秒至一小時）；修改設定會立即重試 pending 工作。重啟或完成收據寫入失敗後，以 Cairn 的持久 capture 身分避免重複 extraction。擷取已完成但 Cairn 分類失敗時記錄警示，不重播已完成擷取。
+
+提供者與模型 ID 可留空使用可用預設值，指定 ID 不可用時暫停，不使用 astra。`organizationContextBudget` 是 UTF-8 bytes 的保守預算（預設 32,768），並非精確 token 數或模型 context window；Cairn 另限制每次模型輸入 6,000、輸出 1,024 個計數單位。整理來源採固定前綴：請求最多 300 UTF-16 units/900 bytes、成果最多 1,200 units/2,400 bytes，保持完整字元；完整的原始工作紀錄仍依既有 3,600 units 規則儲存。真實模型限制與整理品質需另行實測。
+
+`ui.status.organization` 是選填欄位，回報 disabled/idle/running/paused/error、pending/completed 與錯誤碼，狀態列以繁體中文顯示。關閉或 AI 不可用時明確記憶讀寫仍可使用。dispose 取消 host AI、等待 workers/名稱更新，再關閉 Cairn handles。此次只接工作紀錄 capture，未提供 Cairn episodes、確認審閱或 session-context 的新 UI/API。
 
 ## 目錄
 
@@ -10,7 +22,7 @@ TeamUQ 記憶系統的獨立 repo，最終形態是完全信任級（full-trust�
 src/backend/            外部後端入口：entry（activate）、service（派送與生命週期）、rememberCall、inspectCall、uiDispatch、profileSync（名稱表推送）、diagnose、contractErrors
 contract/v1/             memory contract、types、fixture 的 plugin-owned 唯一來源；vendor 由 contract:sync 生成
 vendor/teamuq-contract/ memory contract 的生成快照（contract.mjs、型別、fixtures、lock）＋ vendor.lock.json
-vendor/teamuq-devkit/   TeamUQ 作者端 devkit 單檔（tuq-plugin-tool.mjs）＋ devkit.lock.json
+vendor/teamuq-devkit/   公開 devkit 作者 CLI、lib capability client 與 devkit.lock.json
 plugin/                 manifest.template.json（composed，版本由 package.json 帶入）、ui/index.html（只引用 app.js、app.css）
 src/ui/                 view 的純 TypeScript（main.ts → ui/app.js；api/{agentAvatarClient,backendClient,errors}.ts、dom/html.ts、components/{dialog,drawer,avatar,sparkline}.ts、state/teamHome.ts、views/（團隊首頁、狀態列、記憶空間、時間軸與搜尋、詳情與遺忘）、router.ts、i18n/、styles/{app.css,home.css,tokens.css,tokens.lock.json}）；tsconfig.ui.json 檢查（lib DOM），tsconfig.json 排除
 src/contracts/uiContract.ts  七個 ui.* 方法名單、請求與回應的 zod schema、錯誤碼（backend 與 UI 共用；UI 只 import 型別）
@@ -31,7 +43,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 
 ## 來源與差異
 
-來源 commit 與 tree hash 記在首個 commit 訊息。相對來源只有下列改動：
+來源 commit 與 tree hash 記在首個 commit 訊息。初始搬移的差異如下；後續外掛接線另見工作紀錄與 AI 整理說明：
 
 - import 路徑：`MemoryActor` 由 `contracts/public.ts` 改為 `contracts/actor.ts`（`public.ts` 其餘內容屬 HTTP 傳輸，不搬）。
 - `tools/verify-source-untouched.mjs`：repoRoot 與唯一 import 檢查位置改為本 repo；另驗證 `accepted[]` 含現行 commit，與 `redact.mjs` 的 sha256。
@@ -41,24 +53,24 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 
 ## 後端入口（P2）
 
-`src/backend/entry.ts` 匯出 `activate(context)`，回傳凍結的 `{ call, dispose }`。`context` 是 host 傳入的 `{pluginId, dataDir, assetPacks, allowAddons}`；只用 `dataDir`（必須是絕對路徑）。
+`src/backend/entry.ts` 匯出 `activate(context)`，回傳凍結的 `{ call, dispose }`。使用公開 SDK context 的 `dataDir`（必須是絕對路徑）、`host` 與 `settings`。
 
 - 資料根：`<dataDir>/memory-cairn-v1`。啟動時 `warmUp` 會建 `CairnDataLayout(root, { pinPath })` 並 `preflight`；失敗不擋啟動，之後每次 `call` 與 `diagnose` 會重試。
 - `pinPath`：backend 模組同目錄有 `cairn-pin.json`（打包後）就用它，否則取模組往上兩層（`out/backend` 的 repo 根）。P3 stage 必須把 `cairn-pin.json` 放在 `backend.mjs` 旁。
-- `call(method, params)` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`（見「名稱表（S4）」）與七個 `ui.*`（`uiDispatch`，見「UI 方法（S3）」；預期錯誤回 `{ok:false, code}` 不 throw，出口一律 JSON 來回一次）；其餘（含 `memory.recall@1`、`memory.forget@1` 等，recall／capture／correct／forget 的程式碼雖在但沒有入口）一律拋 `unknown_method`。
+- `call(method, params)` 只服務 `memory.remember@1`、`memory.inspect@1`、`diagnose`、`memory.profile.sync@1`（見「名稱表（S4）」）與七個 `ui.*`（`uiDispatch`，見「UI 方法（S3）」；預期錯誤回 `{ok:false, code}` 不 throw，出口一律 JSON 來回一次）；其餘（含 `memory.recall@1`、`memory.forget@1` 等，recall 沒有公開入口，capture 由背景整理 worker 使用，correct／forget 保留 application 能力）一律拋 `unknown_method`。
 - 整次呼叫失敗只會拋帶 `code` 的錯誤，且碼只能是 `unknown_method`、`invalid_params`、`result_too_large`、`internal`（host 把 `code` 原樣回給 Core）。請求違反契約 schema 是 `invalid_params`；訊息只含欄位路徑，不回顯內容。dispose 之後的呼叫拋 `internal`。
 - 個別操作的失敗是回應內的 `{ok:false, error}`，碼取自契約 `MEMORY_ERROR_CODES`；契約沒有的碼（`CAPABILITY_*`、`SESSION_BINDING_MISMATCH`、`IDENTITY_UNBOUND`）收成 `INTERNAL`，且原始碼中沒有任何地方會產生它們。儲存層起不來時，每個 op 依實際碼（`STORAGE_*`、`DEPENDENCY_INCOMPATIBLE`）回失敗，不用 `INTERNAL`。
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
-- inspect：以整個回應 `JSON.stringify(...).length`（UTF-16 單位）60,000 為預算；超過就把 limit 對半、重查，直到符合。回 `nextCursor`（list 取 `nextCursor`，get 取 `nextReceiptCursor`）與 `appliedLimit`，呼叫端續頁必須用 `appliedLimit`。`limit` 沒給時明確用 6（與 application 預設一致）。降到 1 仍超過拋 `result_too_large`。**限制**：Cairn 的 cursor 綁定簽發時的 limit，帶 `cursor` 的續頁超過預算無法對半，同樣拋 `result_too_large`。
+- inspect：以整個回應 `Buffer.byteLength(JSON.stringify(response), "utf8")`、60,000 bytes 為預算；超過就把 limit 對半、重查，直到符合。回 `nextCursor`（list 取 `nextCursor`，get 取 `nextReceiptCursor`）與 `appliedLimit`，呼叫端續頁必須用 `appliedLimit`。`limit` 沒給時明確用 6。降到 1 仍超過拋 `result_too_large`。Cairn cursor 綁定簽發時的 limit，帶 cursor 的續頁超過預算無法對半，同樣拋 `result_too_large`。
 - 每個回應在回傳前都用 vendored 回應 schema 解析（失敗拋 `internal`）；`diagnose` 不含任何路徑，`storage.status` 為 `ready` 或小寫的錯誤碼（如 `storage_unsafe`）。
-- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.2.2`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
+- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.3.0`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
 - 資料層的祖先目錄檢查只從 `dataDir` 往下走（`CairnDataLayout` 的 `trustedBase`）：`--permission` 下外掛讀不到 `dataDir` 以上的任何路徑，往上 lstat 會被拒（實測回 `STORAGE_BUSY`）。`dataDir` 以下仍拒絕 symlink／junction；`dataDir` 以上的重導向（例如 macOS `/var`）視為 host 的事。不傳 `trustedBase` 時維持從根目錄往下檢查。
 
 ## 唯讀讀取器與 agent 目錄（S1）
 
 UI 需要 Cairn API 沒有的東西（一次列多個 namespace、內容片段、總數），所以 `src/adapters/ui/cairnReader.ts` 直接以 SQL 讀庫檔；這是唯一對 Cairn 庫檔下 SQL 的檔案，寫入仍走 Cairn API（`AGENTS.md` 有完整規則，`verify-source-untouched` 強制）。
 
-- `readCairn(path, work)`：開檔前 `lstat` 檢查檔案存在、是一般檔、父目錄與 `-journal`／`-wal`／`-shm` 不是 symlink／junction；以讀寫模式開檔、設 `PRAGMA query_only = ON`，因為 `readOnly` 遇到 crashed writer 留下的 hot journal 會回 `attempt to write a readonly database`，讀寫模式則會先回復 journal（`test/cairn-reader-safety.test.mjs` 重現）。之後驗 `application_id` 與 `user_version = 13`，不符或不是資料庫回 `unsupported_schema`。每次呼叫開、查、關，不佔 `CoreHandlePool`；`openCairn(path)` 回可重複 `run` 的 session（同一次 UI 呼叫內重用已開的庫，呼叫結束一定關，閒置時不持有任何鎖）。失敗回 `{ok:false, code}`，碼為 `not_found`、`unsafe_path`、`unsupported_schema`、`busy`、`unreadable`，不帶路徑。
+- `readCairn(path, work)`：開檔前 `lstat` 檢查檔案存在、是一般檔、父目錄與 `-journal`／`-wal`／`-shm` 不是 symlink／junction；以讀寫模式開檔、設 `PRAGMA query_only = ON`，因為 `readOnly` 遇到 crashed writer 留下的 hot journal 會回 `attempt to write a readonly database`，讀寫模式則會先回復 journal（`test/cairn-reader-safety.test.mjs` 重現）。之後驗 `application_id` 與 `user_version = 18`，不符或不是資料庫回 `unsupported_schema`。每次呼叫開、查、關，不佔 `CoreHandlePool`；`openCairn(path)` 回可重複 `run` 的 session（同一次 UI 呼叫內重用已開的庫，呼叫結束一定關，閒置時不持有任何鎖）。失敗回 `{ok:false, code}`，碼為 `not_found`、`unsafe_path`、`unsupported_schema`、`busy`、`unreadable`，不帶路徑。
 - `list` 以 `(updated_at DESC, id ASC)` 排序，用 keyset（`after`）分頁與 `updatedFrom`／`updatedBefore` 時間窗；`get` 回完整內容與依 `(created_at, id)` 排序的 receipts。兩者與 Cairn 的 `list`／`get` 逐項相等由 `test/cairn-reader.test.mjs` 把關（含 legacy fixture），升 Cairn pin 時 parity 不過就擋下。
 - `layout.listAgentDirectories()`（`CairnDataLayout`，由 `agentDirectoryNames()` 與逐個 `inspectAgentDirectory(hash)` 組成，另有 `agentsFingerprint()`＝`agents/` 的 mtime）列出 `agents/<64 位 hex>/`，不建目錄、不改 identity，對每個目錄與檔案套用和 `agentDbPath` 相同的 reparse point 檢查，狀態為 `ready`、`no_database`、`unsafe`、`unreadable`。
 - `listAgents(layout)`（`agentCatalog.ts`）從 `namespace_epochs` 取 `owner_id` 與 namespace、由未刪除的列算出每個 namespace 的筆數、首末時間與完整更新時間序列（`timesMs`，新到舊）；0 筆的 agent 與 namespace 不列出；`owner_id` 的 sha256 必須等於目錄名（否則 `identity_mismatch`）、同一庫只能有一個 `owner_id`（否則 `owner_conflict`）；讀不了的 agent 放進 `unavailable[]` 並附原因。
@@ -180,7 +192,7 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 | `contract.d.mts` | 本 repo 加的一行橋接（tsc 把對 `contract.mjs` 的 import 解析到 `.d.mts`），列在 `vendor.lock.json` 的 `pluginOwnedFiles` |
 | `vendor.lock.json` | Core commit（HEAD）、最後改到契約目錄的 commit、Core `lock.json` 的 sha256、每個 vendored 檔的 sha256 |
 
-- 同步：`npm run contract:sync` 從 `contract/v1/` 重生 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`；變更來源後用 `node tools/sync-contract.mjs --refresh-lock` 更新 source hashes。Core SDK/devkit只用 `node tools/sync-vendor.mjs --core <TeamUQ 路徑> --only devkit` 生成同步。
+- 同步：`npm run contract:sync` 從 `contract/v1/` 重生 `vendor/teamuq-contract/` 與 `src/backend/vendoredContractLock.ts`；變更來源後用 `node tools/sync-contract.mjs --refresh-lock` 更新 source hashes。SDK/devkit 用 `node tools/sync-vendor.mjs --kit <公開 devkit 路徑> --only devkit` 同步，之後用 `npm run types:sync` 生成 SDK。
 - 驗證：`npm run contract:verify`（不需要 Core）比對 vendored 檔與兩份 lock、橋接檔內容、`vendoredContractLock.ts`；加 `--core <路徑>` 會另外對照 Core 的 lock 與 commit。
 
 ## 升級 Cairn 後的舊庫（G7）
@@ -203,10 +215,10 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 ## 打包與簽章（P3）
 
 ```powershell
-node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.2.2.tuqplugin
+node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.3.0.tuqplugin
 node tools/build.mjs --stage-only           # 只做 stage 與 devkit validate
 node tools/build.mjs --key <file.key.pem>   # 真金鑰：互動輸入 passphrase，預設 --anchors core
-node tools/verify-artifact.mjs dist/teamuq.memory-1.2.2.tuqplugin --pub-file dist/signer.pub.json
+node tools/verify-artifact.mjs dist/teamuq.memory-1.3.0.tuqplugin --pub-file dist/signer.pub.json
 ```
 
 build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock）→ esbuild 打 `stage/backend.mjs`（zod 內聯；`cairn-memory/core/index.mjs` 改成外部相對路徑 `./cairn/core/index.mjs`，其他 `cairn-memory` import 一律報錯）→ `stage-cairn` → 由 `plugin/manifest.template.json` 產 manifest → devkit `validate` → `release`（devkit `pack`＋`verify`）→ `verify-artifact`。
@@ -214,21 +226,21 @@ build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock�
 | 產物內容 | 說明 |
 |---|---|
 | `backend.mjs`、`cairn-pin.json` | 同目錄（`resolvePinPath` 的規則）；pin 檔以 LF 寫入 |
-| `cairn/core/**` | 56 檔，排除 `core/test` 與 `core/testing`（沒有任何執行期 import；`verify-artifact` 會檢查每個 staged `.mjs` 的相對 import 與 `new URL` 資產都解得到） |
+| `cairn/core/**` | 78 檔，排除 `core/test` 與 `core/testing`（沒有任何執行期 import；`verify-artifact` 會檢查每個 staged `.mjs` 的相對 import 與 `new URL` 資產都解得到） |
 | `cairn/plugins/cairn-memory/lib/redact.mjs`、`cairn/LICENSE` | 保留 `core/validation.mjs` 需要的相對路徑 |
 | `ui/index.html`、`ui/app.js`、`ui/app.css` | `bundleUi`：esbuild 把 `src/ui/main.ts` 打成 IIFE `app.js`（不得拉進 node_modules）；`index.html` 來自 `plugin/ui/`、`app.css` 由 `src/ui/styles/app.css` 連同 `tokens.css` 一起打包。`verify-artifact` 對這三檔做 CSP 安全掃描（無 inline script／事件屬性／`javascript:`、`eval`、`new Function`、`http(s)://`、`fetch(`、`WebSocket`） |
 | `manifest.json`、`integrity.json`、`signature.json` | manifest 見下；後兩者由 devkit 產生 |
 
-- `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 58 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。
-- manifest（composed）：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.ui: ui/index.html`＋`entry.backend: backend.mjs`、`contributes.views` 一個 view（id `memory`、標題「記憶」、presentations `tab`＋`fullpage`、預設 `tab`）、`permissions: ["ui:view","backend:invoke","agent:avatar-read"]`、`backendMethods` 為七個 `ui.*`（不得含 `memory.*`）、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.7.0`（頭像 bridge 從 Core 1.7.0 起提供；更早版本不識別 `agent:avatar-read`，`verify-artifact` 斷言此值）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 4`（UI 與 Core sink 共用的在途呼叫上限）、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
-- devkit：`vendor/teamuq-devkit/tuq-plugin-tool.mjs` 是 TeamUQ `npm run build:plugin-devkit -- --out <路徑>` 的產物，禁止手改；`devkit.lock.json` 記 Core commit、Core 版本與 sha256（CRLF 正規化為 LF 再雜湊）。更新：`npm run devkit:sync -- --core <TeamUQ 路徑>`（Core 內嵌來源有未提交變更時拒絕）。`release`、`build`、`verify-artifact` 執行前都會比對 lock。
-- devkit 內嵌當下 Core 的 `TEAMUQ_TRUST_ANCHORS`：現為 `teamuq-root-2026a`、`teamuq-root-2026b` 兩把公鑰（Core 1.6.3，含 `--preplanted-id` 的 commit 記在 `devkit.lock.json`）。Core 的 anchors 再變動就必須重跑 `devkit:sync`。
+- `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 80 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。
+- manifest（composed）：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.ui: ui/index.html`＋`entry.backend: backend.mjs`、`contributes.views` 一個 view（id `memory`、標題「記憶」、presentations `tab`＋`fullpage`、預設 `tab`）、`permissions` 包含 UI、工作紀錄與目錄讀取、舊狀態只讀遷移、settings:plugin、ai:chat；新收據不需要 plugin-state:write、`backendMethods` 為七個 `ui.*`（不得含 `memory.*`）、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.7.12`（對齊公開 Devkit 1.7.12 的 snapshot、AI 與設定 API）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 4`（UI 與 Core sink 共用的在途呼叫上限）、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
+- devkit：共用 `_devkit` 放在外掛 repos 旁，每個外掛釘選自己的 CLI/lib 與生成 SDK。同步公開 kit：`node tools/sync-vendor.mjs --kit <公開 devkit 路徑> --only devkit`；來源檔案先比對 kit.version.json 的大小與 SHA-256，lock 記錄 kit 版本、metadata hash 與 vendored CLI/lib 的雜湊。`contract:verify` 同時檢查 SDK 版本與 hash；打包前也驗證 devkit lock。
+- 作者 CLI 使用公開 kit 內嵌的 trust anchors；公開 kit 更新後重新同步。此 repo 不讀取主程式的 anchors。
 
 ### 簽章與金鑰
 
 - `release.mjs` 包裝 devkit `pack`（再以另一個行程 `verify`），拒絕位於本 repo 內或任何 git 工作樹內的金鑰路徑，並拒絕 devkit 檔與 lock 不符。真金鑰的 passphrase 只能在互動終端機輸入；環境變數 `TEAMUQ_KEY_PASSPHRASE_FOR_TESTS` 只在 `build.mjs` 為暫時金鑰注入時才傳給 devkit，其餘情況一律移除。
 - 暫時金鑰（`tools/temp-key.mjs`）：`os.tmpdir()` 下的隨機目錄、隨機 passphrase、keyId `teamuq-tmp-<8 hex>`，用完即刪；只留公鑰在 `dist/signer.pub.json`。產物只能用 `--anchors self` 驗章，真的 Core 不接受。
-- **`teamuq.` 前綴與 `--anchors self`**：Core 的 `assertSignerMayInstall`（`reviewArtifact.ts`）只認簽署者種類：非 `dev-` 的 keyId 落在 anchors 的 `rootKeys` 就是 `teamuq` 簽署者，可安裝 `teamuq.` 前綴的 id。devkit 的 `--anchors self` 把「目前這把金鑰」當唯一的 rootKey，所以 `teamuq.memory` 通得過 pack 自我檢查與 `verify`（keyId 須非 `dev-` 開頭，暫時金鑰已符合）。Core 現行 `TEAMUQ_TRUST_ANCHORS` 仍是空的，同一份產物在真的 Core 會回 `signer_unknown`（e2e 有斷言）。安裝測試以測試 anchors 注入暫時金鑰，未改 Core。
+- `--anchors self` 只用於作者端暫時金鑰自我驗證；通過並不代表已取得正式 host 的簽署信任。正式安裝需使用 host 信任的 release 或 development 簽署方式，依公開 devkit 文件操作。
 
 ### 正式簽章（H2）
 
@@ -263,7 +275,7 @@ npm run dev:pack -- --key $env:LOCALAPPDATA\TeamUQ\plugin-dev-keys\<dev-keyId>.k
 - 只有 `dev:pack` 帶 `--preplanted-id teamuq.memory`；`build` 與 `release` 的行為不變，正式簽章仍照上面的 H2。`dev:pack` 的產物帶開發簽章，Core 的打包版一律拒絕。
 - 沒有 TTY（CI、agent、一次性證明）時用 `npm run dev:pack -- --temp-key`：以暫時開發金鑰簽章並在結束時刪除，輸出 JSON 帶 `throwawayKey.publicKey`；只適合單次驗證，之後的更新要用同一把金鑰才能過簽章者鏈。`dev:pack` 出檔前會以 `verify-artifact --dev` 自我檢查（含 CSP 掃描），不合格就 exit 1。`node tools/verify-artifact.mjs <檔> --pub-file <.pub.json> --dev` 可單獨檢查 dev-pack 產物。
 - 開發版 manifest 的版本是 1.0.x 遞增，`diagnose` 回報的 `plugin.version` 仍是 `src/backend/diagnose.ts` 的常數，兩者在開發版本不一致是預期的。
-- devkit 必須是含 `--preplanted-id` 的 Core 版本：目前 vendor 的是 Core worktree `task/ext-mem-devtrust` 的 commit（見 `devkit.lock.json`）；合回 V1 後 commit 雜湊改變，重跑 `npm run devkit:sync -- --core <TeamUQ 路徑>`。
+- 作者 CLI 已釘選公開 Devkit 1.7.12，支援 dev-pack 的 preplanted id；升版從公開 kit 同步。
 
 ## 需求與指令
 
@@ -288,7 +300,7 @@ npm run check          # tsc → node --test → contract:verify → verify-sour
 | `npm run check:secrets` | 找私鑰區塊、`*.pem`／`*.key`／`keys/`，並確認 `.gitignore` 仍排除它們 |
 | `npm run build` | 見「打包與簽章」，輸出到 `dist/`（gitignored） |
 | `npm run dev:pack -- --key <dev key>` | 見「開發迭代」：以開發金鑰打出 `dist/dev/teamuq.memory.tuqplugin`（版本逐次遞增），只給隔離 Core dev profile |
-| `npm run devkit:sync -- --core <路徑>` | 重建並 vendor devkit（`contract:sync` 只同步契約） |
+| `node tools/sync-vendor.mjs --kit <公開 devkit 路徑> --only devkit` | 從公開 kit vendor CLI/lib 與來源 lock（`contract:sync` 只同步契約） |
 
 ## 金鑰
 

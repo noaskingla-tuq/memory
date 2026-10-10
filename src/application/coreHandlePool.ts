@@ -10,6 +10,7 @@ interface PoolEntry {
 export interface CoreHandlePoolOptions {
   readonly layout: DataLayoutPort;
   readonly openCore: (path: string) => MemoryCorePort;
+  readonly openAgentCore?: (path: string, agentId: string) => MemoryCorePort;
   readonly observability?: ObservabilityPort;
   readonly maxOpenAgentHandles?: number;
   readonly idleHandleTtlMs?: number;
@@ -54,7 +55,7 @@ export class CoreHandlePool {
       throw new MemoryServiceError("RESOURCE_BUSY", "No idle agent memory handle is available");
     }
     const entry: PoolEntry = {
-      core: this.options.openCore(this.options.layout.agentDbPath(agentId)),
+      core: this.options.openAgentCore?.(this.options.layout.agentDbPath(agentId), agentId) ?? this.options.openCore(this.options.layout.agentDbPath(agentId)),
       leases: 1,
       lastUsedAt: this.now(),
     };

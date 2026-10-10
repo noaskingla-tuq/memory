@@ -8,8 +8,8 @@
   "publisher": "teamuq",
   "description": "TeamUQ 對話記憶：為每個 agent 保存可追溯的記憶，資料留在本機。",
   "pluginApi": "^2.0.0",
-  "minCoreVersion": ">=1.7.0",
-  "hostApis": [{ "id": "teamuq.host-data", "range": "^1.0.0" }],
+  "minCoreVersion": ">=1.7.12",
+  "hostApis": [{ "id": "teamuq.host-data", "range": "^1.1.0" }],
   "trustTier": "full-trust",
   "entry": { "ui": "ui/index.html", "backend": "backend.mjs" },
   "contributes": {
@@ -18,7 +18,17 @@
     ]
   },
   "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 4, "idleUnloadSec": 180, "bootTimeoutSec": 30 },
-  "permissions": ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "plugin-state:write", "data:legacy-migrate"],
+  "permissions": ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat"],
+  "settingsSchema": {
+    "title": "工作紀錄 AI 整理",
+    "summary": "原始工作紀錄保存在本機；啟用後會把請求與成果送到所選 AI 提供者，整理成可追溯的記憶。",
+    "fields": [
+      { "key": "organizationEnabled", "type": "toggle", "label": "啟用 AI 整理", "default": false, "help": "關閉時仍保存原始工作紀錄。開啟後會接續處理等待中的紀錄。" },
+      { "key": "organizationProvider", "type": "text", "label": "AI 提供者 ID", "default": "", "maxLength": 128, "help": "留空使用目前可用的預設提供者；指定 ID 不可用時會暫停整理。" },
+      { "key": "organizationModel", "type": "text", "label": "模型 ID", "default": "", "maxLength": 128, "help": "留空使用提供者的預設模型；不使用 astra。" },
+      { "key": "organizationContextBudget", "type": "range", "label": "AI 輸入預算", "default": 32768, "min": 8192, "max": 262144, "step": 8192, "unit": "bytes", "help": "以 UTF-8 bytes 保守估算，並非精確 token 數；Cairn 另有每次模型輸入上限。" }
+    ]
+  },
   "backendMethods": ["ui.overview", "ui.agentStats", "ui.list", "ui.search", "ui.get", "ui.forget", "ui.status"],
   "data": { "uninstall": "keep", "legacyMigrations": [{ "id": "cairn-v1", "source": "memory-cairn-v1", "target": "memory-cairn-v1" }] }
 }

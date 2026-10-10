@@ -21,6 +21,7 @@ export function activate(context: PluginBackendContextV1): MemoryPluginBackend {
     dataRoot: join(dataDir, "memory-cairn-v1"),
     pinPath: resolvePinPath(import.meta.url),
     host: context.host,
+    settings: context.settings,
   });
   backend.startWorkers();
   backend.warmUp();

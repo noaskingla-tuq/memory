@@ -1,4 +1,4 @@
-import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiMethodName } from "../contracts/uiContract.js";
+import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiMethodName } from "../contracts/uiContract.js";
 import { runAgentStats } from "../application/ui/agentStats.js";
 import { serializedBytes, UI_RESPONSE_BUDGET_BYTES } from "../application/ui/budget.js";
 import { runGet } from "../application/ui/detail.js";
@@ -14,11 +14,14 @@ import type { UiServices } from "../application/ui/uiServices.js";
 import { MemoryServiceError } from "../domain/errors.js";
 import { callError } from "./contractErrors.js";
 import { PLUGIN_VERSION } from "./diagnose.js";
+import type { OrganizationStatus } from "../application/punchOrganization.js";
 
 export interface UiDispatchDeps {
   readonly storageStatus: () => string;
   readonly services: () => UiServices | undefined;
   readonly profile: ProfilePort;
+  readonly organizationStatus?: () => OrganizationStatus;
+  readonly onForgotten?: (agentId: string, memoryId: string) => Promise<void>;
 }
 
 export function isUiMethod(method: unknown): method is UiMethodName {
@@ -38,7 +41,7 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   // why: calls that arrive in the same loop turn would otherwise all start their first slice back to back, so each call first waits for its own turn
   await clock.yieldNow();
   if (method === "ui.status") {
-    return runStatus(services, clock, { version: PLUGIN_VERSION, storageStatus: deps.storageStatus(), uptimeSec: Math.round(process.uptime()), profile: deps.profile });
+    return runStatus(services, clock, { version: PLUGIN_VERSION, storageStatus: deps.storageStatus(), uptimeSec: Math.round(process.uptime()), profile: deps.profile, ...(deps.organizationStatus === undefined ? {} : { organization: deps.organizationStatus() }) });
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;
@@ -53,8 +56,15 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
       return runListing("search", request, services, clock);
     case "ui.get":
       return runGet(request, services, clock);
-    case "ui.forget":
-      return runForget(request, services);
+    case "ui.forget": {
+      const result = await runForget(request, services);
+      if (result.ok) {
+        const ref = params as UiForgetRequest;
+        try { await deps.onForgotten?.(ref.agentId, ref.memoryId); }
+        catch { throw new MemoryServiceError("STORAGE_BUSY", "Organization source cleanup is pending"); }
+      }
+      return result;
+    }
   }
 }
 

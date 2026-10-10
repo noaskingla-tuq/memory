@@ -36,8 +36,8 @@ import {
   type BackupHooks,
 } from "./upgradeBackup.js";
 
-export const CAIRN_COMMIT = "83a10c3b7664b1f67485a19e7d84d24dcb3041a5";
-export const CAIRN_CORE_TREE = "c5ba8efa24876b77e2279b9cbc827c221ae277f5";
+export const CAIRN_COMMIT = "0c7aa20a9cb490bac4d15eca28b2036823a5f48e";
+export const CAIRN_CORE_TREE = "91de36a70932c3ed190c0191e087359b5adaa9ae";
 
 function comparablePath(path: string): string {
   const absolute = resolve(path);

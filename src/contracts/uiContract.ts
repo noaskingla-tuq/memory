@@ -315,6 +315,7 @@ export const uiStatusSuccess = z
       .strict(),
     lastWriteAt: timestamp.nullable(),
     uptimeSec: count,
+    organization: z.object({ state: z.enum(["disabled", "idle", "running", "paused", "error"]), pending: count, completed: count, lastError: z.string().nullable() }).strict().optional(),
   })
   .strict();
 

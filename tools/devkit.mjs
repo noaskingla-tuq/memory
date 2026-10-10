@@ -8,7 +8,15 @@ const DEVKIT_PATH = join(DEVKIT_DIR, DEVKIT_FILE)
 
 export function assertDevkitLock() {
   const lock = JSON.parse(readFileSync(join(DEVKIT_DIR, DEVKIT_LOCK), 'utf8'))
-  if (hashBytes(readFileSync(DEVKIT_PATH)) !== lock.sha256) throw new Error(`${DEVKIT_FILE} differs from ${DEVKIT_LOCK}; run node tools/sync-vendor.mjs --core <TeamUQ> --only devkit`)
+  if (hashBytes(readFileSync(DEVKIT_PATH)) !== lock.sha256) throw new Error(`${DEVKIT_FILE} differs from ${DEVKIT_LOCK}; run npm run devkit:sync -- --kit <public-devkit>`)
+  if (lock.source?.repo === 'teamuq-plugin-devkit') {
+    const expected = [DEVKIT_FILE, 'lib/tuq-capability-client.mjs', 'lib/tuq-capability-client.d.mts']
+    if (JSON.stringify(lock.files?.map((file) => file.path)) !== JSON.stringify(expected)) throw new Error('portable devkit file set differs from its lock')
+    for (const file of lock.files) {
+      const bytes = readFileSync(join(DEVKIT_DIR, file.path))
+      if (hashBytes(bytes) !== file.sha256) throw new Error(`${file.path} differs from ${DEVKIT_LOCK}`)
+    }
+  }
   return lock
 }
 

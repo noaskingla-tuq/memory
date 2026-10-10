@@ -53,8 +53,8 @@ async function tamperedArtifact(t, tamper) {
 test("the pin records exactly the Cairn core without test directories, redact.mjs and LICENSE", () => {
   assert.deepEqual(checkPinStage(pin), []);
   const paths = pin.stage.files.map((entry) => entry.path);
-  assert.equal(paths.length, 58);
-  assert.equal(paths.filter((path) => path.startsWith("core/")).length, 56);
+  assert.equal(paths.length, computeStageRecord().length);
+  assert.equal(paths.filter((path) => path.startsWith("core/")).length, computeStageRecord().filter((entry) => entry.path.startsWith("core/")).length);
   assert.ok(paths.includes("plugins/cairn-memory/lib/redact.mjs"));
   assert.ok(paths.includes("LICENSE"));
   assert.equal(paths.some((path) => /(^|\/)(?:test|testing)\//u.test(path)), false);
@@ -81,7 +81,7 @@ test("the stage check names a changed hash, a missing entry and an unlisted file
 test("stageCairn copies the recorded files byte for byte and the pin next to backend.mjs", (t) => {
   const stageDir = scratch(t);
   const staged = stageCairn(stageDir);
-  assert.equal(staged.files, 58);
+  assert.equal(staged.files, pin.stage.files.length);
   for (const entry of pin.stage.files) {
     assert.equal(sha256Bytes(readFileSync(join(stageDir, "cairn", ...entry.path.split("/")))), entry.sha256, entry.path);
   }
@@ -101,15 +101,17 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   const manifest = JSON.parse(readFileSync(join(dist, "stage", "manifest.json"), "utf8"));
   assert.equal(manifest.version, packageJson.version);
   assert.equal(manifest.name, "Cairn記憶管理");
-  assert.equal(manifest.minCoreVersion, ">=1.7.0");
+  assert.equal(manifest.minCoreVersion, ">=1.7.12");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
-    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "plugin-state:write", "data:legacy-migrate"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
+    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
   );
   assert.deepEqual(manifest.contributes.views, [
     { id: "memory", title: "Cairn記憶管理", icon: "cairn-icon.png", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
   ]);
   assert.equal(manifest.resources.maxSessions, 4);
+  assert.deepEqual(manifest.hostApis, [{ id: "teamuq.host-data", range: "^1.1.0" }]);
+  assert.equal(manifest.settingsSchema.fields.find((field) => field.key === "organizationEnabled").default, false);
   assert.deepEqual(manifest.backendMethods, UI_METHOD_NAMES);
   assert.equal(manifest.backendMethods.some((method) => method.startsWith("memory.")), false);
   assert.equal(manifest.backendMethods.includes("memory.profile.sync@1"), false);
@@ -132,7 +134,7 @@ test("a full build signs with a throwaway key, verifies itself and leaves no key
   assert.equal(info.anchors, "self");
   assert.equal(info.signer.kind, "teamuq");
   assert.match(info.signer.keyId, /^memory-tmp-[0-9a-f]{8}$/u);
-  assert.equal(info.file, join(dist, "teamuq.memory-1.2.2.tuqplugin"));
+  assert.equal(info.file, join(dist, `teamuq.memory-${packageJson.version}.tuqplugin`));
   const report = verifyArtifact(info.file, { anchors: "self", pubFile: info.pubFile });
   assert.deepEqual(failedChecks(report), []);
   const pluginFiles = [
@@ -166,13 +168,13 @@ test("verify-artifact rejects a missing Cairn file, a smuggled test directory an
   assert.ok(failedChecks(unlicensed).includes("cairn/LICENSE is present"));
 });
 
-test("verify-artifact rejects a manifest that lets Core 1.6.0 to 1.6.2 install the plugin", async (t) => {
+test("verify-artifact rejects a manifest that permits a Core older than the pinned public API", async (t) => {
   const report = await tamperedArtifact(t, (stageDir) => {
     const file = join(stageDir, "manifest.json");
-    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.7.0", ">=1.6.0"));
+    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.7.12", ">=1.7.0"));
   });
   assert.equal(report.ok, false);
-  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.7.0"));
+  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.7.12"));
 });
 
 test("verify-artifact rejects a backend that imports Cairn or a package by a bare name", async (t) => {

@@ -5,7 +5,7 @@ import type { DirectoryAgent, DirectoryProject, DirectorySnapshot, ProfileDirect
 
 export const LEGACY_PUNCH_RECEIPT_NAMESPACE = "legacy-punch-write";
 
-function toPunch(record: Awaited<ReturnType<PluginHostApiV1["workRecords"]["readSettledPage"]>>["records"][number]): SettledPunch {
+function toPunch(record: Awaited<ReturnType<PluginHostApiV1["workRecords"]["readPage"]>>["records"][number]): SettledPunch {
   return {
     id: record.punchId,
     agentId: record.agentId,
@@ -22,10 +22,19 @@ function toPunch(record: Awaited<ReturnType<PluginHostApiV1["workRecords"]["read
 }
 
 export function createPunchFeed(host: PluginHostApiV1): PunchFeedPort {
+  let firstPage: Awaited<ReturnType<PluginHostApiV1["workRecords"]["readPage"]>> | undefined;
+  let snapshot: NonNullable<typeof firstPage>["snapshot"] | undefined;
   return {
-    openSettledSnapshot: () => host.workRecords.openSettledSnapshot(),
+    async openSettledSnapshot() {
+      firstPage = await host.workRecords.readPage({ cursor: null, limit: 100 });
+      snapshot = firstPage.snapshot;
+      return firstPage.snapshot;
+    },
     async readSettledPage(input) {
-      const page = await host.workRecords.readSettledPage(input);
+      const cached = input.cursor === null && input.limit === 100 && firstPage?.snapshot.snapshotId === input.snapshotId ? firstPage : undefined;
+      firstPage = undefined;
+      const page = cached ?? await host.workRecords.readPage(input);
+      if (page.snapshot.snapshotId !== input.snapshotId || snapshot?.snapshotId !== input.snapshotId || page.snapshot.generation !== snapshot.generation || page.snapshot.highWatermark !== snapshot.highWatermark) throw new Error("work_record_snapshot_changed");
       return { snapshot: page.snapshot, records: page.records.map(toPunch), nextCursor: page.nextCursor };
     },
     subscribeSettledChanges(listener) {
@@ -57,25 +66,28 @@ export function createLegacyPunchState(host: PluginHostApiV1): LegacyPunchStateP
 }
 
 async function readDirectoryPages<TEntry, T>(options: {
-  readonly open: () => Promise<{ snapshotId: string; generation: string; highWatermark: string | null }>;
-  readonly read: (request: { snapshotId: string; cursor: string | null; limit: number }) => Promise<{
+  readonly read: (request: { snapshotId?: string; cursor: string | null; limit: number }) => Promise<{
     snapshot: { snapshotId: string; generation: string; highWatermark: string | null };
     entries: readonly TEntry[];
     nextCursor: string | null;
   }>;
   readonly select: (entry: TEntry) => T | null;
 }): Promise<DirectorySnapshot<T>> {
-  const snapshot = await options.open();
+  let snapshot: { snapshotId: string; generation: string; highWatermark: string | null } | undefined;
   const entries: T[] = [];
   let cursor: string | null = null;
+  const seen = new Set<string>();
   do {
-    const page = await options.read({ snapshotId: snapshot.snapshotId, cursor, limit: 100 });
-    if (page.snapshot.snapshotId !== snapshot.snapshotId || page.snapshot.generation !== snapshot.generation) throw new Error("directory_snapshot_changed");
+    const page = await options.read({ ...(snapshot === undefined ? {} : { snapshotId: snapshot.snapshotId }), cursor, limit: 100 });
+    snapshot ??= page.snapshot;
+    if (page.snapshot.snapshotId !== snapshot.snapshotId || page.snapshot.generation !== snapshot.generation || page.snapshot.highWatermark !== snapshot.highWatermark) throw new Error("directory_snapshot_changed");
     for (const entry of page.entries) {
       const selected = options.select(entry);
       if (selected !== null) entries.push(selected);
     }
     cursor = page.nextCursor;
+    if (cursor !== null && seen.has(cursor)) throw new Error("directory_cursor_repeated");
+    if (cursor !== null) seen.add(cursor);
   } while (cursor !== null);
   return { generation: snapshot.generation, entries };
 }
@@ -83,14 +95,12 @@ async function readDirectoryPages<TEntry, T>(options: {
 export function createProfileDirectory(host: PluginHostApiV1): ProfileDirectoryPort {
   return {
     readAgents: () => readDirectoryPages<Awaited<ReturnType<PluginHostApiV1["agentDirectory"]["readPage"]>>["entries"][number], DirectoryAgent>({
-      open: () => host.agentDirectory.openSnapshot(),
       read: (request) => host.agentDirectory.readPage(request),
       select: (entry) => "teamKey" in entry
         ? { id: entry.id, name: entry.name, teamKey: entry.teamKey, teamName: entry.teamName, title: entry.title, enabled: entry.enabled }
         : null,
     }),
     readProjects: () => readDirectoryPages<Awaited<ReturnType<PluginHostApiV1["projectDirectory"]["readPage"]>>["entries"][number], DirectoryProject>({
-      open: () => host.projectDirectory.openSnapshot(),
       read: (request) => host.projectDirectory.readPage(request),
       select: (entry) => ({ id: entry.id, name: entry.name, archived: entry.archived }),
     }),

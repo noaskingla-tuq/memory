@@ -27,7 +27,7 @@ export function assertContractResponse(method, response) {
   const parsed = RESPONSE_SCHEMAS[method].safeParse(response);
   assert.equal(parsed.success, true, JSON.stringify(parsed.error?.issues));
   assert.deepEqual(parsed.data, response);
-  assert.ok(JSON.stringify(response).length <= contract.MEMORY_LIMITS.resultMaxBytes);
+  assert.ok(Buffer.byteLength(JSON.stringify(response), "utf8") <= contract.MEMORY_LIMITS.resultMaxBytes);
   return parsed.data;
 }
 

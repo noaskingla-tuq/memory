@@ -59,16 +59,16 @@ const inspect = async (backend, input) => {
   return assertContractResponse("memory.inspect@1", response);
 };
 
-test("twelve 4,000-character CJK items exceed the budget, so the limit is halved and reported", async (t) => {
+test("eight-thousand-character CJK items use UTF-8 bytes and repeatedly halve the limit", async (t) => {
   const { backend, calls } = start(t, () => 8000);
   const response = await inspect(backend, { scope: "personal", limit: 12 });
-  assert.deepEqual(calls.map((call) => call.limit), [12, 6]);
-  assert.equal(response.appliedLimit, 6);
+  assert.deepEqual(calls.map((call) => call.limit), [12, 6, 3, 1]);
+  assert.equal(response.appliedLimit, 1);
   assert.equal(response.result.ok, true);
-  assert.equal(response.result.value.memories.length, 6);
+  assert.equal(response.result.value.memories.length, 1);
   assert.equal(response.nextCursor, response.result.value.nextCursor);
-  assert.ok(response.nextCursor.startsWith("c:6:"));
-  const size = JSON.stringify(response).length;
+  assert.ok(response.nextCursor.startsWith("c:1:"));
+  const size = Buffer.byteLength(JSON.stringify(response), "utf8");
   assert.ok(size <= BUDGET, `size ${size}`);
   assert.ok(size <= RESULT_LIMIT);
 });
@@ -76,10 +76,10 @@ test("twelve 4,000-character CJK items exceed the budget, so the limit is halved
 test("halving repeats until the page fits", async (t) => {
   const { backend, calls } = start(t, () => 16000);
   const response = await inspect(backend, { scope: "personal", limit: 12 });
-  assert.deepEqual(calls.map((call) => call.limit), [12, 6, 3]);
-  assert.equal(response.appliedLimit, 3);
-  assert.equal(response.result.value.memories.length, 3);
-  assert.ok(JSON.stringify(response).length <= BUDGET);
+  assert.deepEqual(calls.map((call) => call.limit), [12, 6, 3, 1]);
+  assert.equal(response.appliedLimit, 1);
+  assert.equal(response.result.value.memories.length, 1);
+  assert.ok(Buffer.byteLength(JSON.stringify(response), "utf8") <= BUDGET);
 });
 
 test("continuing with nextCursor and appliedLimit reads the whole set without gaps", async (t) => {
@@ -95,11 +95,11 @@ test("continuing with nextCursor and appliedLimit reads the whole set without ga
 });
 
 test("a page that already fits keeps the requested limit", async (t) => {
-  const { backend, calls } = start(t, () => 4000);
+  const { backend, calls } = start(t, () => 1000);
   const response = await inspect(backend, { scope: "personal", limit: 12 });
   assert.deepEqual(calls.map((call) => call.limit), [12]);
   assert.equal(response.appliedLimit, 12);
-  assert.ok(JSON.stringify(response).length <= BUDGET);
+  assert.ok(Buffer.byteLength(JSON.stringify(response), "utf8") <= BUDGET);
 });
 
 test("a single item over the budget is result_too_large after the limit reaches one", async (t) => {
@@ -129,7 +129,7 @@ test("reading one memory halves its receipt page and reports nextReceiptCursor a
   assert.ok(response.appliedLimit < 12);
   assert.equal(response.result.value.receipts.length, response.appliedLimit);
   assert.equal(response.nextCursor, response.result.value.nextReceiptCursor);
-  assert.ok(JSON.stringify(response).length <= BUDGET);
+  assert.ok(Buffer.byteLength(JSON.stringify(response), "utf8") <= BUDGET);
 });
 
 test("the default limit is applied explicitly so an issued cursor stays valid", async (t) => {

@@ -53,7 +53,7 @@ export async function inspect(
       ...(next === undefined ? {} : { nextCursor: next }),
       appliedLimit: limit,
     });
-    if (JSON.stringify(response).length <= budget) return response;
+    if (Buffer.byteLength(JSON.stringify(response), "utf8") <= budget) return response;
     if (limit === 1) throw callError("result_too_large", "A single inspected item exceeds the result budget");
     // why: a Cairn cursor cannot be re-issued for a smaller limit, so only a first page (no cursor) can be halved
     if (request.input.cursor !== undefined) {

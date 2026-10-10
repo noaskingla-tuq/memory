@@ -71,6 +71,18 @@ export function punchOperationId(punchId: string): string {
   return `punch:${sha256(punchId).slice(0, 32)}`;
 }
 
+export function buildPunchSourceMessages(punch: SettledPunch) {
+  const texts = [clean(punch.name ?? ""), clean(lexicalToPlainText(punch.description))];
+  const id = punchOperationId(punch.id);
+  return texts.flatMap((text, index) => {
+    if (text === "") return [];
+    let content = head(text, index === 0 ? 300 : 1200);
+    // why: Cairn bounds each model input to 6000 units; UTF-8 bytes conservatively bound source text alongside its extraction prompt
+    while (Buffer.byteLength(content, "utf8") > (index === 0 ? 900 : 2400)) content = head(content, content.length - 1);
+    return [{ id: `${id}:${index === 0 ? "request" : "outcome"}`, role: index === 0 ? "user" as const : "assistant" as const, content }];
+  });
+}
+
 export function buildPunchMemoryContent(punch: SettledPunch): PunchMemoryContent | null {
   const request = head(clean(punch.name ?? ""), MAX_NAME_UNITS);
   const outcome = clean(lexicalToPlainText(punch.description));

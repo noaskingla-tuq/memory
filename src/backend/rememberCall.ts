@@ -50,7 +50,7 @@ export async function remember(
   }
   const response = memoryRememberResponseSchema.safeParse({ results });
   if (!response.success) throw callError("internal", "Remember response failed the contract schema");
-  if (JSON.stringify(response.data).length > MEMORY_LIMITS.resultMaxBytes) {
+  if (Buffer.byteLength(JSON.stringify(response.data), "utf8") > MEMORY_LIMITS.resultMaxBytes) {
     throw callError("result_too_large", "Remember response exceeds the result limit");
   }
   return response.data;

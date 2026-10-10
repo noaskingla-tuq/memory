@@ -4,7 +4,7 @@ import type { CoreResult, MemoryCorePort } from "../../application/ports.js";
 import type { MemoryModelPort } from "../../application/modelPort.js";
 import { createCairnModelAdapter } from "../model/cairnModelAdapter.js";
 
-type ModelFailureCode = "model_not_configured" | "model_policy_denied";
+type ModelFailureCode = string;
 
 interface ModelFailureContext {
   code?: ModelFailureCode;
@@ -24,10 +24,7 @@ export function openCairnCore(
           (code) => {
             const context = failures.getStore();
             if (context !== undefined)
-              context.code =
-                code === "MODEL_NOT_CONFIGURED"
-                  ? "model_not_configured"
-                  : "model_policy_denied";
+              context.code = code.toLowerCase();
           },
         );
   const core = openMemoryCore({
@@ -43,7 +40,7 @@ export function openCairnCore(
       if (!result.ok && context.code !== undefined) {
         return {
           ok: false as const,
-          error: { code: context.code, retryable: false },
+          error: { code: context.code, retryable: ["model_timeout", "resource_busy", "storage_busy"].includes(context.code) },
         };
       }
       return result;

@@ -18,7 +18,7 @@ const OPERATIONS: readonly MemoryModelOperation[] = [
 ];
 
 function assertPolicy(policy: MemoryModelPolicy): void {
-  if (!policy.enabled || policy.contextWindow < 8_192) {
+  if (policy.contextWindow < 8_192) {
     throw new MemoryServiceError(
       "MODEL_POLICY_DENIED",
       "Memory model policy is not allowed",
@@ -27,7 +27,7 @@ function assertPolicy(policy: MemoryModelPolicy): void {
 }
 
 export type ReportModelFailure = (
-  code: "MODEL_NOT_CONFIGURED" | "MODEL_POLICY_DENIED",
+  code: MemoryServiceError["code"],
 ) => void;
 
 function reportStableFailure(
@@ -35,7 +35,7 @@ function reportStableFailure(
   report?: ReportModelFailure,
 ): void {
   const code = error instanceof MemoryServiceError ? error.code : undefined;
-  if (code === "MODEL_NOT_CONFIGURED" || code === "MODEL_POLICY_DENIED") {
+  if (code !== undefined) {
     report?.(code);
   }
 }
@@ -48,8 +48,9 @@ export function createCairnModelAdapter(
   const policy = port.resolvePolicy(agentId);
   assertPolicy(policy);
   const adapter: Record<string, unknown> = {
-    contextWindow: policy.contextWindow,
+    get contextWindow() { return port.resolvePolicy(agentId).contextWindow; },
     countTokens: (text: string) => {
+      const policy = port.resolvePolicy(agentId);
       const count = port.countTokens(policy, text);
       if (!Number.isSafeInteger(count) || count < 0) {
         throw new MemoryServiceError(
@@ -67,6 +68,12 @@ export function createCairnModelAdapter(
       readonly maxOutputTokens: 1024;
       readonly signal: AbortSignal;
     }) => {
+      const policy = port.resolvePolicy(agentId);
+      assertPolicy(policy);
+      if (!policy.enabled) {
+        report?.("MODEL_NOT_CONFIGURED");
+        throw new MemoryServiceError("MODEL_NOT_CONFIGURED", "Memory organization is disabled");
+      }
       if (!policy.allowedOperations.has(operation)) {
         const error = new MemoryServiceError(
           "MODEL_POLICY_DENIED",
@@ -76,7 +83,7 @@ export function createCairnModelAdapter(
         throw error;
       }
       try {
-        return await port.invoke({ agentId, policy, operation, ...request });
+        return await port.invoke({ agentId, policy, operation, ...request, maxOutputTokens: 1024 });
       } catch (error) {
         reportStableFailure(error, report);
         throw error;

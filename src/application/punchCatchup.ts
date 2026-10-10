@@ -24,6 +24,7 @@ export interface PunchCatchupOptions {
   readonly receipts: PunchReceiptStorePort;
   readonly legacyReceipts?: LegacyPunchStatePort;
   readonly writer: PunchMemoryWriterPort;
+  readonly onAdmitted?: (punch: SettledPunch, memoryId: string) => Promise<void>;
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly pollMs?: number;
@@ -228,6 +229,12 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
       const item = nonEmpty[index]!;
       const result = results[index]!;
       if (result.ok) {
+        try {
+          await options.onAdmitted?.(item.punch, result.memoryId);
+        } catch {
+          tally.stoppedCode = "organization_queue_unavailable";
+          continue;
+        }
         internalFailures.delete(item.punch.id);
         rows.push({ state: "written", punchId: item.punch.id, agentId: item.punch.agentId, scope: scopeOf(item.punch), projectId: item.punch.projectId, memoryId: result.memoryId, contentSha256: item.content.contentSha256, writtenAt: at });
         tally.written += 1;
@@ -281,9 +288,15 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
     const lastWrittenAtMs = [...receipts.values()].reduce<number | null>((latest, row) => row.state === "written" ? Math.max(latest ?? row.writtenAt, row.writtenAt) : latest, null);
     tally.lastWrittenAtMs = lastWrittenAtMs;
     let cursor: string | null = null;
+    const seenCursors = new Set<string>();
     let more = false;
     do {
       const page = await options.feed.readSettledPage({ snapshotId: snapshot.snapshotId, cursor, limit: PAGE_LIMIT });
+      if (page.snapshot.snapshotId !== snapshot.snapshotId || page.snapshot.generation !== snapshot.generation || page.snapshot.highWatermark !== snapshot.highWatermark) throw new Error("work_record_snapshot_changed");
+      for (const punch of page.records) {
+        const admitted = receipts.get(punch.id);
+        if (admitted?.state === "written" && buildPunchMemoryContent(punch)?.contentSha256 === admitted.contentSha256) await options.onAdmitted?.(punch, admitted.memoryId);
+      }
       const eligible = page.records.filter((punch) => punch.startedAtMs >= (sinceMs ?? 0) && punch.endedAtMs <= now() - minAgeMs && !receipts.has(punch.id));
       pending += eligible.length;
       const processable = eligible.slice(0, Math.max(0, maxPerRun - examined));
@@ -302,6 +315,8 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
         if (tally.stoppedCode === null && batch.length === BATCH_SIZE) await pause(options.batchPauseMs ?? 200);
       }
       cursor = page.nextCursor;
+      if (cursor !== null && seenCursors.has(cursor)) throw new Error("work_record_cursor_repeated");
+      if (cursor !== null) seenCursors.add(cursor);
       more = cursor !== null || processable.length < eligible.length;
       if (examined >= maxPerRun) break;
     } while (cursor !== null && tally.stoppedCode === null && !stopped);
@@ -336,7 +351,8 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
     start() {
       if (started || stopped) return;
       started = true;
-      unsubscribe = options.feed.subscribeSettledChanges(() => run());
+      try { unsubscribe = options.feed.subscribeSettledChanges(() => run()); }
+      catch { log({ event: "punch_subscription_unavailable" }); }
       poll = setInterval(run, options.pollMs ?? 30_000);
       poll.unref();
       run();

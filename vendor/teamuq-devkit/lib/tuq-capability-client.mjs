@@ -98,7 +98,6 @@ var RETRYABLE = new Set(RETRY_AFTER_CODES);
 var CapabilityLinkError = class extends Error {
   code;
   retryAfterMs;
-  // why: the message is the code alone because provider text and endpoint or ticket details must never reach a screen or a log (R-CSM-3, R-CSM-7)
   constructor(code, options = {}) {
     super(code);
     this.name = "CapabilityLinkError";

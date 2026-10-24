@@ -3,18 +3,18 @@
   "tool": "tuq-plugin-tool",
   "file": "tuq-plugin-tool.mjs",
   "hashRule": "sha256 hex of file bytes with CRLF normalised to LF",
-  "sha256": "2d2e2ecca07176a8f019ddc7338109ece3a246760fe7f5fe5d24c50351ba346a",
-  "bytes": 5463838,
+  "sha256": "a179f0e1201d036e4dc904782ca2fe1591f2ff14558221e457f737ab96a09d86",
+  "bytes": 8208252,
   "files": [
     {
       "path": "tuq-plugin-tool.mjs",
-      "sha256": "2d2e2ecca07176a8f019ddc7338109ece3a246760fe7f5fe5d24c50351ba346a",
-      "bytes": 5463838
+      "sha256": "a179f0e1201d036e4dc904782ca2fe1591f2ff14558221e457f737ab96a09d86",
+      "bytes": 8208252
     },
     {
       "path": "lib/tuq-capability-client.mjs",
-      "sha256": "44bdce7aa5b5e06f1509cf384fd4f1db3b0481155108401f2e87da6fd029a9f3",
-      "bytes": 79490
+      "sha256": "06619baa46ccda5e323366508b421457b9e42581b4d3f75f3ea2c3a8fa1b5881",
+      "bytes": 79343
     },
     {
       "path": "lib/tuq-capability-client.d.mts",
@@ -24,8 +24,8 @@
   ],
   "source": {
     "repo": "teamuq-plugin-devkit",
-    "coreVersion": "1.7.12",
-    "kitVersion": "1.7.12",
-    "metadataSha256": "756147e68e705129dd6652cb13e9c066a5a0e8668ba5c8e54d63449ebb0e1fa5"
+    "coreVersion": "1.7.15",
+    "kitVersion": "1.7.15",
+    "metadataSha256": "915cbd5abf42932ce18c21731023ab532bfe545a7f1dd53fd8c7301924d35839"
   }
 }

@@ -1,0 +1,24 @@
+{
+  "cairnCommit": "7197d80035a015db195d7724729926f8749afd32",
+  "agentId": "fixture-agent",
+  "actor": {
+    "agentId": "fixture-agent",
+    "projectId": "fixture-project",
+    "sessionId": "fixture-session",
+    "providerId": "codex"
+  },
+  "memories": [
+    {
+      "scope": "personal",
+      "kind": "preference",
+      "content": "Fixture agent prefers concise answers.",
+      "id": "e94c171c-6f5c-4787-9b82-ce3f5e17caad"
+    },
+    {
+      "scope": "project",
+      "kind": "instruction",
+      "content": "Fixture project deploys through the release gate.",
+      "id": "a6be4618-b03e-48fd-98dc-e2a614cd47e2"
+    }
+  ]
+}

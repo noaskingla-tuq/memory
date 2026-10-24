@@ -13,7 +13,7 @@ const SIDE_EFFECT_IMPORT = /^[ \t]*import\s*(['"])([^'"]+)\1/gmu
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu
 const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
-// why: snapshot readPage and host AI/settings are pinned to the public 1.7.12 devkit
+// why: this plugin only needs host APIs available since Core 1.7.12; its SDK and CLI are synced to the public 1.7.15 devkit
 const MIN_CORE_VERSION = '>=1.7.12'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'

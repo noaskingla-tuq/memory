@@ -17,6 +17,8 @@ export const DETAIL_STRINGS = {
   "dt.scope.project": "專案：{name}",
   "dt.receipts.none": "沒有收據紀錄。",
   "dt.receipts.capped": "最多列出 {n} 筆收據。",
+  "dt.organization.title": "外掛自動整理功能",
+  "dt.organization.detail": "啟用時，整理流程會使用已結案工作紀錄的工作名稱與成果摘要作為輸入。這是功能的一般說明，不判定目前記憶的來源；其他明確寫入方式也可能建立記憶。",
   "dt.receipt.line": "{client}・對話 {session}・{role}・{at}",
   "dt.receipt.role.user": "使用者的訊息",
   "dt.receipt.role.assistant": "助理的訊息",

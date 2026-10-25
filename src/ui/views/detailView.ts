@@ -74,10 +74,11 @@ export function renderReady(data: DetailData): SafeHtml {
   const text = detailText(data);
   const tool = toolText(item);
   const work = data.work === undefined ? EMPTY_HTML : html`<span>${workText(item)}</span>${tool === null ? EMPTY_HTML : html`<span>${tool}</span>`}`;
+  const organization = html`<p class="muted dr-source"><b>${t("dt.organization.title")}</b> ${t("dt.organization.detail")}</p>`;
   const request = text.request === null ? EMPTY_HTML : html`<h3 class="dr-h">${t("dt.section.request")}</h3><div class="dr-txt">${text.request}</div>`;
   const result = text.result.trim() === "" ? t("dt.noText") : text.result;
   const siblings = data.sameSession.length === 0 ? EMPTY_HTML : html`<h3 class="dr-h">${t("dt.section.sameSession", { n: data.sameSession.length })}</h3><div class="dr-sibs">${data.sameSession.map(renderSibling)}</div>`;
-  return html`<p class="dr-who"><b>${agentNameOf(data)}</b> <span class="badge">${scopeText(item)}</span></p><p class="muted dr-meta"><span>${writtenFull(data)}</span>${work}</p>${request}<h3 class="dr-h">${text.isWork ? t("dt.section.result") : t("dt.section.content")}</h3><div class="dr-txt">${result}</div><h3 class="dr-h">${t("dt.section.scope")}</h3>${renderScope(data)}${renderReceipts(data)}<details class="dr-raw"><summary>${t("dt.section.raw")}</summary><pre>${data.content}</pre></details>${siblings}`;
+  return html`<p class="dr-who"><b>${agentNameOf(data)}</b> <span class="badge">${scopeText(item)}</span></p><p class="muted dr-meta"><span>${writtenFull(data)}</span>${work}</p>${organization}${request}<h3 class="dr-h">${text.isWork ? t("dt.section.result") : t("dt.section.content")}</h3><div class="dr-txt">${result}</div><h3 class="dr-h">${t("dt.section.scope")}</h3>${renderScope(data)}${renderReceipts(data)}<details class="dr-raw"><summary>${t("dt.section.raw")}</summary><pre>${data.content}</pre></details>${siblings}`;
 }
 
 function skeleton(): SafeHtml {

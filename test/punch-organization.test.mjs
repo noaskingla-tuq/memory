@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createLocalPunchReceiptStore } from "../out/adapters/storage/punchStateStore.js";
 import { createPunchOrganizationWorker } from "../out/application/punchOrganization.js";
-import { buildPunchSourceMessages } from "../out/application/punchContent.js";
-import { startBackend, callInspect } from "./backendHarness.mjs";
+import { buildPunchSourceMessages, punchOperationId } from "../out/application/punchContent.js";
+import { startBackend, callInspect, callRemember, op } from "./backendHarness.mjs";
+import { databasePathOf, rawWrite } from "./readerHarness.mjs";
 
 const punch = (overrides = {}) => ({ id: "p", agentId: "sw/a", projectId: "project", sessionId: "s", providerId: "mock", model: "allowed", punchType: "main", startedAtMs: Date.now() - 500000, endedAtMs: Date.now() - 200000, name: "Remember a project decision", description: JSON.stringify({ root: { children: [{ type: "text", text: "Use a synthetic fixture for every upgrade." }] } }), ...overrides });
 const ok = (value = {}) => ({ ok: true, value, requestId: "r" });
@@ -36,7 +37,7 @@ test("disabled organization preserves a durable job; enabling captures provenanc
   assert.equal(h.calls[0].actor.sessionId, "s");
   assert.equal(h.calls[0].input.scope, "project");
   assert.deepEqual(h.calls[0].input.messages.map((message) => message.role), ["user", "assistant"]);
-  assert.equal(h.calls[0].input.messages[1].content, "Use a synthetic fixture for every upgrade.");
+  assert.ok(h.calls[0].input.messages[1].content.endsWith("Use a synthetic fixture for every upgrade."));
   assert.match(h.calls[0].input.messages[0].id, /^punch:/);
   await second.enqueue(punch(), "raw"); await second.idle(); await second.stop();
   const third = h.create(); third.start(); await third.idle();
@@ -64,11 +65,45 @@ test("processing captures stay pending and a forgotten source is terminally skip
   skipped.start(); await skipped.idle();
   assert.equal((await h.store.readPage(null, 100)).records[0].value.state, "skipped");
 });
+test("a persisted legacy queue input is retried byte-for-byte without adding new summary labels", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "memory-organize-legacy-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const store = createLocalPunchReceiptStore(dir);
+  const id = punchOperationId("legacy-punch");
+  const legacyInput = {
+    scope: "project",
+    operationId: `organize:${id}`,
+    messages: [
+      { id: `${id}:request`, role: "user", content: "Old request payload." },
+      { id: `${id}:outcome`, role: "assistant", content: "Old outcome payload." },
+    ],
+  };
+  const job = { version: 1, punchId: "legacy-punch", memoryId: "raw-memory", actor: { agentId: "sw/a", projectId: "project", sessionId: "s", providerId: "mock" }, input: legacyInput, state: "pending", attempts: 0, nextAttemptAt: 0, lastError: null };
+  await store.writeBatch([{ key: job.punchId, value: job, expectedRevision: null, sourceKind: "work-record", sourceId: job.punchId }]);
+  let now = 100;
+  const calls = [];
+  const first = createPunchOrganizationWorker({ store, enabled: () => true, now: () => now, capture: async (call) => { calls.push(call); return { ok: false, error: { code: "MODEL_NOT_CONFIGURED", retryable: false } }; } });
+  first.start(); await first.idle();
+  assert.equal(JSON.stringify(calls[0].input), JSON.stringify(legacyInput));
+  const pending = (await store.readPage(null, 100)).records[0].value;
+  assert.equal(pending.state, "pending");
+  assert.equal(JSON.stringify(pending.input), JSON.stringify(legacyInput));
+  await first.stop();
+  now = 100_000;
+  const second = createPunchOrganizationWorker({ store, enabled: () => true, now: () => now, capture: async (call) => { calls.push(call); return ok(); } });
+  second.start(); await second.idle();
+  assert.equal(JSON.stringify(calls[1].input), JSON.stringify(legacyInput));
+  assert.deepEqual((await store.readPage(null, 100)).records[0].value.input.messages, []);
+  await second.stop();
+});
 test("source conversion bounds CJK bytes and preserves valid surrogate pairs", () => {
   const messages = buildPunchSourceMessages(punch({ name: "😀".repeat(1000), description: "測".repeat(6000) }));
   assert.ok(Buffer.byteLength(messages[0].content, "utf8") <= 900);
   assert.ok(Buffer.byteLength(messages[1].content, "utf8") <= 2400);
   assert.ok(messages.every((message) => message.content.isWellFormed()));
+  assert.match(messages[0].content, /name（工作名稱／請求欄位）.*role=user.*合成角色，不代表原始發話者/u);
+  assert.match(messages[1].content, /description（Lexical 純文字成果欄位；作者未知）.*role=assistant.*合成角色，不代表原始發話者/u);
+  assert.deepEqual(messages.map((message) => message.id), [`${punchOperationId("p")}:request`, `${punchOperationId("p")}:outcome`]);
 });
 
 function hostRig(initialValues = { organizationEnabled: false }) {
@@ -121,6 +156,9 @@ test("production service admits raw context with retired host state, then captur
   backend.startWorkers(); await backend.idleWorkers();
   const queue = createLocalPunchReceiptStore(dirname(dataRoot), "punch-organization.json");
   const unacknowledged = (await queue.readPage(null, 100)).records[0].value;
+  assert.deepEqual(unacknowledged.input.messages.map((message) => message.id), [`${punchOperationId("p")}:request`, `${punchOperationId("p")}:outcome`]);
+  assert.match(unacknowledged.input.messages[0].content, /name（工作名稱／請求欄位）.*role=user.*合成角色，不代表原始發話者/u);
+  assert.match(unacknowledged.input.messages[1].content, /description（Lexical 純文字成果欄位；作者未知）.*role=assistant.*合成角色，不代表原始發話者/u);
   const raw = await callInspect(backend, { scope: "project", limit: 12 }, { agentId: "sw/a", projectId: "project" });
   assert.equal(raw.result.value.memories.length, 1);
   assert.equal(h.aiCalls, 0);
@@ -132,7 +170,12 @@ test("production service admits raw context with retired host state, then captur
   assert.ok(inferred);
   const detail = await callInspect(backend, { scope: "project", memoryId: inferred.id }, { agentId: "sw/a", projectId: "project" });
   assert.deepEqual(detail.result.value.receipts.map((row) => row.role).sort(), ["assistant", "user"]);
-  assert.ok(detail.result.value.receipts.every((row) => row.sessionId === "s" && row.eventId.startsWith("punch:")));
+  assert.ok(detail.result.value.receipts.every((row) => row.sessionId === "s" && /^punch:[0-9a-f]{32}:(?:request|outcome)$/u.test(row.eventId)));
+  const inferredUi = await backend.call("ui.get", { agentId: "sw/a", scope: "project", projectId: "project", memoryId: inferred.id });
+  assert.equal(Object.hasOwn(inferredUi, "source"), false);
+  const rawMemory = raw.result.value.memories[0];
+  const rawUi = await backend.call("ui.get", { agentId: "sw/a", scope: "project", projectId: "project", memoryId: rawMemory.id });
+  assert.equal(Object.hasOwn(rawUi, "source"), false);
   const status = await backend.call("ui.status", {});
   assert.equal(status.organization.completed, 1);
   h.event(); await backend.idleWorkers(); assert.equal(h.aiCalls, 2);
@@ -144,6 +187,42 @@ test("production service admits raw context with retired host state, then captur
   assert.equal((await reopened.call("ui.status", {})).organization.pending, 0);
   assert.equal((await callInspect(reopened, { scope: "project", limit: 12 }, { agentId: "sw/a", projectId: "project" })).result.value.memories.length, 2);
   await reopened.dispose();
+});
+test("memory.remember operation IDs that collide with Punch receipt IDs do not label ui.get", async (t) => {
+  const { backend } = startBackend(t);
+  const binding = { agentId: "sw/a", projectId: "project" };
+  const operationIds = [
+    "punch:0123456789abcdef0123456789abcdef",
+    "punch:fedcba9876543210fedcba9876543210:request",
+  ];
+  for (const [index, operationId] of operationIds.entries()) {
+    const remembered = await callRemember(backend, [op(`A manual note with a colliding receipt ID ${index}.`, operationId, "project")], binding);
+    const memoryId = remembered.results[0].value.memory.id;
+    const detail = await backend.call("ui.get", { ...binding, scope: "project", memoryId });
+    assert.equal(detail.ok, true);
+    assert.equal(Object.hasOwn(detail, "source"), false, `manual operationId ${operationId} must not imply a Punch source`);
+  }
+});
+test("ui.get leaves manual and mixed receipt-ID memories without individual source claims", async (t) => {
+  const { backend, dataRoot } = startBackend(t);
+  const binding = { agentId: "sw/a", projectId: "project" };
+  const content = "A synthetic memory with mixed receipt IDs.";
+  const mixedWrites = await callRemember(backend, Array.from({ length: 12 }, (_, index) => op(content, `manual-mixed-${index}`, "project")), binding);
+  const memoryId = mixedWrites.results[0].value.memory.id;
+  const punchEvent = punchOperationId("mixed-punch");
+  const collisionWrite = await callRemember(backend, [op(content, punchEvent, "project")], binding);
+  assert.equal(collisionWrite.results[0].value.memory.id, memoryId);
+  rawWrite(databasePathOf(dataRoot, "sw/a"), (db) => {
+    db.prepare("UPDATE receipts SET created_at = '2026-09-01T00:00:00.000Z' WHERE memory_id = ? AND event_id <> ?").run(memoryId, punchEvent);
+    db.prepare("UPDATE receipts SET created_at = '2026-09-01T00:00:01.000Z' WHERE memory_id = ? AND event_id = ?").run(memoryId, punchEvent);
+  });
+  const mixed = await backend.call("ui.get", { ...binding, scope: "project", memoryId });
+  assert.equal(Object.hasOwn(mixed, "source"), false);
+  assert.equal(mixed.receipts.length, 12);
+  assert.ok(mixed.receipts.every((receipt) => receipt.eventId !== punchEvent), "the Punch-shaped manual receipt is outside the displayed page");
+  const manual = await callRemember(backend, [op("A manual-only synthetic note.", "manual-only-event", "project")], binding);
+  const manualDetail = await backend.call("ui.get", { ...binding, scope: "project", memoryId: manual.results[0].value.memory.id });
+  assert.equal(Object.hasOwn(manualDetail, "source"), false);
 });
 test("production organization skips a forgotten raw source before any model request", async (t) => {
   const h = hostRig(); const { backend, dataRoot } = startBackend(t, { host: h.host, settings: h.settings });

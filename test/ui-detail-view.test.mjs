@@ -39,6 +39,17 @@ test("a ready drawer tells who wrote what, when it was written, when the work ra
   assertSafe(markup, "ready");
 });
 
+test("the detail drawer explains automatic organization without attributing the current memory", () => {
+  const markup = body(ready(getResponse()));
+  assert.ok(markup.includes("外掛自動整理功能"));
+  assert.ok(markup.includes("啟用時，整理流程會使用已結案工作紀錄的工作名稱與成果摘要作為輸入"));
+  assert.ok(markup.includes("這是功能的一般說明，不判定目前記憶的來源"));
+  assert.ok(markup.includes("其他明確寫入方式也可能建立記憶"));
+  assertSafe(markup, "automatic organization explanation");
+  const manual = body(ready(getResponse({ content: "一筆手動寫入的筆記", work: null })));
+  assert.ok(manual.includes("這是功能的一般說明，不判定目前記憶的來源"));
+});
+
 test("the receipts list each tool, conversation, role and time; none says so, and a full page says it is capped", () => {
   const two = getResponse({
     receipts: [
@@ -71,7 +82,7 @@ test("plain text that is not a work record is shown whole under 內容, with no 
   const plain = getResponse({ content: "一筆手動寫入的筆記", work: null });
   const markup = body(ready(plain));
   assert.ok(markup.includes('<h3 class="dr-h">內容</h3><div class="dr-txt">一筆手動寫入的筆記</div>'));
-  assert.ok(!markup.includes("成果") && !markup.includes("請求") && !markup.includes("工作 "));
+  assert.ok(!markup.includes('<h3 class="dr-h">成果</h3>') && !markup.includes('<h3 class="dr-h">請求</h3>') && !markup.includes("<span>工作 "));
 });
 
 test("the original text of the memory is one click away inside a details element", () => {

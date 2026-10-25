@@ -84,6 +84,12 @@ test("a well formed sample of each success shape is accepted and any extra field
   }
 });
 
+test("ui.get keeps its existing shape and refuses an uncontracted source field", () => {
+  const old = SUCCESS["ui.get"];
+  assert.equal(parseUiResponse("ui.get", old), true);
+  assert.equal(parseUiResponse("ui.get", { ...old, source: "contains-work-record-summary" }), false);
+});
+
 test("failures use a closed code list and carry retryable", () => {
   for (const code of UI_FAILURE_CODES) assert.equal(uiFailureSchema.safeParse({ ok: false, code, retryable: false }).success, true, code);
   assert.equal(uiFailureSchema.safeParse({ ok: false, code: "INTERNAL", retryable: false }).success, false);

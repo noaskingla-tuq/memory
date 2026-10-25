@@ -4,6 +4,10 @@ import type { SettledPunch } from "./punchDataPorts.js";
 const MAX_CONTENT_UNITS = 3_600;
 const MAX_NAME_UNITS = 300;
 const ELLIPSIS = " …… ";
+const SOURCE_PREFIXES = [
+  "〔已結算工作紀錄摘要〕name（工作名稱／請求欄位）；role=user 是外掛配置的合成角色，不代表原始發話者：",
+  "〔已結算工作紀錄摘要〕description（Lexical 純文字成果欄位；作者未知）；role=assistant 是外掛配置的合成角色，不代表原始發話者：",
+] as const;
 const BLOCK_TYPES = new Set(["root", "paragraph", "heading", "quote", "list", "listitem", "code", "table", "tablerow", "tablecell"]);
 
 export interface PunchMemoryContent {
@@ -76,10 +80,11 @@ export function buildPunchSourceMessages(punch: SettledPunch) {
   const id = punchOperationId(punch.id);
   return texts.flatMap((text, index) => {
     if (text === "") return [];
+    const prefix = SOURCE_PREFIXES[index]!;
     let content = head(text, index === 0 ? 300 : 1200);
     // why: Cairn bounds each model input to 6000 units; UTF-8 bytes conservatively bound source text alongside its extraction prompt
-    while (Buffer.byteLength(content, "utf8") > (index === 0 ? 900 : 2400)) content = head(content, content.length - 1);
-    return [{ id: `${id}:${index === 0 ? "request" : "outcome"}`, role: index === 0 ? "user" as const : "assistant" as const, content }];
+    while (Buffer.byteLength(prefix + content, "utf8") > (index === 0 ? 900 : 2400)) content = head(content, content.length - 1);
+    return [{ id: `${id}:${index === 0 ? "request" : "outcome"}`, role: index === 0 ? "user" as const : "assistant" as const, content: prefix + content }];
   });
 }
 

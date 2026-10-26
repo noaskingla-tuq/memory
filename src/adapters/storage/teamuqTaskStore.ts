@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { parseTeamuqTaskStored, type TeamuqTaskStore } from "../../application/teamuqTaskBinding.js";
+import { parseTeamuqTaskStored, TEAMUQ_TASK_FILE_VERSION, type TeamuqTaskStore } from "../../application/teamuqTaskBinding.js";
 
 export const TEAMUQ_TASK_FILE = "teamuq-task.json";
 
@@ -27,7 +27,7 @@ export function createTeamuqTaskStore(dataDir: string): TeamuqTaskStore {
     },
     save(record) {
       safe();
-      writeFileSync(temporary, JSON.stringify({ version: 1, projectId: record.projectId, taskId: record.taskId }));
+      writeFileSync(temporary, JSON.stringify({ version: TEAMUQ_TASK_FILE_VERSION, projectId: record.projectId, tasks: Object.fromEntries(record.tasks) }));
       renameSync(temporary, file);
     },
   };

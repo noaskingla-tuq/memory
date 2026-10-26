@@ -87,12 +87,12 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   let settingValues: Readonly<Record<string, boolean | number | string>> = {};
   try { settingValues = options.settings?.all() ?? {}; } catch {}
   const organizationSettings = () => readOrganizationSettings(settingValues);
-  // why: a host without the Program API (older Core) gets no binding, so its AI turns never carry a taskId and never call Program
-  const teamuqTask = options.host?.program === undefined ? undefined : createTeamuqTaskBinding({ program: options.host.program, store: createTeamuqTaskStore(dirname(options.dataRoot)) });
-  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask);
   const profilePath = options.profilePath ?? join(dirname(options.dataRoot), PROFILE_DIRECTORY, PROFILE_FILE);
   // why: the name table is independent of Cairn storage, so it loads and accepts pushes even while the Cairn layout is unavailable
   const profile = new ProfileTable(loadProfileFile(profilePath));
+  // why: a host without the Program API (older Core) gets no binding, so its AI turns never carry a taskId and never call Program
+  const teamuqTask = options.host?.program === undefined ? undefined : createTeamuqTaskBinding({ program: options.host.program, store: createTeamuqTaskStore(dirname(options.dataRoot)), profile });
+  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask);
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
   const organization = options.host === undefined ? undefined : createPunchOrganizationWorker({

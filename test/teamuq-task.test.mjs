@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ import { createTeamuqTaskStore, TEAMUQ_TASK_FILE } from "../out/adapters/storage
 import { createTeamuqTaskBinding, TEAMUQ_PROJECT_NAME, teamuqTaskNameFor } from "../out/application/teamuqTaskBinding.js";
 import { NO_PROFILE } from "../out/application/ui/profilePort.js";
 import { readOrganizationSettings } from "../out/backend/organizationSettings.js";
+import { createTestHost } from "../vendor/teamuq-devkit-testing/tuq-plugin-test-host.mjs";
 
 const enabled = () => readOrganizationSettings();
 const invoke = (port, agentId = "a") => port.invoke({ agentId, policy: port.resolvePolicy(agentId), operation: "extract", system: "JSON please", input: {}, maxOutputTokens: 1024, signal: new AbortController().signal });
@@ -242,4 +244,107 @@ test("an unreadable state file is treated as absent and rewritten on the next cr
   assert.equal(prog.calls.length, 2);
   assert.deepEqual(opens.map((open) => open.taskId), ["102"]);
   assert.deepEqual(JSON.parse(readFileSync(join(dir, TEAMUQ_TASK_FILE), "utf8")), { version: 2, projectId: "101", tasks: { "x/a": "102" } });
+});
+
+const KIT_DIR = new URL("../vendor/teamuq-devkit-testing/", import.meta.url);
+const KIT_SHA256 = {
+  "tuq-plugin-test-host.mjs": "01ba78a1a51b98a9248d8d67e1784f7a8a24ebb4b3b1595896ed6a22f1aed850",
+  "tuq-plugin-test-host.d.mts": "2dcb56574c0ea7b9a9cc61f9aef81de7c055529e1c814b125e6946943fd5e36c",
+  "tuq-plugin-test-host.version.json": "dc7e756f33eacac25ecaee28a6b900b8239fee64a9225753ffd3646c0070a36f",
+};
+const sha256Of = (file) => createHash("sha256").update(readFileSync(new URL(file, KIT_DIR))).digest("hex");
+
+test("the vendored devkit test host matches its pinned sha256 and the kit's version.json", () => {
+  for (const [file, sha256] of Object.entries(KIT_SHA256)) assert.equal(sha256Of(file), sha256, file);
+  assert.deepEqual(JSON.parse(readFileSync(new URL("tuq-plugin-test-host.version.json", KIT_DIR), "utf8")), { coreVersion: "1.8.0", file: "tuq-plugin-test-host.mjs", sha256: KIT_SHA256["tuq-plugin-test-host.mjs"] });
+});
+
+// why: the production manifest declares no read permission; the devkit copy adds the two reads only so the scenarios can read Tasks back, and every write permission is the template's own
+const READ_BACK_PERMISSIONS = ["program:data:projects:read", "program:data:tasks:read"];
+const memoryVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+const devkitManifest = () => {
+  const template = JSON.parse(readFileSync(new URL("../plugin/manifest.template.json", import.meta.url), "utf8").replace("@VERSION@", memoryVersion));
+  return { ...template, permissions: [...template.permissions, ...READ_BACK_PERMISSIONS] };
+};
+const JSON_REPLY = { events: [{ textDelta: '{"items":[]}' }, "completed"] };
+const devkitHost = (t) => {
+  const host = createTestHost({ manifest: devkitManifest() });
+  t.after(() => host.close());
+  return host;
+};
+const devkitPort = (host, profile) => createHostMemoryModelPort(host.backend.host.ai, enabled, undefined, createTeamuqTaskBinding({ program: host.backend.host.program, store: null, profile, now: () => host.clock.now() }));
+const scripted = (host, port, agentId) => {
+  host.ai.next(JSON_REPLY);
+  return invoke(port, agentId);
+};
+const devkitProfile = () => profileWith({ "sw/developer": { name: "開發工程師", teamKey: "sw" }, "sw/tester": { name: "測試工程師", teamKey: "sw" }, "sw/qa": { name: "品保工程師", teamKey: "sw" } });
+const replyOf = (record) => record.reply.value;
+const createdTasks = (host) => host.calls("program.call:data.tasks.create");
+const openedTaskIds = (host) => host.calls("backend:ai.openSession").map((record) => record.args.taskId);
+const okResult = (reply) => {
+  assert.equal(reply.ok, true, JSON.stringify(reply));
+  return reply.result;
+};
+
+test("devkit host: each agent gets its own Task under one Project, and the Tasks read back through program.call", async (t) => {
+  const host = devkitHost(t);
+  const port = devkitPort(host, devkitProfile());
+  await scripted(host, port, "sw/developer");
+  await scripted(host, port, "sw/tester");
+  await scripted(host, port, "sw/developer");
+  await port.cancel();
+  const projects = host.calls("program.call:data.projects.create");
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].args.input.name, TEAMUQ_PROJECT_NAME);
+  const projectId = replyOf(projects[0]).result.id;
+  const tasks = createdTasks(host);
+  assert.deepEqual(tasks.map((record) => record.args.input.name), [teamuqTaskNameFor("開發工程師"), teamuqTaskNameFor("測試工程師")]);
+  assert.deepEqual(tasks.map((record) => record.args.input.projectId), [projectId, projectId]);
+  const [developerTask, testerTask] = tasks.map((record) => replyOf(record).result.id);
+  assert.deepEqual(openedTaskIds(host), [developerTask, testerTask, developerTask]);
+  for (const [taskId, name] of [[developerTask, teamuqTaskNameFor("開發工程師")], [testerTask, teamuqTaskNameFor("測試工程師")]]) {
+    const read = okResult(await host.backend.host.program.call("data.tasks.get", { taskId }));
+    assert.equal(read.name, name);
+    assert.equal(read.projectId, projectId);
+  }
+});
+
+test("devkit host: a deleted Task fails its open with task_not_found, and only that agent's Task is rebuilt", async (t) => {
+  const host = devkitHost(t);
+  const program = host.backend.host.program;
+  const port = devkitPort(host, devkitProfile());
+  await scripted(host, port, "sw/developer");
+  await scripted(host, port, "sw/tester");
+  const [developerTask, testerTask] = createdTasks(host).map((record) => replyOf(record).result.id);
+  const { authoredRevision } = okResult(await program.call("data.tasks.get", { taskId: testerTask }));
+  okResult(await program.call("data.tasks.delete", { taskId: testerTask, expectedAuthoredRevision: authoredRevision }));
+  const error = await host.backend.host.ai.openSession({ system: "x", taskId: testerTask }).then(() => null, (caught) => caught);
+  assert.equal(error.code, "task_not_found");
+  assert.equal(error.message, "host request failed: task_not_found");
+
+  await scripted(host, port, "sw/tester");
+  await scripted(host, port, "sw/developer");
+  await port.cancel();
+  assert.equal(host.calls("program.call:data.projects.create").length, 1);
+  const tasks = createdTasks(host);
+  assert.deepEqual(tasks.map((record) => record.args.input.name), [teamuqTaskNameFor("開發工程師"), teamuqTaskNameFor("測試工程師"), teamuqTaskNameFor("測試工程師")]);
+  const rebuiltTester = replyOf(tasks[2]).result.id;
+  assert.notEqual(rebuiltTester, testerTask);
+  assert.deepEqual(openedTaskIds(host), [developerTask, testerTask, testerTask, testerTask, rebuiltTester, developerTask]);
+});
+
+test("devkit host: with tasks:write revoked, an agent without a Task opens with no taskId and the denial comes back as an envelope", async (t) => {
+  const host = devkitHost(t);
+  const port = devkitPort(host, devkitProfile());
+  await scripted(host, port, "sw/developer");
+  const [developerTask] = createdTasks(host).map((record) => replyOf(record).result.id);
+  await host.revoke("program:data:tasks:write");
+  assert.deepEqual(await scripted(host, port, "sw/qa"), { items: [] });
+  await port.cancel();
+  const denial = replyOf(createdTasks(host).at(-1));
+  assert.equal(denial.ok, false);
+  assert.equal(denial.error.code, "forbidden");
+  const opens = host.calls("backend:ai.openSession");
+  assert.equal(Object.hasOwn(opens.at(-1).args, "taskId"), false);
+  assert.deepEqual(openedTaskIds(host), [developerTask, undefined]);
 });

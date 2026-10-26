@@ -3,6 +3,7 @@
 @import "./space.css";
 @import "./timeline.css";
 @import "./detail.css";
+@import "./settings.css";
 
 *,
 *::before,

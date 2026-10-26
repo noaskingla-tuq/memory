@@ -129,8 +129,9 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   const views = manifest.contributes?.views ?? []
   check('manifest declares exactly the Cairn記憶管理 view (tab and fullpage, default tab) on ui/index.html', views.length === 1 && views[0].id === 'memory' && views[0].title === 'Cairn記憶管理' && views[0].icon === 'cairn-icon.png' && views[0].entry === UI_ENTRY && views[0].defaultPresentation === 'tab' && JSON.stringify([...(views[0].presentations ?? [])].sort()) === JSON.stringify(['fullpage', 'tab']), JSON.stringify(views))
   const uiHtml = text(UI_ENTRY)
-  const headerHasBundledLogo = /<header\b[^>]*>[\s\S]*?<img class="hdr-logo" src="\.\.\/cairn-icon\.png" width="24" height="24" alt="">\s*<h1 id="title"><\/h1>[\s\S]*?<\/header>/u.test(uiHtml)
-  check('UI title and decorative header logo use Cairn記憶管理 and the bundled PNG', uiHtml.includes('<title>Cairn記憶管理</title>') && headerHasBundledLogo && entries.has('cairn-icon.png') && text('ui/app.js').includes('Cairn記憶管理'))
+  const compactUiHtml = uiHtml.replace(/\s+/gu, ' ')
+  const headerHasLinkedBrandAndNavigation = compactUiHtml.includes('<a id="brand-home" class="hdr-brand" href="#/" aria-label="Cairn記憶管理，回到總覽"> <img class="hdr-logo" src="../cairn-icon.png" width="24" height="24" alt=""> <h1 id="title">Cairn記憶管理</h1> </a>') && compactUiHtml.includes('<nav id="primary-nav" class="hdr-nav" aria-label="主要導覽"> <a id="nav-overview" href="#/">總覽</a> <a id="nav-settings" href="#/settings">設定</a> </nav>')
+  check('UI title, linked brand, fixed overview/settings navigation and decorative logo are localized and use the bundled PNG', uiHtml.includes('<title>Cairn記憶管理</title>') && headerHasLinkedBrandAndNavigation && entries.has('cairn-icon.png') && text('ui/app.js').includes('Cairn記憶管理'))
   check('manifest permissions are exactly the seven UI methods, host data grants and legacy migration grant, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
   const legacySources = RELEASE_METADATA.legacyDataSources ?? []
   const migrations = manifest.data?.legacyMigrations ?? []

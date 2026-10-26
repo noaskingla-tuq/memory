@@ -104,7 +104,7 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.equal(manifest.minCoreVersion, ">=1.7.12");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
-    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
+    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat", "program:data:projects:write", "program:data:tasks:write"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
   );
   assert.deepEqual(manifest.contributes.views, [
     { id: "memory", title: "Cairn記憶管理", icon: "cairn-icon.png", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },

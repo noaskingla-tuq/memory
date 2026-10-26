@@ -20,7 +20,7 @@ const PLUGIN_ID = 'teamuq.memory'
 const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metadata.json'), 'utf8'))
 const UI_ENTRY = 'ui/index.html'
 const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css', 'cairn-icon.png']
-const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'ai:chat', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'project-directory:read', 'settings:plugin', 'ui:view', 'work-records:read']
+const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'ai:chat', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'program:data:projects:write', 'program:data:tasks:write', 'project-directory:read', 'settings:plugin', 'ui:view', 'work-records:read']
 const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
 const EXPECTED_MAX_SESSIONS = 4
 // why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin

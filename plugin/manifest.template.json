@@ -18,7 +18,7 @@
     ]
   },
   "resources": { "memoryMB": 512, "cpuThreads": 1, "maxSessions": 4, "idleUnloadSec": 180, "bootTimeoutSec": 30 },
-  "permissions": ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat"],
+  "permissions": ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat", "program:data:projects:write", "program:data:tasks:write"],
   "settingsSchema": {
     "title": "工作紀錄 AI 整理",
     "summary": "原始工作紀錄儲存在本機；預設把請求與成果送到所選 AI 提供者，整理成可追溯的記憶。",

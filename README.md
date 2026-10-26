@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.2，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.15，釘選 Cairn v1-preview.3（套件版本 0.3.2，預設 schema 18）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.4，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.15，釘選 Cairn v1-preview.3（套件版本 0.3.2，預設 schema 18）。
 
 > 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
 
@@ -232,7 +232,7 @@ build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock�
 | `manifest.json`、`integrity.json`、`signature.json` | manifest 見下；後兩者由 devkit 產生 |
 
 - `cairn-pin.json` 的 `stage` 記錄每個 Cairn 檔的路徑與 sha256（共 147 筆）。`verify-source-untouched` 比對「node_modules 的檔案集合與雜湊」等於「pin 記錄」；升 Cairn 後跑 `node tools/stage-cairn.mjs --record` 重寫，再讀 diff。
-- manifest（composed）：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.ui: ui/index.html`＋`entry.backend: backend.mjs`、`contributes.views` 一個 view（id `memory`、標題「記憶」、presentations `tab`＋`fullpage`、預設 `tab`）、`permissions` 包含 UI、工作紀錄與目錄讀取、舊狀態只讀遷移、settings:plugin、ai:chat；新收據不需要 plugin-state:write、`backendMethods` 為七個 `ui.*`（不得含 `memory.*`）、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.7.12`（現有 snapshot、AI 與設定 API 自該 Core 版本起可用；vendored SDK/CLI 已同步公開 Devkit 1.7.15）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 4`（UI 與 Core sink 共用的在途呼叫上限）、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
+- manifest（composed）：id `teamuq.memory`、publisher `teamuq`、`trustTier: full-trust`、`entry.ui: ui/index.html`＋`entry.backend: backend.mjs`、`contributes.views` 一個 view（id `memory`、標題「記憶」、presentations `tab`＋`fullpage`、預設 `tab`）、`permissions` 包含 UI、工作紀錄與目錄讀取、舊狀態只讀遷移、settings:plugin、ai:chat、program:data:projects:write 與 program:data:tasks:write（用來建立外掛自己的 Project「Cairn記憶管理」與 Task「AI 整理記憶」，每一輪 AI 對話都帶這個 `taskId`；無此權限或舊 Core 時對話照常、不帶 `taskId`）；新收據不需要 plugin-state:write、`backendMethods` 為七個 `ui.*`（不得含 `memory.*`）、`data.uninstall: keep`、`pluginApi ^2.0.0`、`minCoreVersion >=1.7.12`（現有 snapshot、AI 與設定 API 自該 Core 版本起可用；vendored SDK/CLI 已同步公開 Devkit 1.7.15）、`platforms` 不限（純 JS 加 `node:sqlite`，無原生檔）。資源：`memoryMB 512`、`cpuThreads 1`、`maxSessions 4`（UI 與 Core sink 共用的在途呼叫上限）、`idleUnloadSec 180`、`bootTimeoutSec 30`（S0 建議 256～512、10～30；S0 實測 RSS 約 110～120 MB，冷啟動約 150～300 ms）。
 - devkit：共用 `_devkit` 放在外掛 repos 旁，每個外掛釘選自己的 CLI/lib 與生成 SDK。同步公開 kit：`node tools/sync-vendor.mjs --kit <公開 devkit 路徑> --only devkit`；來源檔案先比對 kit.version.json 的大小與 SHA-256，lock 記錄 kit 版本、metadata hash 與 vendored CLI/lib 的雜湊。`contract:verify` 同時檢查 SDK 版本與 hash；打包前也驗證 devkit lock。
 - 作者 CLI 使用公開 kit 內嵌的 trust anchors；公開 kit 更新後重新同步。此 repo 不讀取主程式的 anchors。
 

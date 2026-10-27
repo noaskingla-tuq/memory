@@ -8,6 +8,8 @@ const labels: Readonly<Record<SettingKey, StringKey>> = {
   organizationProvider: "settings.provider.label",
   organizationModel: "settings.model.label",
   organizationContextBudget: "settings.budget.label",
+  organizationFrequency: "settings.frequency.label",
+  organizationDailyTime: "settings.dailyTime.label",
 };
 
 function checkboxInput(disabled: boolean, checked: boolean): SafeHtml {
@@ -29,6 +31,23 @@ function textInput(id: string, key: SettingKey, value: string, placeholder: stri
 function rangeInput(value: number, describedBy: string, disabled: boolean, invalid: boolean): SafeHtml {
   if (disabled) return html`<input id="settings-budget" data-setting-key="organizationContextBudget" type="range" min="8192" max="262144" step="8192" value="${value}" aria-describedby="${describedBy}" aria-invalid="${invalid}" disabled>`;
   return html`<input id="settings-budget" data-setting-key="organizationContextBudget" type="range" min="8192" max="262144" step="8192" value="${value}" aria-describedby="${describedBy}" aria-invalid="${invalid}">`;
+}
+
+function frequencySelect(value: string, describedBy: string, disabled: boolean): SafeHtml {
+  const daily = value === "daily"
+    ? html`<option value="daily" selected>${t("settings.frequency.daily")}</option>`
+    : html`<option value="daily">${t("settings.frequency.daily")}</option>`;
+  const immediate = value === "immediate"
+    ? html`<option value="immediate" selected>${t("settings.frequency.immediate")}</option>`
+    : html`<option value="immediate">${t("settings.frequency.immediate")}</option>`;
+  return disabled
+    ? html`<select id="settings-frequency" data-setting-key="organizationFrequency" aria-describedby="${describedBy}" disabled>${daily}${immediate}</select>`
+    : html`<select id="settings-frequency" data-setting-key="organizationFrequency" aria-describedby="${describedBy}">${daily}${immediate}</select>`;
+}
+
+function dailyTimeInput(value: string, describedBy: string, disabled: boolean, invalid: boolean): SafeHtml {
+  if (disabled) return html`<input id="settings-daily-time" data-setting-key="organizationDailyTime" type="time" step="60" value="${value}" aria-describedby="${describedBy}" aria-invalid="${invalid}" disabled>`;
+  return html`<input id="settings-daily-time" data-setting-key="organizationDailyTime" type="time" step="60" value="${value}" aria-describedby="${describedBy}" aria-invalid="${invalid}">`;
 }
 
 function actionButton(label: string, action: string, type: "button" | "submit", disabled: boolean, primary = false): SafeHtml {
@@ -62,6 +81,33 @@ function organizationField(snapshot: SettingsSnapshot, disabled: boolean): SafeH
   return html`<div class="setting-row setting-row-switch">
     <div class="setting-copy"><label for="settings-enabled">${t("settings.enabled.label")}</label><p id="settings-enabled-help">${t("settings.enabled.help")}</p><p id="settings-enabled-effect">${t("settings.enabled.effect")}</p>${conflictCopy(snapshot, key)}</div>
     <div class="setting-control"><label class="settings-switch" for="settings-enabled">${checkboxInput(disabled, checked)}<span class="settings-switch-track" aria-hidden="true"></span><span class="settings-switch-state">${checked ? t("settings.enabled.on") : t("settings.enabled.off")}</span></label><p id="settings-enabled-status" class="setting-key-status" aria-live="polite">${status}</p></div>
+  </div>`;
+}
+
+function frequencyField(snapshot: SettingsSnapshot, disabled: boolean): SafeHtml {
+  const key: SettingKey = "organizationFrequency";
+  const value = snapshot.draft?.[key] as string ?? "daily";
+  const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
+  return html`<div class="setting-row">
+    <div class="setting-copy"><label for="settings-frequency">${t(labels[key])}</label><p id="settings-frequency-help">${t("settings.frequency.help")}</p><p id="settings-frequency-effect">${t("settings.frequency.effect")}</p>${conflictCopy(snapshot, key)}</div>
+    <div class="setting-control">${frequencySelect(value, "settings-frequency-help settings-frequency-effect settings-frequency-status", disabled)}<p id="settings-frequency-status" class="setting-key-status" aria-live="polite">${status}</p></div>
+  </div>`;
+}
+
+function dailyTimeField(snapshot: SettingsSnapshot, disabled: boolean): SafeHtml {
+  const key: SettingKey = "organizationDailyTime";
+  const value = snapshot.draft?.[key] as string ?? "02:00";
+  const isDisabled = disabled || snapshot.draft?.organizationFrequency !== "daily";
+  const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
+  const issue = snapshot.dailyTimeIssue === "invalid"
+    ? html`<p id="settings-daily-time-issue" class="setting-note setting-invalid" role="alert">${t("settings.dailyTime.invalid")}</p>`
+    : html``;
+  const issueId = snapshot.dailyTimeIssue === null ? "" : "settings-daily-time-issue";
+  const describedBy = ["settings-daily-time-help", "settings-daily-time-effect", "settings-daily-time-status", issueId].filter((part) => part !== "").join(" ");
+  const disabledHelp = isDisabled ? html`<p class="setting-note">${t("settings.dailyTime.disabled")}</p>` : html``;
+  return html`<div class="setting-row">
+    <div class="setting-copy"><label for="settings-daily-time">${t(labels[key])}</label><p id="settings-daily-time-help">${t("settings.dailyTime.help")}</p><p id="settings-daily-time-effect">${t("settings.dailyTime.effect")}</p>${disabledHelp}${issue}${conflictCopy(snapshot, key)}</div>
+    <div class="setting-control">${dailyTimeInput(value, describedBy, isDisabled, snapshot.dailyTimeIssue === "invalid")}<p id="settings-daily-time-status" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }
 
@@ -122,7 +168,7 @@ function errorState(snapshot: SettingsSnapshot): SafeHtml {
 function actions(snapshot: SettingsSnapshot, busy: boolean): SafeHtml {
   const dirty = snapshot.dirtyKeys.length > 0;
   const canCancel = dirty && !busy && !snapshot.hasUnknown;
-  const canSave = dirty && !busy && !snapshot.hasUnknown && !Object.values(snapshot.outcomes).includes("conflict");
+  const canSave = dirty && !busy && !snapshot.hasUnknown && snapshot.dailyTimeIssue === null && !Object.values(snapshot.outcomes).includes("conflict");
   const saveLabel: StringKey = snapshot.saving ? "settings.state.saving" : snapshot.lastSave === "partial" || snapshot.lastSave === "failed" ? "settings.action.retrySave" : "settings.action.save";
   return html`<div class="settings-actions">${actionButton(t(saveLabel), "save", "submit", !canSave, true)}${actionButton(t("settings.action.cancel"), "cancel", "button", !canCancel)}</div>`;
 }
@@ -132,7 +178,7 @@ export function settingsPage(snapshot: SettingsSnapshot): SafeHtml {
   const busy = snapshot.phase === "loading" || snapshot.saving || snapshot.reconciling;
   const fieldsDisabled = busy || snapshot.hasUnknown;
   const body = isReady
-    ? html`<fieldset class="settings-card"><legend>${t("settings.group.organization")}</legend>${organizationField(snapshot, fieldsDisabled)}</fieldset>
+    ? html`<fieldset class="settings-card"><legend>${t("settings.group.organization")}</legend>${organizationField(snapshot, fieldsDisabled)}${frequencyField(snapshot, fieldsDisabled)}${dailyTimeField(snapshot, fieldsDisabled)}</fieldset>
       <fieldset class="settings-card"><legend>${t("settings.group.provider")}</legend>${textField(snapshot, "organizationProvider", fieldsDisabled)}${textField(snapshot, "organizationModel", fieldsDisabled)}</fieldset>
       <fieldset class="settings-card"><legend>${t("settings.group.budget")}</legend>${budgetField(snapshot, fieldsDisabled)}</fieldset>
       ${saveFeedback(snapshot)}${snapshot.savedCount > 0 && snapshot.dirtyKeys.length > 0 ? html`<p class="settings-saved-note">${t("settings.note.savedKeys")}</p>` : html``}`

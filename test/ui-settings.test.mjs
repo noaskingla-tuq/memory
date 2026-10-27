@@ -60,7 +60,7 @@ test("the settings route is explicit and keeps existing home and agent routes", 
   assert.deepEqual(ui.parseRoute("#/agent/sw%2Fdeveloper"), { name: "agent", agentId: "sw/developer" });
 });
 
-test("load normalizes the same four consumer values and ignores unknown host keys", async () => {
+test("load normalizes consumer values and ignores unknown host keys", async () => {
   const host = fakeHost({
     organizationEnabled: "false",
     organizationProvider: "  provider-x  ",
@@ -91,6 +91,111 @@ test("invalid stored budgets use the consumer default without writing on load", 
   state.update("organizationContextBudget", 40960);
   assert.deepEqual(state.view().dirtyKeys, ["organizationContextBudget"]);
   assert.equal(state.view().budgetIssue, null);
+});
+
+test("frequency and daily time use conservative defaults for missing or invalid legacy values", async () => {
+  const host = fakeHost({ organizationFrequency: "weekly", organizationDailyTime: "24:00" });
+  const state = ui.createSettingsState(ui.createSettingsClient(() => host.api));
+  await state.load();
+  assert.equal(state.view().baseline.organizationFrequency, "daily");
+  assert.equal(state.view().baseline.organizationDailyTime, "02:00");
+  assert.equal(state.view().dailyTimeIssue, null);
+  assert.deepEqual(host.calls, [["all"]], "loading legacy values never rewrites host settings");
+
+  const missing = ui.createSettingsState(ui.createSettingsClient(() => fakeHost().api));
+  await missing.load();
+  assert.equal(missing.view().baseline.organizationFrequency, "daily");
+  assert.equal(missing.view().baseline.organizationDailyTime, "02:00");
+});
+
+test("schedule settings save in a mode-safe order and keep unrelated host values", async () => {
+  const host = fakeHost({ organizationFrequency: "daily", organizationDailyTime: "02:00", untouchedHostKey: "keep" });
+  const state = ui.createSettingsState(ui.createSettingsClient(() => host.api));
+  await state.load();
+  state.update("organizationDailyTime", "08:15");
+  state.update("organizationFrequency", "immediate");
+  state.update("organizationProvider", "provider-new");
+  await state.save();
+  assert.deepEqual(host.calls.filter(([method]) => method === "set").map(([, key, value]) => [key, value]), [
+    ["organizationProvider", "provider-new"],
+    ["organizationFrequency", "immediate"],
+    ["organizationDailyTime", "08:15"],
+  ]);
+  assert.equal(host.values.untouchedHostKey, "keep");
+  assert.equal(host.values.organizationDailyTime, "08:15", "switching to immediate retains the selected daily time");
+
+  host.calls.length = 0;
+  state.update("organizationFrequency", "daily");
+  state.update("organizationDailyTime", "09:30");
+  await state.save();
+  assert.deepEqual(host.calls.filter(([method]) => method === "set").map(([, key, value]) => [key, value]), [
+    ["organizationDailyTime", "09:30"],
+    ["organizationFrequency", "daily"],
+  ]);
+});
+
+test("enabling a disabled plugin applies its target schedule before enabling work", async () => {
+  const host = fakeHost({ organizationEnabled: false, organizationFrequency: "immediate", organizationDailyTime: "02:00" });
+  const snapshots = [];
+  const set = host.api.set;
+  host.api.set = async (key, value) => {
+    const result = await set(key, value);
+    snapshots.push({ ...host.values });
+    return result;
+  };
+  const state = ui.createSettingsState(ui.createSettingsClient(() => host.api));
+  await state.load();
+  state.update("organizationEnabled", true);
+  state.update("organizationDailyTime", "23:00");
+  state.update("organizationFrequency", "daily");
+  await state.save();
+  assert.deepEqual(host.calls.filter(([method]) => method === "set").map(([, key]) => key), [
+    "organizationDailyTime", "organizationFrequency", "organizationEnabled",
+  ]);
+  assert.ok(snapshots.slice(0, -1).every((values) => values.organizationEnabled === false));
+  assert.deepEqual(snapshots.at(-1), { organizationEnabled: true, organizationFrequency: "daily", organizationDailyTime: "23:00" });
+  assert.equal(state.view().lastSave, "saved");
+});
+
+test("a failed schedule write reports partial success and retries only the unconfirmed value", async () => {
+  const host = fakeHost({ organizationFrequency: "immediate", organizationDailyTime: "02:00" });
+  host.failSet = "organizationFrequency";
+  const state = ui.createSettingsState(ui.createSettingsClient(() => host.api));
+  await state.load();
+  state.update("organizationDailyTime", "23:00");
+  state.update("organizationFrequency", "daily");
+  await state.save();
+  assert.equal(state.view().lastSave, "partial");
+  assert.equal(state.view().savedCount, 1);
+  assert.deepEqual(state.view().dirtyKeys, ["organizationFrequency"]);
+  assert.equal(host.values.organizationDailyTime, "23:00");
+  assert.equal(host.values.organizationFrequency, "immediate", "a failed mode switch leaves the runtime in the known prior mode");
+  await state.save();
+  assert.equal(state.view().lastSave, "saved");
+  assert.equal(host.values.organizationFrequency, "daily");
+  assert.deepEqual(host.calls.filter(([method]) => method === "set").map(([, key]) => key), [
+    "organizationDailyTime", "organizationFrequency", "organizationFrequency",
+  ]);
+});
+
+test("invalid daily time is announced and cannot be written until corrected", async () => {
+  const host = fakeHost();
+  const state = ui.createSettingsState(ui.createSettingsClient(() => host.api));
+  await state.load();
+  state.update("organizationDailyTime", "24:00");
+  const invalid = state.view();
+  const markup = ui.settingsPage(invalid).value;
+  assert.equal(invalid.dailyTimeIssue, "invalid");
+  assert.ok(markup.includes("aria-invalid=\"true\""));
+  assert.ok(markup.includes("HH:mm"));
+  assert.ok(markup.includes('data-settings-action="save" disabled'));
+  await state.save();
+  assert.deepEqual(host.calls.filter(([method]) => method === "set"), []);
+
+  state.update("organizationDailyTime", "23:59");
+  await state.save();
+  assert.equal(state.view().lastSave, "saved");
+  assert.equal(host.values.organizationDailyTime, "23:59");
 });
 
 test("save writes only dirty allowlisted keys in order and confirms each value by readback", async () => {
@@ -229,5 +334,20 @@ test("rendered controls are labelled, escaped and show invalid-budget guidance",
   assert.ok(!markup.includes("<img") && !markup.includes("onerror=\"x\""));
   assert.ok(markup.includes('aria-describedby="settings-provider-help settings-provider-effect settings-provider-status"'));
   assert.ok(markup.includes('type="range" min="8192" max="262144" step="8192"'));
+  assert.ok(markup.includes('id="settings-frequency" data-setting-key="organizationFrequency"'));
+  assert.ok(markup.includes("每天一輪") && markup.includes("即時整理"));
+  assert.ok(markup.includes('id="settings-daily-time" data-setting-key="organizationDailyTime" type="time"'));
+  assert.ok(markup.includes("本機時區"));
   assert.ok(markup.includes("不要輸入 API 金鑰"));
+});
+
+test("daily time is disabled in immediate mode while the saved value remains visible", async () => {
+  const host = fakeHost({ organizationFrequency: "immediate", organizationDailyTime: "07:45" });
+  const state = ui.createSettingsState(ui.createSettingsClient(() => host.api));
+  await state.load();
+  const markup = ui.settingsPage(state.view()).value;
+  assert.equal(state.view().draft.organizationDailyTime, "07:45");
+  assert.ok(markup.includes('value="07:45"') && markup.includes('id="settings-daily-time"'));
+  assert.match(markup, /id="settings-daily-time"[^>]*disabled/u);
+  assert.ok(markup.includes("保留每日時間供切回"));
 });

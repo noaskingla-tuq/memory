@@ -28,7 +28,7 @@ import { refreshMemoryProfile } from "../application/profileRefresh.js";
 import { createHostMemoryModelPort } from "../adapters/model/hostMemoryModelPort.js";
 import { createTeamuqTaskBinding } from "../application/teamuqTaskBinding.js";
 import { createTeamuqTaskStore } from "../adapters/storage/teamuqTaskStore.js";
-import { createLocalPunchReceiptStore } from "../adapters/storage/punchStateStore.js";
+import { createLocalPunchOrganizationStore, createLocalPunchReceiptStore } from "../adapters/storage/punchStateStore.js";
 import { createPunchOrganizationWorker } from "../application/punchOrganization.js";
 import { createMigratingPunchReceiptStore } from "./punchStateMigration.js";
 import { readOrganizationSettings } from "./organizationSettings.js";
@@ -43,6 +43,7 @@ export interface BackendOptions {
   readonly uiSampleRows?: number;
   readonly uiNow?: () => number;
   readonly uiReceiptChunk?: number;
+  readonly organizationNow?: () => number;
   readonly profilePath?: string;
   readonly profileIo?: ProfileIo;
   readonly host?: PluginHostApiV1;
@@ -83,6 +84,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   let warming: Promise<void> | undefined;
   let profileTimer: ReturnType<typeof setInterval> | null = null;
   let profileRefreshing: Promise<void> | null = null;
+  let workerStartup: Promise<void> = Promise.resolve();
   let workersStarted = false;
   let settingValues: Readonly<Record<string, boolean | number | string>> = {};
   try { settingValues = options.settings?.all() ?? {}; } catch {}
@@ -95,9 +97,14 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask);
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
-  const organization = options.host === undefined ? undefined : createPunchOrganizationWorker({
-    store: createLocalPunchReceiptStore(dirname(options.dataRoot), "punch-organization.json"),
+  const organizationStore = options.host === undefined ? undefined : createLocalPunchOrganizationStore(dirname(options.dataRoot));
+  const organization = organizationStore === undefined ? undefined : createPunchOrganizationWorker({
+    store: organizationStore,
+    claimDailyRound: organizationStore.claimDailyRound,
     enabled: () => organizationSettings().enabled,
+    frequency: () => organizationSettings().frequency,
+    dailyTime: () => organizationSettings().dailyTime,
+    ...(options.organizationNow === undefined ? {} : { now: options.organizationNow }),
     async capture(job) {
       const active = ensure();
       try { return await active.application.execute("memory_capture", job.input, job.actor, job.memoryId); }
@@ -106,9 +113,17 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   });
   let unsubscribeSettings: (() => void) | undefined;
   try { unsubscribeSettings = options.settings?.onChange((values) => {
+    const previousSettings = organizationSettings();
     settingValues = values;
-    if (!organizationSettings().enabled) model?.interrupt();
-    organization?.settingsChanged();
+    const nextSettings = organizationSettings();
+    if (!nextSettings.enabled) model?.interrupt();
+    const schedulingChanged = previousSettings.enabled !== nextSettings.enabled
+      || previousSettings.providerId !== nextSettings.providerId
+      || previousSettings.modelId !== nextSettings.modelId
+      || previousSettings.contextBudget !== nextSettings.contextBudget
+      || previousSettings.frequency !== nextSettings.frequency
+      || (nextSettings.frequency === "daily" && previousSettings.dailyTime !== nextSettings.dailyTime);
+    if (schedulingChanged) organization?.settingsChanged();
   }); } catch { settingValues = {}; }
 
   const punchWorker = options.host === undefined ? undefined : createPunchCatchupWorker({
@@ -268,15 +283,23 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     startWorkers() {
       if (workersStarted || disposed) return;
       workersStarted = true;
-      organization?.start();
+      organization?.start({ deferInitialRun: punchWorker !== undefined });
       punchWorker?.start();
+      if (organization !== undefined && punchWorker !== undefined) {
+        workerStartup = punchWorker.initialCatchupReady().then(() => { if (!disposed) organization.resumeStartup(); });
+      }
       refreshProfile();
       if (options.host !== undefined) {
         profileTimer = setInterval(refreshProfile, 30_000);
         profileTimer.unref();
       }
     },
-    async idleWorkers() { await punchWorker?.idle(); await organization?.idle(); await profileRefreshing; },
+    async idleWorkers() {
+      await punchWorker?.idle();
+      if (punchWorker?.status() !== null) await workerStartup;
+      await organization?.idle();
+      await profileRefreshing;
+    },
     openHandles: () => ready?.pool.openHandles ?? 0,
   };
 }

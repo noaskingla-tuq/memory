@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createLocalPunchReceiptStore } from "../out/adapters/storage/punchStateStore.js";
+import { createLocalPunchOrganizationStore, createLocalPunchReceiptStore } from "../out/adapters/storage/punchStateStore.js";
 import { createMigratingPunchReceiptStore } from "../out/backend/punchStateMigration.js";
 import { createPunchFeed, createProfileDirectory } from "../out/backend/hostDataAdapter.js";
 
@@ -29,6 +29,31 @@ test("local state survives reopen, paginates and commits revision batches atomic
   await reopened.writeBatch([{ key: "a-before-checkpoint", value: 1 }]);
   assert.equal((await reopened.readPage(snapshotPage.nextCursor, 1)).records[0].key, "p");
   await assert.rejects(reopened.readPage(snapshotPage.nextCursor, 1), /state_cursor_invalid/);
+});
+test("organization date claims survive legacy queue reads and ordinary job writes", async (t) => {
+  const dir = scratch(t);
+  const path = join(dir, "punch-organization.json");
+  writeFileSync(path, JSON.stringify({ version: 1, records: { "legacy-punch": { key: "legacy-punch", value: { state: "pending" }, revision: 4 } } }));
+  const store = createLocalPunchOrganizationStore(dir);
+  const legacy = (await store.readPage(null, 100)).records[0];
+  assert.equal(legacy.key, "legacy-punch");
+  assert.equal(legacy.revision, 4);
+  assert.equal(await store.claimDailyRound("2026-10-27"), true);
+  assert.equal(await store.claimDailyRound("2026-10-27"), false);
+  await assert.rejects(store.claimDailyRound("2026-02-30"), /organization_claim_date_invalid/);
+
+  await store.writeBatch([
+    { key: legacy.key, value: { state: "completed" }, expectedRevision: legacy.revision },
+    { key: "new-punch", value: { state: "pending" }, expectedRevision: null },
+  ]);
+  const persisted = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual(persisted.organizationClaims, { version: 1, dates: ["2026-10-27"] });
+  const reopened = createLocalPunchOrganizationStore(dir);
+  assert.equal(await reopened.claimDailyRound("2026-10-27"), false);
+  assert.equal(await reopened.claimDailyRound("2026-10-28"), true);
+  const rows = await reopened.readPage(null, 100);
+  assert.equal(rows.records.find((row) => row.key === "legacy-punch").value.state, "completed");
+  assert.equal(rows.records.find((row) => row.key === "new-punch").value.state, "pending");
 });
 test("corrupt state, duplicate keys and unsafe paths fail without overwriting evidence", async (t) => {
   const dir = scratch(t);

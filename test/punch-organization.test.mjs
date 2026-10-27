@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createLocalPunchReceiptStore } from "../out/adapters/storage/punchStateStore.js";
+import { createLocalPunchOrganizationStore, createLocalPunchReceiptStore } from "../out/adapters/storage/punchStateStore.js";
 import { createPunchOrganizationWorker } from "../out/application/punchOrganization.js";
 import { buildPunchSourceMessages, punchOperationId } from "../out/application/punchContent.js";
 import { startBackend, callInspect, callRemember, op } from "./backendHarness.mjs";
@@ -15,17 +15,19 @@ function rig(t, overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), "memory-organize-"));
   const workers = [];
   t.after(async () => { for (const worker of workers) await worker.stop(); rmSync(dir, { recursive: true, force: true }); });
-  const store = createLocalPunchReceiptStore(dir);
+  const store = createLocalPunchOrganizationStore(dir);
   let enabled = false;
-  let now = 100;
+  let frequency = "daily";
+  let dailyTime = "02:00";
+  let now = new Date(2026, 0, 1, 3).getTime();
   const calls = [];
-  const create = (patch = {}) => { const worker = createPunchOrganizationWorker({ store, enabled: () => enabled, now: () => now, capture: async (job) => { calls.push(job); return ok(); }, ...overrides, ...patch }); workers.push(worker); return worker; };
-  return { store, create, calls, enable: () => { enabled = true; }, advance: () => { now += 100000; } };
+  const create = (patch = {}) => { const worker = createPunchOrganizationWorker({ store, claimDailyRound: store.claimDailyRound, enabled: () => enabled, frequency: () => frequency, dailyTime: () => dailyTime, now: () => now, capture: async (job) => { calls.push(job); return ok(); }, ...overrides, ...patch }); workers.push(worker); return worker; };
+  return { dir, store, create, calls, enable: () => { enabled = true; }, setFrequency: (value) => { frequency = value; }, setDailyTime: (value) => { dailyTime = value; }, setNow: (value) => { now = value; }, advanceDay: () => { now = new Date(2026, 0, 2, 3).getTime(); } };
 }
 test("disabled organization preserves a durable job; enabling captures provenance once across restart", async (t) => {
   const h = rig(t);
-  const first = h.create(); first.start();
-  await first.enqueue(punch(), "raw"); await first.idle();
+  const first = h.create();
+  await first.enqueue(punch(), "raw"); first.start(); await first.idle();
   assert.equal(h.calls.length, 0);
   assert.equal(first.status().state, "disabled");
   await first.stop();
@@ -44,23 +46,149 @@ test("disabled organization preserves a durable job; enabling captures provenanc
   assert.equal(h.calls.length, 1);
   assert.equal(third.status().completed, 1);
 });
-test("retry state survives restart and waits for backoff before another capture", async (t) => {
+test("local 02:00 claim gates every trigger and leaves post-round work for tomorrow", async (t) => {
+  const h = rig(t); h.enable();
+  const worker = h.create();
+  await worker.enqueue(punch(), "raw");
+  h.setNow(new Date(2026, 0, 1, 1, 59, 59).getTime());
+  worker.start(); await worker.idle();
+  assert.equal(h.calls.length, 0);
+  assert.equal(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims, undefined);
+
+  h.setNow(new Date(2026, 0, 1, 2, 0, 0).getTime());
+  worker.wake(); await worker.idle();
+  assert.equal(h.calls.length, 1);
+  worker.settingsChanged(); await worker.idle(); worker.wake(); await worker.idle();
+  await worker.enqueue(punch({ id: "arrived-after-round" }), "raw-later"); await worker.idle();
+  assert.equal(h.calls.length, 1);
+  assert.equal((await h.store.readPage(null, 100)).records.find((row) => row.key === "arrived-after-round").value.state, "pending");
+
+  h.setNow(new Date(2026, 0, 2, 1, 59, 59).getTime()); worker.wake(); await worker.idle();
+  assert.equal(h.calls.length, 1);
+  h.setNow(new Date(2026, 0, 2, 2, 0, 0).getTime()); worker.wake(); await worker.idle();
+  assert.equal(h.calls.length, 2);
+  await worker.enqueue(punch({ id: "after-clock-rollback" }), "raw-rollback"); await worker.idle();
+  h.setNow(new Date(2026, 0, 1, 3, 0, 0).getTime()); worker.wake(); await worker.idle();
+  assert.equal(h.calls.length, 2);
+  assert.equal((await h.store.readPage(null, 100)).records.find((row) => row.key === "after-clock-rollback").value.state, "pending");
+  h.setNow(new Date(2026, 0, 3, 2, 0, 0).getTime()); worker.wake(); await worker.idle();
+  assert.equal(h.calls.length, 3);
+  const saved = JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8"));
+  assert.deepEqual(saved.organizationClaims.dates, ["2026-01-01", "2026-01-02", "2026-01-03"]);
+});
+test("immediate mode bypasses the daily startup gate, preserves retry backoff and never claims a date", async (t) => {
+  const h = rig(t); h.enable(); h.setFrequency("immediate"); h.setNow(new Date(2026, 0, 1, 1, 0).getTime());
+  let attempts = 0;
+  const worker = h.create({ capture: async () => { attempts++; return attempts === 1 ? { ok: false, error: { code: "MODEL_NOT_CONFIGURED", retryable: false } } : ok(); } });
+  await worker.enqueue(punch(), "raw");
+  worker.start({ deferInitialRun: true }); await worker.idle();
+  assert.equal(attempts, 1, "immediate work is not held by the daily-only startup gate or 02:00 time");
+  assert.equal(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims, undefined);
+  worker.wake(); await worker.idle();
+  assert.equal(attempts, 1, "ordinary wakes respect the retry backoff");
+  worker.settingsChanged(); await worker.idle();
+  assert.equal(attempts, 2, "an explicit settings wake keeps the existing immediate retry behavior");
+  await worker.stop();
+});
+test("switching immediate to daily lets the active job finish and gates the next job at the selected time", async (t) => {
+  const h = rig(t); h.enable(); h.setFrequency("immediate"); h.setNow(new Date(2026, 0, 1, 3, 0).getTime()); h.setDailyTime("04:00");
+  let release;
+  let entered;
+  const capturing = new Promise((resolve) => { entered = resolve; });
+  const activeJob = new Promise((resolve) => { release = resolve; });
+  const calls = [];
+  const worker = h.create({ capture: async (job) => { calls.push(job.punchId); if (calls.length === 1) { entered(); await activeJob; } return ok(); } });
+  await worker.enqueue(punch({ id: "in-flight" }), "raw-1");
+  await worker.enqueue(punch({ id: "next-job" }), "raw-2");
+  worker.start(); await capturing;
+  h.setFrequency("daily"); worker.settingsChanged(); release(); await worker.idle();
+  assert.deepEqual(calls, ["in-flight"]);
+  assert.equal(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims, undefined);
+  assert.equal((await h.store.readPage(null, 100)).records.find((row) => row.key === "next-job").value.state, "pending");
+
+  h.setNow(new Date(2026, 0, 1, 4, 0).getTime()); worker.wake(); await worker.idle();
+  assert.deepEqual(calls, ["in-flight", "next-job"]);
+  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims.dates, ["2026-01-01"]);
+  await worker.stop();
+});
+test("switching daily to immediate at an in-flight job boundary uses the new mode and keeps the daily claim", async (t) => {
+  const h = rig(t); h.enable();
+  let mode = "daily";
+  let frequencyReads = 0;
+  let readsAtRelease = 0;
+  let readsAtNextCapture = -1;
+  let release;
+  let entered;
+  const capturing = new Promise((resolve) => { entered = resolve; });
+  const activeJob = new Promise((resolve) => { release = resolve; });
+  const calls = [];
+  const worker = h.create({
+    frequency: () => { frequencyReads++; return mode; },
+    capture: async (job) => {
+      calls.push(job.punchId);
+      if (calls.length === 1) { entered(); await activeJob; }
+      else readsAtNextCapture = frequencyReads - readsAtRelease;
+      return ok();
+    },
+  });
+  await worker.enqueue(punch({ id: "daily-in-flight" }), "raw-1");
+  await worker.enqueue(punch({ id: "immediate-pending" }), "raw-2");
+  worker.start(); await capturing;
+  mode = "immediate"; worker.settingsChanged();
+  readsAtRelease = frequencyReads;
+  release(); await worker.idle();
+  assert.deepEqual(calls, ["daily-in-flight", "immediate-pending"]);
+  assert.ok(readsAtNextCapture >= 2, "the changed mode is read at the old job boundary and again for the queued immediate run");
+  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims.dates, ["2026-01-01"]);
+  await worker.stop();
+});
+test("switching daily to immediate preserves the date claim and processes pending work", async (t) => {
+  const h = rig(t); h.enable();
+  const worker = h.create(); worker.start(); await worker.idle();
+  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims.dates, ["2026-01-01"]);
+  h.setFrequency("immediate"); h.setDailyTime("08:00");
+  await worker.enqueue(punch({ id: "immediate-after-switch" }), "raw"); await worker.idle();
+  assert.equal(h.calls.length, 1);
+  h.setFrequency("daily"); worker.settingsChanged(); await worker.idle();
+  assert.equal(h.calls.length, 1, "the prior daily claim is retained when switching modes and time");
+  assert.deepEqual(JSON.parse(readFileSync(join(h.dir, "punch-organization.json"), "utf8")).organizationClaims.dates, ["2026-01-01"]);
+  await worker.stop();
+});
+test("an empty due round is still claimed and cannot consume later work that day", async (t) => {
+  const h = rig(t); h.enable();
+  const worker = h.create(); worker.start(); await worker.idle();
+  await worker.enqueue(punch(), "raw"); await worker.idle();
+  assert.equal(h.calls.length, 0);
+  h.advanceDay(); worker.wake(); await worker.idle();
+  assert.equal(h.calls.length, 1);
+});
+test("a failed daily-claim write prevents capture and can be retried before the date is claimed", async (t) => {
+  const h = rig(t); h.enable();
+  const blocked = h.create({ claimDailyRound: async () => { throw new Error("claim write failed"); } });
+  await blocked.enqueue(punch(), "raw"); blocked.start(); await blocked.idle();
+  assert.equal(h.calls.length, 0);
+  assert.equal(blocked.status().lastError, "STORAGE_BUSY");
+  await blocked.stop();
+  const recovered = h.create(); recovered.start(); await recovered.idle();
+  assert.equal(h.calls.length, 1);
+});
+test("a failed round stays pending across restart and retries in the next day's round", async (t) => {
   const h = rig(t); h.enable();
   const first = h.create({ capture: async () => ({ ok: false, error: { code: "MODEL_NOT_CONFIGURED", retryable: false } }) });
-  first.start(); await first.enqueue(punch(), "raw"); await first.idle();
+  await first.enqueue(punch(), "raw"); first.start(); await first.idle();
   assert.equal(first.status().state, "paused");
   const saved = (await h.store.readPage(null, 100)).records[0].value;
   assert.equal(saved.attempts, 1); assert.equal(saved.state, "pending");
   await first.stop();
   const second = h.create(); second.start(); await second.idle(); assert.equal(h.calls.length, 0);
-  h.advance(); second.wake(); await second.idle(); assert.equal(h.calls.length, 1);
+  h.advanceDay(); second.wake(); await second.idle(); assert.equal(h.calls.length, 1);
 });
 test("processing captures stay pending and a forgotten source is terminally skipped", async (t) => {
   const h = rig(t); h.enable();
   const worker = h.create({ capture: async () => ok({ processing: true }) });
-  worker.start(); await worker.enqueue(punch(), "raw"); await worker.idle();
+  await worker.enqueue(punch(), "raw"); worker.start(); await worker.idle();
   assert.equal((await h.store.readPage(null, 100)).records[0].value.state, "pending");
-  await worker.stop(); h.advance();
+  await worker.stop(); h.advanceDay();
   const skipped = h.create({ capture: async () => ({ ok: false, error: { code: "MEMORY_SUPPRESSED", retryable: false } }) });
   skipped.start(); await skipped.idle();
   assert.equal((await h.store.readPage(null, 100)).records[0].value.state, "skipped");
@@ -68,7 +196,7 @@ test("processing captures stay pending and a forgotten source is terminally skip
 test("a persisted legacy queue input is retried byte-for-byte without adding new summary labels", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "memory-organize-legacy-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const store = createLocalPunchReceiptStore(dir);
+  const store = createLocalPunchOrganizationStore(dir);
   const id = punchOperationId("legacy-punch");
   const legacyInput = {
     scope: "project",
@@ -80,17 +208,17 @@ test("a persisted legacy queue input is retried byte-for-byte without adding new
   };
   const job = { version: 1, punchId: "legacy-punch", memoryId: "raw-memory", actor: { agentId: "sw/a", projectId: "project", sessionId: "s", providerId: "mock" }, input: legacyInput, state: "pending", attempts: 0, nextAttemptAt: 0, lastError: null };
   await store.writeBatch([{ key: job.punchId, value: job, expectedRevision: null, sourceKind: "work-record", sourceId: job.punchId }]);
-  let now = 100;
+  let now = new Date(2026, 0, 1, 3).getTime();
   const calls = [];
-  const first = createPunchOrganizationWorker({ store, enabled: () => true, now: () => now, capture: async (call) => { calls.push(call); return { ok: false, error: { code: "MODEL_NOT_CONFIGURED", retryable: false } }; } });
+  const first = createPunchOrganizationWorker({ store, claimDailyRound: store.claimDailyRound, enabled: () => true, now: () => now, capture: async (call) => { calls.push(call); return { ok: false, error: { code: "MODEL_NOT_CONFIGURED", retryable: false } }; } });
   first.start(); await first.idle();
   assert.equal(JSON.stringify(calls[0].input), JSON.stringify(legacyInput));
   const pending = (await store.readPage(null, 100)).records[0].value;
   assert.equal(pending.state, "pending");
   assert.equal(JSON.stringify(pending.input), JSON.stringify(legacyInput));
   await first.stop();
-  now = 100_000;
-  const second = createPunchOrganizationWorker({ store, enabled: () => true, now: () => now, capture: async (call) => { calls.push(call); return ok(); } });
+  now = new Date(2026, 0, 2, 3).getTime();
+  const second = createPunchOrganizationWorker({ store, claimDailyRound: store.claimDailyRound, enabled: () => true, now: () => now, capture: async (call) => { calls.push(call); return ok(); } });
   second.start(); await second.idle();
   assert.equal(JSON.stringify(calls[1].input), JSON.stringify(legacyInput));
   assert.deepEqual((await store.readPage(null, 100)).records[0].value.input.messages, []);
@@ -184,7 +312,7 @@ test("production service admits raw context with retired host state, then captur
   await queue.writeBatch([{ key: completed.key, value: { ...unacknowledged, state: "pending", nextAttemptAt: 0 }, expectedRevision: completed.revision }]);
   const { backend: reopened } = startBackend(t, { dataRoot, host: h.host, settings: h.settings });
   reopened.startWorkers(); await reopened.idleWorkers(); assert.equal(h.aiCalls, 2);
-  assert.equal((await reopened.call("ui.status", {})).organization.pending, 0);
+  assert.equal((await reopened.call("ui.status", {})).organization.pending, 1);
   assert.equal((await callInspect(reopened, { scope: "project", limit: 12 }, { agentId: "sw/a", projectId: "project" })).result.value.memories.length, 2);
   await reopened.dispose();
 });

@@ -155,10 +155,10 @@ function renderSettings(snapshot: SettingsSnapshot = settings.view()): void {
   const end = active instanceof HTMLInputElement && active.type === "text" ? active.selectionEnd : null;
   mount(view, settingsPage(snapshot));
   if (fieldKey !== undefined) {
-    const replacement = view.querySelector<HTMLInputElement>(`[data-setting-key="${fieldKey}"]`);
+    const replacement = view.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-setting-key="${fieldKey}"]`);
     if (replacement !== null && !replacement.disabled) {
       replacement.focus({ preventScroll: true });
-      if (replacement.type === "text" && start !== null && end !== null) replacement.setSelectionRange(start, end);
+      if (replacement instanceof HTMLInputElement && replacement.type === "text" && start !== null && end !== null) replacement.setSelectionRange(start, end);
       return;
     }
   }
@@ -265,6 +265,8 @@ const SETTING_STATUS_IDS: Readonly<Record<SettingKey, string>> = {
   organizationProvider: "settings-provider-status",
   organizationModel: "settings-model-status",
   organizationContextBudget: "settings-budget-status",
+  organizationFrequency: "settings-frequency-status",
+  organizationDailyTime: "settings-daily-time-status",
 };
 
 const SETTING_KEYS: readonly SettingKey[] = [
@@ -272,10 +274,12 @@ const SETTING_KEYS: readonly SettingKey[] = [
   "organizationProvider",
   "organizationModel",
   "organizationContextBudget",
+  "organizationFrequency",
+  "organizationDailyTime",
 ];
 
 function syncSettingsDraft(snapshot: SettingsSnapshot): void {
-  for (const key of ["organizationEnabled", "organizationProvider", "organizationModel", "organizationContextBudget"] as const) {
+  for (const key of SETTING_KEYS) {
     const container = document.getElementById(SETTING_STATUS_IDS[key]);
     if (container === null) continue;
     const status = snapshot.savingKey === key ? "saving" : snapshot.outcomes[key] ?? (snapshot.dirtyKeys.includes(key) ? "dirty" : undefined);
@@ -308,16 +312,33 @@ function syncSettingsDraft(snapshot: SettingsSnapshot): void {
       budget.setAttribute("aria-describedby", "settings-budget-help settings-budget-effect settings-budget-status");
     }
   }
+  const dailyTime = document.getElementById("settings-daily-time");
+  const dailyTimeIssue = document.getElementById("settings-daily-time-issue");
+  if (dailyTime instanceof HTMLInputElement) {
+    const invalid = snapshot.dailyTimeIssue === "invalid";
+    dailyTime.setAttribute("aria-invalid", String(invalid));
+    dailyTime.setAttribute("aria-describedby", invalid
+      ? "settings-daily-time-help settings-daily-time-effect settings-daily-time-status settings-daily-time-issue"
+      : "settings-daily-time-help settings-daily-time-effect settings-daily-time-status");
+    if (invalid && dailyTimeIssue === null) {
+      const issue = document.createElement("p");
+      issue.id = "settings-daily-time-issue";
+      issue.className = "setting-note setting-invalid";
+      issue.setAttribute("role", "alert");
+      issue.textContent = t("settings.dailyTime.invalid");
+      dailyTime.closest(".setting-copy")?.appendChild(issue);
+    } else if (!invalid) dailyTimeIssue?.remove();
+  }
   const feedback = view.querySelector<HTMLElement>(".settings-feedback");
   if (feedback !== null) {
     feedback.setAttribute("role", "status");
     feedback.setAttribute("aria-live", "polite");
-    feedback.textContent = snapshot.dirtyKeys.length > 0 ? t("settings.state.dirty") : snapshot.savedCount > 0 ? t("settings.state.saved") : t("settings.state.loaded");
+    feedback.textContent = snapshot.dailyTimeIssue === "invalid" ? t("settings.dailyTime.invalid") : snapshot.dirtyKeys.length > 0 ? t("settings.state.dirty") : snapshot.savedCount > 0 ? t("settings.state.saved") : t("settings.state.loaded");
   }
   const save = view.querySelector<HTMLButtonElement>('[data-settings-action="save"]');
   const cancel = view.querySelector<HTMLButtonElement>('[data-settings-action="cancel"]');
   if (save !== null) {
-    save.disabled = snapshot.dirtyKeys.length === 0 || snapshot.saving || snapshot.reconciling || snapshot.hasUnknown || Object.values(snapshot.outcomes).includes("conflict");
+    save.disabled = snapshot.dirtyKeys.length === 0 || snapshot.saving || snapshot.reconciling || snapshot.hasUnknown || snapshot.dailyTimeIssue !== null || Object.values(snapshot.outcomes).includes("conflict");
     save.textContent = snapshot.lastSave === "partial" || snapshot.lastSave === "failed" ? t("settings.action.retrySave") : t("settings.action.save");
   }
   if (cancel !== null) cancel.disabled = snapshot.dirtyKeys.length === 0 || snapshot.saving || snapshot.reconciling || snapshot.hasUnknown;
@@ -337,7 +358,7 @@ function focusFirstUnresolvedSettingsControl(snapshot: SettingsSnapshot): void {
   for (const key of SETTING_KEYS) {
     const outcome = snapshot.outcomes[key];
     if (outcome !== "failed" && outcome !== "unknown" && outcome !== "conflict") continue;
-    const control = view.querySelector<HTMLInputElement>(`[data-setting-key="${key}"]`);
+    const control = view.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-setting-key="${key}"]`);
     if (control !== null && !control.disabled) {
       control.focus({ preventScroll: true });
       return;
@@ -359,7 +380,7 @@ settings.subscribe((snapshot) => {
   const newErrorResult = (completedSave || completedReconcile)
     && Object.values(snapshot.outcomes).some((outcome) => outcome === "failed" || outcome === "unknown" || outcome === "conflict");
   const active = document.activeElement;
-  if (!newErrorResult && active instanceof HTMLInputElement && view.contains(active) && (active.type === "text" || active.type === "range") && snapshot.phase === "ready" && !snapshot.saving && !snapshot.reconciling && !snapshot.hasUnknown) {
+  if (!newErrorResult && active instanceof HTMLInputElement && view.contains(active) && (active.type === "text" || active.type === "range" || active.type === "time") && snapshot.phase === "ready" && !snapshot.saving && !snapshot.reconciling && !snapshot.hasUnknown) {
     syncSettingsDraft(snapshot);
     return;
   }

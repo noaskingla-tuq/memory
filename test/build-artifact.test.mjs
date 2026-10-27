@@ -112,6 +112,13 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   assert.equal(manifest.resources.maxSessions, 4);
   assert.deepEqual(manifest.hostApis, [{ id: "teamuq.host-data", range: "^1.1.0" }]);
   assert.equal(manifest.settingsSchema.fields.find((field) => field.key === "organizationEnabled").default, true);
+  const frequency = manifest.settingsSchema.fields.find((field) => field.key === "organizationFrequency");
+  assert.deepEqual(frequency, {
+    key: "organizationFrequency", type: "choice", label: "整理頻率",
+    options: [{ value: "daily", label: "每天一輪" }, { value: "immediate", label: "即時整理" }],
+    default: "daily", help: "每天一輪預設使用本機時間 02:00；即時整理會處理同步後的等待項目。",
+  });
+  assert.equal(manifest.settingsSchema.fields.find((field) => field.key === "organizationDailyTime").default, "02:00");
   assert.deepEqual(manifest.backendMethods, UI_METHOD_NAMES);
   assert.equal(manifest.backendMethods.some((method) => method.startsWith("memory.")), false);
   assert.equal(manifest.backendMethods.includes("memory.profile.sync@1"), false);

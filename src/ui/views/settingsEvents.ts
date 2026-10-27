@@ -10,7 +10,7 @@ export interface SettingsActions {
 }
 
 function keyOf(value: string | undefined): SettingKey | null {
-  if (value === "organizationEnabled" || value === "organizationProvider" || value === "organizationModel" || value === "organizationContextBudget") return value;
+  if (value === "organizationEnabled" || value === "organizationProvider" || value === "organizationModel" || value === "organizationContextBudget" || value === "organizationFrequency" || value === "organizationDailyTime") return value;
   return null;
 }
 
@@ -20,6 +20,7 @@ export function bindSettingsEvents(root: HTMLElement, actions: SettingsActions):
     if (!(input instanceof HTMLInputElement)) return;
     const key = keyOf(input.dataset.settingKey);
     if (key === "organizationProvider" || key === "organizationModel") actions.update(key, input.value);
+    if (key === "organizationDailyTime") actions.update(key, input.value);
     if (key === "organizationContextBudget") {
       const output = input.closest(".setting-control")?.querySelector<HTMLOutputElement>("[data-budget-value]");
       if (output !== null && output !== undefined) output.textContent = `${Number(input.value).toLocaleString("en-US")} ${t("settings.bytes")}`;
@@ -27,10 +28,11 @@ export function bindSettingsEvents(root: HTMLElement, actions: SettingsActions):
     }
   };
   const onChange = (event: Event): void => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
-    const key = keyOf(input.dataset.settingKey);
-    if (key === "organizationEnabled") actions.update(key, input.checked);
+    const control = event.target;
+    if (!(control instanceof HTMLElement)) return;
+    const key = keyOf(control.dataset.settingKey);
+    if (key === "organizationEnabled" && control instanceof HTMLInputElement) actions.update(key, control.checked);
+    if (key === "organizationFrequency" && control instanceof HTMLSelectElement) actions.update(key, control.value);
   };
   const onSubmit = (event: Event): void => {
     const target = event.target;

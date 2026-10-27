@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dirname } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { CoreHandlePool } from "../out/application/coreHandlePool.js";
 import { MemoryApplication } from "../out/application/memoryApplication.js";
 import { createLocalPunchReceiptStore } from "../out/adapters/storage/punchStateStore.js";
@@ -32,6 +33,122 @@ test("dispose cancels an in-flight host model, removes subscriptions and preserv
   const saved = (await createLocalPunchReceiptStore(dirname(dataRoot), "punch-organization.json").readPage(null, 100)).records[0].value;
   assert.equal(saved.state, "pending");
   assert.ok(saved.input.messages.length > 0);
+});
+test("late startup holds the daily claim until an initially failing punch catch-up succeeds", async (t) => {
+  let failInitialRead = true;
+  let settledChanged;
+  const snapshot = { snapshotId: "s", generation: "g", highWatermark: "p" };
+  const punch = { id: "row", punchId: "p", agentId: "sw/a", projectId: null, sessionId: "s", providerId: "mock", model: "allowed", punchType: "main", startedAtMs: Date.now() - 500000, endedAtMs: Date.now() - 200000, name: "Request", description: "Outcome" };
+  const host = {
+    workRecords: {
+      async readPage() {
+        if (failInitialRead) throw Object.assign(new Error("temporarily unavailable"), { code: "temporary" });
+        return { snapshot, records: [punch], nextCursor: null };
+      },
+      subscribeSettledChanges(listener) { settledChanged = listener; return () => { settledChanged = undefined; }; },
+    },
+    pluginState: { async readPage() { throw Object.assign(new Error("retired"), { code: "plugin_state_retired" }); } },
+    agentDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+    projectDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+  };
+  const localDue = new Date(); localDue.setHours(3, 0, 0, 0);
+  const { backend, dataRoot } = startBackend(t, { host, organizationNow: () => localDue.getTime(), settings: { all: () => ({ organizationEnabled: true }), onChange() { return () => {}; } } });
+  backend.startWorkers(); await backend.idleWorkers();
+  const organizationStore = createLocalPunchReceiptStore(dirname(dataRoot), "punch-organization.json");
+  assert.equal((await organizationStore.readPage(null, 100)).records.length, 0);
+
+  failInitialRead = false;
+  settledChanged?.({});
+  await backend.idleWorkers();
+  const organizationRows = (await organizationStore.readPage(null, 100)).records;
+  assert.equal(organizationRows.length, 1);
+  assert.equal(organizationRows[0].value.state, "pending");
+  assert.equal(organizationRows[0].value.attempts, 1);
+  assert.equal(organizationRows[0].value.lastError, "MODEL_NOT_CONFIGURED");
+  const localDate = `${localDue.getFullYear()}-${String(localDue.getMonth() + 1).padStart(2, "0")}-${String(localDue.getDate()).padStart(2, "0")}`;
+  const saved = JSON.parse(readFileSync(join(dirname(dataRoot), "punch-organization.json"), "utf8"));
+  assert.deepEqual(saved.organizationClaims.dates, [localDate]);
+  const punchState = await createLocalPunchReceiptStore(dirname(dataRoot)).readPage(null, 100);
+  assert.equal(punchState.records.find((row) => row.key === "p").value.state, "written");
+  await backend.dispose();
+});
+test("settings subscription applies the selected local daily time and immediate mode to the running worker", async (t) => {
+  let settingsListener;
+  let values = { organizationEnabled: true, organizationFrequency: "daily", organizationDailyTime: "04:00" };
+  let now = new Date(2026, 0, 1, 3, 30).getTime();
+  const snapshot = { snapshotId: "s", generation: "g", highWatermark: "p" };
+  const host = {
+    workRecords: { async readPage() { return { snapshot, records: [{ id: "row", punchId: "p", agentId: "sw/a", projectId: null, sessionId: "s", providerId: "mock", model: "allowed", punchType: "main", startedAtMs: Date.now() - 500000, endedAtMs: Date.now() - 200000, name: "Request", description: "Outcome" }], nextCursor: null }; }, subscribeSettledChanges() { return () => {}; } },
+    pluginState: { async readPage() { throw Object.assign(new Error("retired"), { code: "plugin_state_retired" }); } },
+    agentDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+    projectDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+  };
+  const settings = { all: () => values, onChange(listener) { settingsListener = listener; return () => { settingsListener = undefined; }; } };
+  const { backend, dataRoot } = startBackend(t, { host, organizationNow: () => now, settings });
+  backend.startWorkers(); await backend.idleWorkers();
+  const dir = dirname(dataRoot);
+  const organizationStore = createLocalPunchReceiptStore(dir, "punch-organization.json");
+  assert.equal((await organizationStore.readPage(null, 100)).records.length, 1);
+  assert.equal(JSON.parse(readFileSync(join(dir, "punch-organization.json"), "utf8")).organizationClaims, undefined);
+
+  values = { ...values, organizationDailyTime: "03:00" };
+  settingsListener?.(values);
+  await backend.idleWorkers();
+  let saved = JSON.parse(readFileSync(join(dir, "punch-organization.json"), "utf8"));
+  assert.deepEqual(saved.organizationClaims.dates, ["2026-01-01"]);
+  let job = (await organizationStore.readPage(null, 100)).records[0].value;
+  assert.equal(job.attempts, 1);
+
+  values = { ...values, organizationFrequency: "immediate", organizationDailyTime: "23:00" };
+  settingsListener?.(values);
+  await backend.idleWorkers();
+  saved = JSON.parse(readFileSync(join(dir, "punch-organization.json"), "utf8"));
+  job = (await organizationStore.readPage(null, 100)).records[0].value;
+  assert.deepEqual(saved.organizationClaims.dates, ["2026-01-01"], "switching modes and time never clears the durable daily claim");
+  assert.equal(job.attempts, 2, "the immediate settings update wakes the pending job through the settings subscription");
+  await backend.dispose();
+});
+test("per-key time then frequency subscription uses the daily gate without retrying immediate work early", async (t) => {
+  let settingsListener;
+  let values = { organizationEnabled: true, organizationFrequency: "immediate", organizationDailyTime: "02:00" };
+  let now = new Date(2026, 0, 1, 3, 0).getTime();
+  const snapshot = { snapshotId: "s", generation: "g", highWatermark: "p" };
+  const host = {
+    workRecords: { async readPage() { return { snapshot, records: [{ id: "row", punchId: "p", agentId: "sw/a", projectId: null, sessionId: "s", providerId: "mock", model: "allowed", punchType: "main", startedAtMs: Date.now() - 500000, endedAtMs: Date.now() - 200000, name: "Request", description: "Outcome" }], nextCursor: null }; }, subscribeSettledChanges() { return () => {}; } },
+    pluginState: { async readPage() { throw Object.assign(new Error("retired"), { code: "plugin_state_retired" }); } },
+    agentDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+    projectDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+  };
+  const settings = { all: () => values, onChange(listener) { settingsListener = listener; return () => { settingsListener = undefined; }; } };
+  const { backend, dataRoot } = startBackend(t, { host, organizationNow: () => now, settings });
+  backend.startWorkers(); await backend.idleWorkers();
+  const organizationStore = createLocalPunchReceiptStore(dirname(dataRoot), "punch-organization.json");
+  let job = (await organizationStore.readPage(null, 100)).records[0].value;
+  assert.equal(job.attempts, 1);
+  assert.equal(job.lastError, "MODEL_NOT_CONFIGURED");
+  now = new Date(2026, 0, 1, 3, 30).getTime();
+
+  values = { ...values, organizationDailyTime: "04:00" };
+  settingsListener?.(values);
+  await backend.idleWorkers();
+  job = (await organizationStore.readPage(null, 100)).records[0].value;
+  assert.equal(job.attempts, 1, "the daily-time-only intermediate snapshot does not force an immediate retry");
+
+  values = { ...values, organizationFrequency: "daily" };
+  settingsListener?.(values);
+  await backend.idleWorkers();
+  job = (await organizationStore.readPage(null, 100)).records[0].value;
+  assert.equal(job.attempts, 1, "the mode change observes the saved 04:00 gate before starting work");
+  assert.equal(JSON.parse(readFileSync(join(dirname(dataRoot), "punch-organization.json"), "utf8")).organizationClaims, undefined);
+
+  now = new Date(2026, 0, 1, 4, 0).getTime();
+  values = { ...values, organizationContextBudget: 65536 };
+  settingsListener?.(values);
+  await backend.idleWorkers();
+  job = (await organizationStore.readPage(null, 100)).records[0].value;
+  assert.equal(job.attempts, 2, "a later relevant settings update wakes the now-due daily work using the persisted retry and schedule");
+  assert.deepEqual(JSON.parse(readFileSync(join(dirname(dataRoot), "punch-organization.json"), "utf8")).organizationClaims.dates, ["2026-01-01"]);
+  await backend.dispose();
 });
 test("a capture queued behind forget checks its raw source inside the shared write lane", async () => {
   let alive = true;

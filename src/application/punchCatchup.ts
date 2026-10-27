@@ -48,6 +48,7 @@ export interface PunchCatchupResult {
 export interface PunchCatchupWorker {
   start(): void;
   wake(): void;
+  initialCatchupReady(): Promise<void>;
   idle(): Promise<void>;
   status(): { readonly pending: number; readonly lastWrittenAtMs: number | null } | null;
   stop(): Promise<void>;
@@ -181,6 +182,14 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
   let unsubscribe: (() => void) | null = null;
   let sinceMs: number | null = null;
   let lastStatus: { readonly pending: number; readonly lastWrittenAtMs: number | null } | null = null;
+  let resolveInitialCatchup!: () => void;
+  let initialCatchupResolved = false;
+  const initialCatchup = new Promise<void>((resolve) => { resolveInitialCatchup = resolve; });
+  const markInitialCatchupReady = (): void => {
+    if (initialCatchupResolved) return;
+    initialCatchupResolved = true;
+    resolveInitialCatchup();
+  };
 
   const terminal = async (rows: readonly PunchTerminalReceipt[]): Promise<void> => {
     if (rows.length === 0) return;
@@ -338,6 +347,7 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
     if (stopped || active !== null) { pending = true; return; }
     active = catchUp().then((result) => {
       log({ event: "punch_catchup", ...result });
+      if (result.complete) markInitialCatchupReady();
       if (!result.complete && result.stoppedCode === null) pending = true;
     }).catch((error: unknown) => {
       log({ event: "punch_catchup_failed", code: error instanceof Error ? error.name : typeof error });
@@ -358,11 +368,13 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
       run();
     },
     wake: run,
+    initialCatchupReady: () => initialCatchup,
     async idle() { while (active !== null) await active; },
     status: () => lastStatus,
     async stop() {
       stopped = true;
       pending = false;
+      markInitialCatchupReady();
       if (poll !== null) clearInterval(poll);
       unsubscribe?.();
       unsubscribe = null;

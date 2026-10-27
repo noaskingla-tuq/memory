@@ -106,6 +106,21 @@
   color: var(--text-primary);
 }
 
+.setting-control input[type="time"],
+.setting-control select {
+  width: 100%;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.setting-control input[aria-invalid="true"] {
+  border-color: var(--error-strong);
+}
+
 .setting-control input[type="text"]::placeholder {
   color: var(--text-secondary-strong);
   opacity: 1;
@@ -208,6 +223,10 @@
   border-radius: 8px;
   background: var(--surface-muted);
   overflow-wrap: anywhere;
+}
+
+.setting-invalid {
+  color: var(--error-strong);
 }
 
 .settings-budget-value {

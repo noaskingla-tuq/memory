@@ -3,11 +3,21 @@ export const SETTING_KEYS = [
   "organizationProvider",
   "organizationModel",
   "organizationContextBudget",
+  "organizationFrequency",
+  "organizationDailyTime",
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
 export type SettingValue = boolean | number | string;
-export type SettingsValues = Readonly<Record<SettingKey, SettingValue>>;
+export type OrganizationFrequency = "daily" | "immediate";
+export type SettingsValues = Readonly<{
+  organizationEnabled: boolean;
+  organizationProvider: string;
+  organizationModel: string;
+  organizationContextBudget: number;
+  organizationFrequency: OrganizationFrequency;
+  organizationDailyTime: string;
+}>;
 
 type SettingsBridge = Pick<Window["tuqPlugin"]["settings"], "all" | "get" | "set">;
 type SettingsBridgeSource = () => unknown;

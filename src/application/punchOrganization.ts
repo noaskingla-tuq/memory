@@ -26,21 +26,36 @@ interface Job {
 export interface OrganizationOptions {
   readonly store: PunchReceiptStorePort;
   readonly enabled: () => boolean;
+  readonly frequency?: () => "daily" | "immediate";
+  readonly dailyTime?: () => string;
+  readonly claimDailyRound: (localDate: string) => Promise<boolean>;
   readonly capture: (job: { actor: MemoryActor; input: MemoryCaptureInput; memoryId: string }) => Promise<MemoryResult<unknown>>;
   readonly now?: () => number;
   readonly pollMs?: number;
+}
+
+function localRoundDate(at: number, configuredTime: string): { readonly date: string; readonly due: boolean } {
+  const local = new Date(at);
+  if (!Number.isFinite(local.getTime())) throw new Error("organization_clock_invalid");
+  const date = `${String(local.getFullYear()).padStart(4, "0")}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
+  const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(configuredTime) ? configuredTime : "02:00";
+  const [hourText, minuteText] = time.split(":");
+  const dueMinute = Number(hourText) * 60 + Number(minuteText);
+  return { date, due: local.getHours() * 60 + local.getMinutes() >= dueMinute };
 }
 
 export function createPunchOrganizationWorker(options: OrganizationOptions) {
   const now = options.now ?? Date.now;
   let stopped = false;
   let started = false;
+  let startupReady = true;
   let requested = false;
   let retryNow = false;
   let knownKeys: Set<string> | undefined;
   let active: Promise<void> | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
   let status: OrganizationStatus = { state: "disabled", pending: 0, completed: 0, lastError: null };
+  const frequency = (): "daily" | "immediate" => options.frequency?.() === "immediate" ? "immediate" : "daily";
   const jobs = async () => {
     const rows = [];
     let cursor: string | null = null;
@@ -62,12 +77,19 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     const previousFailure = rows.find(({ job }) => job.lastError !== null && job.state !== "skipped")?.job.lastError ?? null;
     const failureState = previousFailure === "MODEL_NOT_CONFIGURED" || previousFailure === "MODEL_POLICY_DENIED" || previousFailure === "RESOURCE_BUSY" ? "paused" : "error";
     status = { pending: rows.filter(({ job }) => job.state === "pending").length, completed: rows.filter(({ job }) => job.state === "completed").length, lastError: previousFailure, state: !options.enabled() ? "disabled" : previousFailure === null ? "idle" : failureState };
-    const immediate = retryNow;
+    const runFrequency = frequency();
+    const immediateRetry = runFrequency === "immediate" && retryNow;
     retryNow = false;
     if (!options.enabled()) return;
+    if (runFrequency === "daily") {
+      if (!startupReady) return;
+      const schedule = localRoundDate(now(), options.dailyTime?.() ?? "02:00");
+      if (!schedule.due || !(await options.claimDailyRound(schedule.date))) return;
+    }
     for (const { row, job } of rows) {
       if (stopped || !options.enabled()) break;
-      if (job.state !== "pending" || (!immediate && job.nextAttemptAt > now())) continue;
+      if (frequency() !== runFrequency) break;
+      if (job.state !== "pending" || (!immediateRetry && job.nextAttemptAt > now())) continue;
       status = { ...status, state: "running" };
       let result: MemoryResult<unknown>;
       try { result = await options.capture(job); } catch (error) { result = failure("organization", error); }
@@ -111,7 +133,8 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       }
       wake();
     },
-    start() { if (started || stopped) return; started = true; timer = setInterval(wake, options.pollMs ?? 30_000); timer.unref(); wake(); },
+    start(settings: { readonly deferInitialRun?: boolean } = {}) { if (started || stopped) return; started = true; startupReady = settings.deferInitialRun !== true; timer = setInterval(wake, options.pollMs ?? 30_000); timer.unref(); wake(); },
+    resumeStartup() { if (!started || stopped || startupReady) return; startupReady = true; requested = false; wake(); },
     wake,
     settingsChanged() { retryNow = true; wake(); },
     status: (): OrganizationStatus => ({ ...status, ...(!options.enabled() ? { state: "disabled" as const } : {}) }),

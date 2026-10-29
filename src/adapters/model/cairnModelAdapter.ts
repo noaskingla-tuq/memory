@@ -4,6 +4,7 @@ import type {
   MemoryModelPort,
 } from "../../application/modelPort.js";
 import { MemoryServiceError } from "../../domain/errors.js";
+import { currentMemoryInvocation } from "../../application/modelInvocationScope.js";
 
 const OPERATIONS: readonly MemoryModelOperation[] = [
   "select",
@@ -28,6 +29,7 @@ function assertPolicy(policy: MemoryModelPolicy): void {
 
 export type ReportModelFailure = (
   code: MemoryServiceError["code"],
+  phase?: MemoryServiceError["phase"],
 ) => void;
 
 function reportStableFailure(
@@ -36,7 +38,7 @@ function reportStableFailure(
 ): void {
   const code = error instanceof MemoryServiceError ? error.code : undefined;
   if (code !== undefined) {
-    report?.(code);
+    report?.(code, error instanceof MemoryServiceError ? error.phase : undefined);
   }
 }
 
@@ -83,7 +85,8 @@ export function createCairnModelAdapter(
         throw error;
       }
       try {
-        return await port.invoke({ agentId, policy, operation, ...request, maxOutputTokens: 1024 });
+        const invocation = currentMemoryInvocation(operation, request.system, request.input);
+        return await port.invoke({ agentId, policy, operation, ...request, ...(invocation === undefined ? {} : { invocation }), maxOutputTokens: 1024 });
       } catch (error) {
         reportStableFailure(error, report);
         throw error;

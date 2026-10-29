@@ -21,6 +21,7 @@ import type {
   MemoryToolName,
 } from "./toolContract.js";
 import { AgentWriteLane } from "./writeLane.js";
+import { withMemoryCaptureScope } from "./modelInvocationScope.js";
 
 type ToolInput =
   | MemoryRecallInput
@@ -32,7 +33,7 @@ type ToolInput =
 
 function unwrap(result: CoreResult): unknown {
   if (result.ok) return result.value;
-  throw mapCairnError(result.error.code);
+  throw mapCairnError(result.error.code, result.error.phase);
 }
 
 function receipt(
@@ -63,12 +64,15 @@ export class MemoryApplication {
     input: ToolInput,
     binding: MemoryActor,
     sourceMemoryId?: string,
+    allowModelSend = true,
   ): Promise<MemoryResult<unknown>> {
     const requestId = randomUUID();
     const startedAt = performance.now();
     try {
       const value = await this.governor.run(binding.sessionId, () =>
-        this.dispatch(name, input, binding, sourceMemoryId),
+        name === "memory_capture"
+          ? withMemoryCaptureScope(binding, (input as MemoryCaptureInput).operationId, () => this.dispatch(name, input, binding, sourceMemoryId), allowModelSend)
+          : this.dispatch(name, input, binding, sourceMemoryId),
       );
       this.emitCompletion(requestId, name, startedAt, "OK", binding);
       return success(requestId, value);

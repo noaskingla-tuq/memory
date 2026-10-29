@@ -94,21 +94,23 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   const profile = new ProfileTable(loadProfileFile(profilePath));
   // why: a host without the Program API (older Core) gets no binding, so its AI turns never carry a taskId and never call Program
   const teamuqTask = options.host?.program === undefined ? undefined : createTeamuqTaskBinding({ program: options.host.program, store: createTeamuqTaskStore(dirname(options.dataRoot)), profile });
-  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask);
+  const organizationStore = options.host === undefined ? undefined : createLocalPunchOrganizationStore(dirname(options.dataRoot));
+  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask, organizationStore);
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
-  const organizationStore = options.host === undefined ? undefined : createLocalPunchOrganizationStore(dirname(options.dataRoot));
   const organization = organizationStore === undefined ? undefined : createPunchOrganizationWorker({
     store: organizationStore,
-    claimDailyRound: organizationStore.claimDailyRound,
     enabled: () => organizationSettings().enabled,
     frequency: () => organizationSettings().frequency,
     dailyTime: () => organizationSettings().dailyTime,
     ...(options.organizationNow === undefined ? {} : { now: options.organizationNow }),
     async capture(job) {
       const active = ensure();
-      try { return await active.application.execute("memory_capture", job.input, job.actor, job.memoryId); }
-      finally { active.ui.index.markDirty(job.actor.agentId); }
+      try { return await active.application.execute("memory_capture", job.input, job.actor, job.memoryId, job.allowModelSend ?? true); }
+      finally {
+        await model?.releasePair(job.actor.agentId, job.actor.projectId).catch(() => undefined);
+        active.ui.index.markDirty(job.actor.agentId);
+      }
     },
   });
   let unsubscribeSettings: (() => void) | undefined;
@@ -129,6 +131,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   const punchWorker = options.host === undefined ? undefined : createPunchCatchupWorker({
     feed: createPunchFeed(options.host),
     receipts: createMigratingPunchReceiptStore(options.host, createLocalPunchReceiptStore(dirname(options.dataRoot))),
+    ...(organizationStore === undefined ? {} : { resumeStore: organizationStore }),
     onAdmitted: (punch, memoryId) => organization!.enqueue(punch, memoryId),
     writer: {
       async rememberMany(inputs) {

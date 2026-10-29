@@ -5,6 +5,26 @@ import type { DirectoryAgent, DirectoryProject, DirectorySnapshot, ProfileDirect
 
 export const LEGACY_PUNCH_RECEIPT_NAMESPACE = "legacy-punch-write";
 
+interface WorkSnapshotDiagnostics {
+  readonly snapshotId: string;
+  readonly generation: string;
+  readonly highWatermark: string | null;
+  readonly processed: number;
+  readonly scanned: number;
+  readonly returned: number;
+  readonly schemaSkipped: number;
+  readonly complete: boolean;
+}
+
+function isWorkSnapshotDiagnostics(value: unknown): value is WorkSnapshotDiagnostics {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.snapshotId === "string" && typeof row.generation === "string"
+    && (row.highWatermark === null || typeof row.highWatermark === "string")
+    && ["processed", "scanned", "returned", "schemaSkipped"].every((key) => Number.isSafeInteger(row[key]) && (row[key] as number) >= 0)
+    && typeof row.complete === "boolean";
+}
+
 function toPunch(record: Awaited<ReturnType<PluginHostApiV1["workRecords"]["readPage"]>>["records"][number]): SettledPunch {
   return {
     id: record.punchId,
@@ -36,6 +56,19 @@ export function createPunchFeed(host: PluginHostApiV1): PunchFeedPort {
       const page = cached ?? await host.workRecords.readPage(input);
       if (page.snapshot.snapshotId !== input.snapshotId || snapshot?.snapshotId !== input.snapshotId || page.snapshot.generation !== snapshot.generation || page.snapshot.highWatermark !== snapshot.highWatermark) throw new Error("work_record_snapshot_changed");
       return { snapshot: page.snapshot, records: page.records.map(toPunch), nextCursor: page.nextCursor };
+    },
+    async readSnapshotDiagnostics(snapshotId) {
+      const read = (host.workRecords as typeof host.workRecords & { readSnapshotDiagnostics?: (request: { readonly snapshotId: string }) => Promise<unknown> }).readSnapshotDiagnostics;
+      if (read === undefined || snapshot?.snapshotId !== snapshotId) return null;
+      try {
+        const value = await read({ snapshotId });
+        if (!isWorkSnapshotDiagnostics(value)) return null;
+        const result = value;
+        if (result.snapshotId !== snapshotId || result.generation !== snapshot.generation || result.highWatermark !== snapshot.highWatermark
+          || !Number.isSafeInteger(result.processed) || !Number.isSafeInteger(result.scanned) || !Number.isSafeInteger(result.returned)
+          || !Number.isSafeInteger(result.schemaSkipped)) return null;
+        return { processed: result.processed, scanned: result.scanned, returned: result.returned, schemaSkipped: result.schemaSkipped, available: true };
+      } catch { return null; }
     },
     subscribeSettledChanges(listener) {
       return host.workRecords.subscribeSettledChanges(() => listener());

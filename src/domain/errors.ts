@@ -25,6 +25,7 @@ export const MEMORY_ERROR_CODES = [
 ] as const;
 
 export type MemoryErrorCode = (typeof MEMORY_ERROR_CODES)[number];
+export type MemoryFailurePhase = "discovery" | "session_open" | "session_resume" | "task_binding" | "send_unknown" | "turn" | "turn_timeout" | "reply_contract" | "cairn_schema" | "commit" | "state" | "policy" | "quota" | "cancelled";
 
 export type MemoryResult<T> =
   | { readonly ok: true; readonly value: T; readonly requestId: string }
@@ -35,6 +36,7 @@ export type MemoryResult<T> =
         readonly message: string;
         readonly retryable: boolean;
         readonly requestId: string;
+        readonly phase?: MemoryFailurePhase;
       };
     };
 
@@ -54,16 +56,19 @@ const RETRYABLE = new Set<MemoryErrorCode>([
 export class MemoryServiceError extends Error {
   readonly code: MemoryErrorCode;
   readonly retryable: boolean;
+  readonly phase?: MemoryFailurePhase;
 
   constructor(
     code: MemoryErrorCode,
     message: string,
     retryable = RETRYABLE.has(code),
+    phase?: MemoryFailurePhase,
   ) {
     super(message);
     this.name = "MemoryServiceError";
     this.code = code;
     this.retryable = retryable;
+    this.phase = phase;
   }
 }
 
@@ -89,9 +94,16 @@ const CAIRN_ERROR_MAP: Readonly<Record<string, MemoryErrorCode>> = {
   storage_error: "INTERNAL",
 };
 
-export function mapCairnError(code: string): MemoryServiceError {
+export function mapCairnError(code: string, phase?: MemoryFailurePhase): MemoryServiceError {
   const mapped = CAIRN_ERROR_MAP[code] ?? "INTERNAL";
-  return new MemoryServiceError(mapped, `Memory operation failed: ${mapped}`);
+  const inferredPhase: MemoryFailurePhase | undefined =
+    code === "storage_busy" || code === "storage_error" ? "commit"
+      : code === "invalid_model_output" || code === "model_output_invalid" || code === "extraction_failed" ? "cairn_schema"
+        : code === "model_timeout" || code === "model_cancelled" ? "turn_timeout"
+          : code === "model_not_configured" ? "policy"
+            : code === "model_policy_denied" || code === "context_budget_exceeded" ? "policy"
+              : undefined;
+  return new MemoryServiceError(mapped, "Memory operation failed: " + mapped, undefined, phase ?? inferredPhase);
 }
 
 export function failure(requestId: string, error: unknown): MemoryFailure {
@@ -106,6 +118,7 @@ export function failure(requestId: string, error: unknown): MemoryFailure {
       message: normalized.message,
       retryable: normalized.retryable,
       requestId,
+      ...(normalized.phase === undefined ? {} : { phase: normalized.phase }),
     },
   };
 }

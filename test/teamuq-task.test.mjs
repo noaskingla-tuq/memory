@@ -50,6 +50,7 @@ function fakeAi(openFailure = () => null) {
         onEvent(next) { listener = next; return () => { listener = undefined; }; },
         async send() {
           listener({ turnId: "t", kind: "textDelta", text: '{"items":[]}' });
+          listener({ turnId: "t", kind: "contentSaved", sequenceNo: 1 });
           listener({ turnId: "t", kind: "completed" });
           return { turnId: "t" };
         },
@@ -266,7 +267,7 @@ const devkitManifest = () => {
   const template = JSON.parse(readFileSync(new URL("../plugin/manifest.template.json", import.meta.url), "utf8").replace("@VERSION@", memoryVersion));
   return { ...template, permissions: [...template.permissions, ...READ_BACK_PERMISSIONS] };
 };
-const JSON_REPLY = { events: [{ textDelta: '{"items":[]}' }, "completed"] };
+const JSON_REPLY = { events: [{ textDelta: '{"items":[]}' }, { contentSaved: 1 }, "completed"] };
 const devkitHost = (t) => {
   const host = createTestHost({ manifest: devkitManifest() });
   t.after(() => host.close());

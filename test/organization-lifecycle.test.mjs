@@ -19,7 +19,7 @@ test("dispose cancels an in-flight host model, removes subscriptions and preserv
     projectDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
     ai: {
       async getOptions() { return { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 10000 } }; },
-      async openSession() { return { effective: { providerId: "mock", modelId: "allowed" }, turn: null,
+      async openSession() { return { sessionId: "host-session", effective: { providerId: "mock", modelId: "allowed" }, turn: null,
         onEvent() { return () => { counters.off++; }; }, async send() { signalStarted(); return { turnId: "t" }; },
         async interrupt() { counters.interrupted++; }, async close() { counters.closed++; },
       }; },
@@ -146,7 +146,8 @@ test("per-key time then frequency subscription uses the daily gate without retry
   settingsListener?.(values);
   await backend.idleWorkers();
   job = (await organizationStore.readPage(null, 100)).records[0].value;
-  assert.equal(job.attempts, 2, "a later relevant settings update wakes the now-due daily work using the persisted retry and schedule");
+  assert.equal(job.attempts, 1, "a failed AI attempt from earlier that day remains deferred to the next daily round");
+  assert.equal(job.lastAttemptDate, "2026-01-01");
   assert.deepEqual(JSON.parse(readFileSync(join(dirname(dataRoot), "punch-organization.json"), "utf8")).organizationClaims.dates, ["2026-01-01"]);
   await backend.dispose();
 });

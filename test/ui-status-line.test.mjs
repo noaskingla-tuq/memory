@@ -123,6 +123,31 @@ test("the header says the service is running with the time of the last write and
   r.line.stop();
 });
 
+test("organization status keeps reply, commit, legacy and unknown source counts distinct with expandable redacted details", async () => {
+  const organization = {
+    state: "paused", admitted: 12, pending: 5, replyReady: 1, completed: 6, legacyUnlinked: 2,
+    schemaSkipped: null, diagnosticsAvailable: false,
+    sourceGeneration: "generation-1", sourceHighWatermark: "2026-01-01T02:00:00.000Z",
+    sourcePages: 3, sourceScanned: null, sourceReceived: 10, sourceEligible: 8, sourceCheckpointed: false,
+    lastError: "RESOURCE_BUSY", errorPhase: "commit", hostErrorCode: "provider_error",
+    retryable: true, partialDelivered: true, lastAttemptAt: NOW, updatedAt: NOW,
+    dailyRound: { date: "2026-01-01", roundId: "private-round-id", state: "paused", nextResumeAt: NOW + 1000, snapshotHighWatermark: 12, snapshotMembers: 8, completedMembers: 6, deferredMembers: 2 },
+  };
+  const r = rig({ results: [{ ok: true, value: statusValue({ organization }) }] });
+  r.line.start();
+  await r.flush();
+  assert.equal(r.target.dataset.state, "warn");
+  assert.ok(r.target.innerHTML.includes("已收錄 12 · 待整理 5 · 回覆待提交 1 · 整理完成 6"));
+  assert.ok(r.target.innerHTML.includes("待核對 2 筆舊工作"));
+  assert.ok(r.target.innerHTML.includes("來源略過未知"));
+  assert.ok(r.target.innerHTML.includes("<details"));
+  assert.ok(r.target.innerHTML.includes("<summary>整理與來源詳情</summary>"));
+  assert.ok(r.target.innerHTML.includes("provider_error"));
+  assert.equal(r.target.innerHTML.includes("private-round-id"), false);
+  assert.equal(r.target.innerHTML.includes("secret transcript"), false);
+  r.line.stop();
+});
+
 test("no write yet, an unhealthy store and a failed call each get their own plain wording", async () => {
   const none = rig({ results: [{ ok: true, value: statusValue({ lastWriteAt: null }) }] });
   none.line.start();

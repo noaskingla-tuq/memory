@@ -43,6 +43,10 @@ function writeText(status: UiStatus, nowMs: number): string {
   return status.lastWriteAt === null ? t("status.noWrite") : t("status.lastWrite", { ago: relativeTime(status.lastWriteAt, nowMs) });
 }
 
+function detailTime(value: number | null): string {
+  return value === null ? t("status.organization.unknown") : new Date(value).toISOString();
+}
+
 // why: the container carries the overall state too, because the real-Electron harness and any outside probe read #status[data-state] rather than its children
 function renderResult(target: StatusTarget, result: BackendResult, nowMs: number): void {
   if (result.ok && isStatus(result.value)) {
@@ -53,8 +57,34 @@ function renderResult(target: StatusTarget, result: BackendResult, nowMs: number
     const warn = !ready || organizationState === "paused" || organizationState === "error";
     target.dataset.state = warn ? "warn" : "ok";
     const detail = t("status.detail", { version: status.version, storage: status.storage.status });
-    const organizationText = organization !== undefined && ["disabled", "idle", "running", "paused", "error"].includes(organization.state) ? t(`status.organization.${organization.state}`, { n: organization.pending }) : "";
-    mount(target, html`<p class="state" data-state="${warn ? "warn" : "ok"}" title="${detail}">${ready ? t("status.ok") : t("status.storageTrouble")}${ready ? html`<span class="muted">・${writeText(status, nowMs)}</span>` : EMPTY_HTML}${organizationText ? html`<span class="muted">・${organizationText}</span>` : EMPTY_HTML}</p>`);
+    const organizationText = organization !== undefined ? html`
+      <span class="muted">・${t(`status.organization.phase.${organization.state}`)}</span>
+      <span class="muted">・${t("status.organization.summary", { admitted: organization.admitted ?? t("status.organization.unknown"), pending: organization.pending, replies: organization.replyReady, completed: organization.completed })}</span>
+      ${organization.legacyUnlinked > 0 ? html`<span class="muted">・${t("status.organization.legacy", { n: organization.legacyUnlinked })}</span>` : EMPTY_HTML}
+      <span class="muted">・${organization.diagnosticsAvailable === true ? t("status.organization.skipped", { n: organization.schemaSkipped ?? 0 }) : t("status.organization.skippedUnknown")}</span>
+      <details class="organization-details">
+        <summary>${t("status.organization.diagnostics")}</summary>
+        <dl>
+          <dt>${t("status.organization.phase")}</dt><dd>${organization.errorPhase ?? t("status.organization.unknown")}</dd>
+          <dt>${t("status.organization.hostCode")}</dt><dd>${organization.hostErrorCode ?? t("status.organization.unknown")}</dd>
+          <dt>${t("status.organization.retry")}</dt><dd>${organization.retryable === null ? t("status.organization.unknown") : organization.retryable ? t("status.organization.yes") : t("status.organization.no")}</dd>
+          <dt>${t("status.organization.partial")}</dt><dd>${organization.partialDelivered === null ? t("status.organization.unknown") : organization.partialDelivered ? t("status.organization.yes") : t("status.organization.no")}</dd>
+          <dt>${t("status.organization.lastAttempt")}</dt><dd>${detailTime(organization.lastAttemptAt)}</dd>
+          <dt>${t("status.organization.sourceSnapshot")}</dt><dd>${organization.sourceGeneration ?? t("status.organization.unknown")} · ${organization.sourceHighWatermark ?? t("status.organization.unknown")}</dd>
+          <dt>${t("status.organization.sourceCounts")}</dt><dd>${t("status.organization.sourceCountsValue", {
+            pages: organization.sourcePages ?? t("status.organization.unknown"), scanned: organization.sourceScanned ?? t("status.organization.unknown"),
+            received: organization.sourceReceived ?? t("status.organization.unknown"), eligible: organization.sourceEligible ?? t("status.organization.unknown"),
+            checkpointed: organization.sourceCheckpointed === null ? t("status.organization.unknown") : organization.sourceCheckpointed ? t("status.organization.yes") : t("status.organization.no"),
+          })}</dd>
+          <dt>${t("status.organization.dailyRound")}</dt><dd>${organization.dailyRound === null ? t("status.organization.unknown") : t("status.organization.dailyRoundValue", {
+            date: organization.dailyRound.date, state: organization.dailyRound.state, members: organization.dailyRound.snapshotMembers,
+            completed: organization.dailyRound.completedMembers, deferred: organization.dailyRound.deferredMembers,
+            watermark: organization.dailyRound.snapshotHighWatermark,
+          })}</dd>
+          <dt>${t("status.organization.lastError")}</dt><dd>${organization.lastError ?? t("status.organization.unknown")}</dd>
+        </dl>
+      </details>` : EMPTY_HTML;
+    mount(target, html`<p class="state" data-state="${warn ? "warn" : "ok"}" title="${detail}">${ready ? t("status.ok") : t("status.storageTrouble")}${ready ? html`<span class="muted">・${writeText(status, nowMs)}</span>` : EMPTY_HTML}${organizationText}</p>`);
     return;
   }
   target.dataset.state = "error";

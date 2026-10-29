@@ -34,6 +34,10 @@ function harness(records, options = {}) {
       return { snapshot: { snapshotId: "snapshot-1", generation: "g1", highWatermark: "p2" }, records, nextCursor: null };
     },
     subscribeSettledChanges(next) { listener = next; return () => { listener = () => {}; }; },
+    ...(options.diagnostics === undefined ? {} : { async readSnapshotDiagnostics(snapshotId) {
+      assert.equal(snapshotId, "snapshot-1");
+      return { processed: 4, scanned: 4, returned: records.length, schemaSkipped: 1, available: true };
+    } }),
   };
   const receipts = {
     async readPage(cursor, limit) {
@@ -79,6 +83,28 @@ test("activation catches up settled records and persists one terminal receipt pe
   assert.equal([...h.state.values()].filter((value) => value?.version === 1).length, 1);
   await h.worker.stop();
   assert.equal(PUNCH_RECEIPT_NAMESPACE, "punch-write-v1");
+});
+
+test("per-run source diagnostics persist exact supported counts and keep old-host skips unknown", async () => {
+  for (const diagnostics of [undefined, true]) {
+    const sourceRuns = [];
+    const h = harness([punch("p1")], {
+      ...(diagnostics === undefined ? {} : { diagnostics }),
+      resumeStore: { async sourceRun(run) { sourceRuns.push(run); } },
+    });
+    h.worker.start();
+    await h.worker.idle();
+    assert.equal(sourceRuns.length, 1);
+    assert.equal(sourceRuns[0].pages, 1);
+    assert.equal(sourceRuns[0].received, 1);
+    assert.equal(sourceRuns[0].eligible, 1);
+    assert.equal(sourceRuns[0].admitted, 1);
+    assert.equal(sourceRuns[0].checkpointed, true);
+    assert.equal(sourceRuns[0].diagnosticsAvailable, diagnostics === true);
+    assert.equal(sourceRuns[0].schemaSkipped, diagnostics === true ? 1 : null);
+    assert.equal(sourceRuns[0].scanned, diagnostics === true ? 4 : null);
+    await h.worker.stop();
+  }
 });
 
 test("a repeated activation reads durable receipts before writing and remains idempotent", async () => {

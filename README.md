@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.5，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.15，釘選 Cairn v1-preview.3（套件版本 0.3.2，預設 schema 18）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.6，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.7.15，釘選 Cairn v1-preview.3（套件版本 0.3.2，預設 schema 18）。
 
 > 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
 
@@ -8,7 +8,7 @@ TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.5，fu
 
 外掛從公開 `host.workRecords.readPage` 讀取已結算 punches。第一頁同時取得 snapshot 並保留資料，後續頁面固定 snapshotId、generation、highWatermark；重複 cursor 或 snapshot 改變會停止該次同步，稍後重試。`punchId` 保留在本機收據與工作來源，並產生固定的原始寫入與 capture 身分；agentId/projectId 決定記憶 scope，sessionId 用於來源關聯。name 是請求，description 是成果，Lexical JSON 沿用既有純文字轉換。
 
-原始工作紀錄先以 `context` 儲存，再將整理工作持久化，最後確認同步收據。同步收據/checkpoint 位於 `<dataDir>/punch-state.json`，整理佇列位於 `<dataDir>/punch-organization.json`；兩者拒絕 symlink/junction、檢查 revision，先寫 tmp、fsync 後原子 rename。整理檔沿用舊版 `{version, records}`，每日執行日期保存在可選的根層 `organizationClaims` metadata，舊 job rows 不搬動。舊 host pluginState 的收據與 checkpoint 只讀遷移；`plugin_state_retired` 允許直接使用本機狀態，其他讀取失敗或收據衝突會停止並保留資料。相符的舊寫入收據會重建整理工作，已存在的工作保持原始來源不變。
+原始工作紀錄先以 `context` 儲存，再將整理工作持久化，最後確認同步收據。同步收據/checkpoint 位於 `<dataDir>/punch-state.json`，整理佇列位於 `<dataDir>/punch-organization.json`；兩者拒絕 symlink/junction、檢查 revision，先寫 tmp、fsync 後原子 rename。整理檔沿用 `{version:1, records}`，只新增選填的 `organizationResume` 版本 1 與 `organizationQueueSequence`，不建立 SQL table 或匯入 host 私有資料。舊版無映射的 pending job 會保留來源訊息並標記 `legacy_unlinked`，不會自動送模型；舊 claim／已完成工作不重播。只有 claim、沒有相容 round snapshot 的舊日期仍算已消耗，當天只允許精確配對的本機 reply commit recovery，不重新開 AI round。每日 round 在本機日期 claim 與原子佇列序號高水位建立固定快照；重啟接續同一 `roundId`，逐筆繼續未嘗試工作，安全的 reply-ready commit recovery 可以當天接續，已失敗的模型工作與快照後新工作留到下一個每日 round。round metadata 正常最多保留 32 筆並保留當前 open round；較早未完成 round 會在新日期 supersede，pending job 與 operation reply journal 獨立保留。claim 日期另有單調 `throughDate` 高水位，因此時鐘回撥不會重開已消耗日期。舊 host pluginState 的收據與 checkpoint 只讀遷移；`plugin_state_retired` 允許直接使用本機狀態，其他讀取失敗或收據衝突會停止並保留資料。相符的舊寫入收據會重建整理工作，已存在的工作保持原始來源不變。
 
 設定頁可選 `organizationFrequency` 的「每天一輪」或「即時整理」，並設定 `organizationDailyTime`（嚴格 `HH:mm`、本機時區）；預設每天一輪、本機時間 02:00。即時模式會在工作紀錄同步後整理等待項目，並沿用逐筆退避與重試，不建立 daily claim。每日時間在即時模式停用但保留，切回每天一輪仍可使用。現有主機 settings API 逐 key 儲存；設定頁先寫入不會觸發錯誤輪次的欄位，目標為每天一輪時先保存時間、再切換頻率，目標為即時時先切換頻率、再保存時間；停用狀態的設定會在重新啟用前先完成。設定只在各 key 讀回確認後回報儲存，部分失敗會保留未確認草稿。
 
@@ -16,7 +16,11 @@ TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.5，fu
 
 提供者與模型 ID 可留空使用可用預設值，指定 ID 不可用時暫停，不使用 astra。`organizationContextBudget` 是 UTF-8 bytes 的保守預算（預設 32,768），並非精確 token 數或模型 context window；Cairn 另限制每次模型輸入 6,000、輸出 1,024 個計數單位。整理來源採固定前綴：請求最多 300 UTF-16 units/900 bytes、成果最多 1,200 units/2,400 bytes，保持完整字元；完整的原始工作紀錄仍依既有 3,600 units 規則儲存。真實模型限制與整理品質需另行實測。
 
-`ui.status.organization` 是選填欄位，回報 disabled/idle/running/paused/error、pending/completed 與錯誤碼，狀態列以繁體中文顯示。關閉或 AI 不可用時明確記憶讀寫仍可使用。dispose 取消 host AI、等待 workers/名稱更新，再關閉 Cairn handles。此次只接工作紀錄 capture，未提供 Cairn episodes、確認審閱或 session-context 的新 UI/API。
+`ui.status.organization` 是選填欄位，分開回報 source admitted、pending、reply-ready、committed、`legacy_unlinked`、錯誤 phase 與 host error code；預設狀態列提供短計數，細節以鍵盤/touch 可展開。Host 可選的 `workRecords.readSnapshotDiagnostics({snapshotId})` 只回該 plugin 快照的掃描、schema-skip 與高水位計數，未支援或過期時顯示未知，不阻擋有效 work-record page、AI、CRUD 或每日排程。關閉或 AI 不可用時明確記憶讀寫仍可使用。dispose 取消 host AI、等待 workers/名稱更新，再關閉 Cairn handles。此次只接工作紀錄 capture，未提供 Cairn episodes、確認審閱或 session-context 的新 UI/API。
+
+每次 capture 以原始 `(canonical agentId, projectId|null)` 綁定 Cairn host session；TeamUQ 管理 Task ID 只作 host 關聯，不當來源專案識別。session 的固定 system 是 pair-neutral protocol；每個 turn 都攜帶當次 Cairn operation、system/output schema、callKey 與 input。v2 callKey 同時綁定 operation system/schema、request 與 occurrence；舊版 key 僅在保存的 model operation/system/request/occurrence 完全相符時相容，模糊或不符的舊 call 會停止等待核對，不重送。若 host 回報 `closedSessionResume`，重啟後才以原 sessionId attach 並核對有效 provider/model；舊 host、過期 session、權限失效或未知 send 都顯示降級階段，不自動開新 session 重送。Host `completed` 不是持久化回覆；需收到 matching turn 的 `contentSaved` sequenceNo 後才保存 bounded reply checkpoint，再交 Cairn 驗證 schema 並以穩定 operationId commit。`items:[]` 經 Cairn 驗證後是 `empty_success`，整理 job 完成且新記憶數為零；JSON 解析成功本身不算 Cairn schema 成功。
+
+模型回覆 journal 與 session map 只存於 plugin-owned `punch-organization.json`，限制每回覆 16 KiB、每 operation 256 KiB、未完成回覆合計 1 MiB；Cairn job 結束與 operation journal 移除在同一本機原子提交中完成。超過 7 天仍未完成的 recovery 保留資料並顯示待操作員核對，不會靜默丟棄。Host 擁有 conversation text 與權限授權；本機 UI、診斷、telemetry 不顯示 session／turn／source ID、模型 prompt 或回覆文字。
 
 ## 目錄
 

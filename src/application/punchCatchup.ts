@@ -9,6 +9,7 @@ import type {
   PunchTerminalReceipt,
   PunchWriteScope,
   SettledPunch,
+  OrganizationResumeStorePort,
 } from "./punchDataPorts.js";
 
 export const PUNCH_RECEIPT_NAMESPACE = "punch-write-v1";
@@ -22,6 +23,7 @@ const INTERNAL_FAILURE_LIMIT = 3;
 export interface PunchCatchupOptions {
   readonly feed: PunchFeedPort;
   readonly receipts: PunchReceiptStorePort;
+  readonly resumeStore?: Pick<OrganizationResumeStorePort, "sourceRun">;
   readonly legacyReceipts?: LegacyPunchStatePort;
   readonly writer: PunchMemoryWriterPort;
   readonly onAdmitted?: (punch: SettledPunch, memoryId: string) => Promise<void>;
@@ -294,13 +296,21 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
     const tally: Tally = { written: 0, deduplicated: 0, skipped: 0, terminalized: 0, stoppedCode: null, lastWrittenAtMs: null };
     let examined = 0;
     let pending = 0;
+    let pages = 0;
+    let received = 0;
+    let eligibleSeen = 0;
+    let checkpointed = false;
     const lastWrittenAtMs = [...receipts.values()].reduce<number | null>((latest, row) => row.state === "written" ? Math.max(latest ?? row.writtenAt, row.writtenAt) : latest, null);
     tally.lastWrittenAtMs = lastWrittenAtMs;
     let cursor: string | null = null;
     const seenCursors = new Set<string>();
     let more = false;
-    do {
+    let scanError: unknown;
+    try {
+      do {
       const page = await options.feed.readSettledPage({ snapshotId: snapshot.snapshotId, cursor, limit: PAGE_LIMIT });
+      pages += 1;
+      received += page.records.length;
       if (page.snapshot.snapshotId !== snapshot.snapshotId || page.snapshot.generation !== snapshot.generation || page.snapshot.highWatermark !== snapshot.highWatermark) throw new Error("work_record_snapshot_changed");
       for (const punch of page.records) {
         const admitted = receipts.get(punch.id);
@@ -308,6 +318,7 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
       }
       const eligible = page.records.filter((punch) => punch.startedAtMs >= (sinceMs ?? 0) && punch.endedAtMs <= now() - minAgeMs && !receipts.has(punch.id));
       pending += eligible.length;
+      eligibleSeen += eligible.length;
       const processable = eligible.slice(0, Math.max(0, maxPerRun - examined));
       for (let start = 0; start < processable.length && tally.stoppedCode === null; start += BATCH_SIZE) {
         const batch = processable.slice(start, start + BATCH_SIZE);
@@ -328,15 +339,39 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
       if (cursor !== null) seenCursors.add(cursor);
       more = cursor !== null || processable.length < eligible.length;
       if (examined >= maxPerRun) break;
-    } while (cursor !== null && tally.stoppedCode === null && !stopped);
-    if (tally.stoppedCode === null && !more && !stopped) {
-      try {
-        const checkpointValue = { version: 1, sinceMs, generation: snapshot.generation, highWatermark: snapshot.highWatermark, completedAt: now() };
-        await options.receipts.writeBatch([{ key: CHECKPOINT_KEY, value: checkpointValue, expectedRevision: checkpointRevision }]);
-      } catch (error) {
-        tally.stoppedCode = error instanceof Error ? error.name : "checkpoint_write_failed";
+      } while (cursor !== null && tally.stoppedCode === null && !stopped);
+      if (tally.stoppedCode === null && !more && !stopped) {
+        try {
+          const checkpointValue = { version: 1, sinceMs, generation: snapshot.generation, highWatermark: snapshot.highWatermark, completedAt: now() };
+          await options.receipts.writeBatch([{ key: CHECKPOINT_KEY, value: checkpointValue, expectedRevision: checkpointRevision }]);
+          checkpointed = true;
+        } catch (error) {
+          tally.stoppedCode = error instanceof Error ? error.name : "checkpoint_write_failed";
+        }
       }
+    } catch (error) {
+      scanError = error;
+      tally.stoppedCode = error instanceof Error ? error.name : "work_record_scan_failed";
     }
+    let diagnostics = null;
+    try { diagnostics = await options.feed.readSnapshotDiagnostics?.(snapshot.snapshotId) ?? null; } catch { diagnostics = null; }
+    try {
+      await options.resumeStore?.sourceRun?.({
+        snapshotId: snapshot.snapshotId,
+        generation: snapshot.generation,
+        highWatermark: snapshot.highWatermark,
+        pages,
+        scanned: diagnostics?.scanned ?? null,
+        received,
+        eligible: eligibleSeen,
+        admitted: [...receipts.values()].filter((receipt) => receipt.state === "written").length + tally.written,
+        checkpointed,
+        schemaSkipped: diagnostics?.schemaSkipped ?? null,
+        diagnosticsAvailable: diagnostics?.available === true,
+        updatedAt: now(),
+      });
+    } catch {}
+    if (scanError !== undefined) throw scanError;
     const remaining = Math.max(0, pending - tally.terminalized);
     const result = { examined, written: tally.written, deduplicated: tally.deduplicated, skipped: tally.skipped, pending: remaining, lastWrittenAtMs: tally.lastWrittenAtMs, complete: tally.stoppedCode === null && !more, stoppedCode: tally.stoppedCode };
     if (result.complete) lastStatus = { pending: remaining, lastWrittenAtMs: tally.lastWrittenAtMs };

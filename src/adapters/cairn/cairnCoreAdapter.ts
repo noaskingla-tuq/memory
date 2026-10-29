@@ -2,12 +2,14 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { openMemoryCore } from "cairn-memory/core/index.mjs";
 import type { CoreResult, MemoryCorePort } from "../../application/ports.js";
 import type { MemoryModelPort } from "../../application/modelPort.js";
+import type { MemoryFailurePhase } from "../../domain/errors.js";
 import { createCairnModelAdapter } from "../model/cairnModelAdapter.js";
 
 type ModelFailureCode = string;
 
 interface ModelFailureContext {
   code?: ModelFailureCode;
+  phase?: MemoryFailurePhase;
 }
 
 export function openCairnCore(
@@ -21,10 +23,12 @@ export function openCairnCore(
       : createCairnModelAdapter(
           modelBinding.agentId,
           modelBinding.port,
-          (code) => {
+          (code, phase) => {
             const context = failures.getStore();
-            if (context !== undefined)
+            if (context !== undefined) {
               context.code = code.toLowerCase();
+              if (phase !== undefined) context.phase = phase;
+            }
           },
         );
   const core = openMemoryCore({
@@ -40,7 +44,7 @@ export function openCairnCore(
       if (!result.ok && context.code !== undefined) {
         return {
           ok: false as const,
-          error: { code: context.code, retryable: ["model_timeout", "resource_busy", "storage_busy"].includes(context.code) },
+          error: { code: context.code, retryable: ["model_timeout", "resource_busy", "storage_busy"].includes(context.code), ...(context.phase === undefined ? {} : { phase: context.phase }) },
         };
       }
       return result;

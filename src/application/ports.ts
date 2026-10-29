@@ -1,10 +1,11 @@
 import type { MemoryNamespace } from "../domain/namespace.js";
+import type { MemoryFailurePhase } from "../domain/errors.js";
 
 export type CoreResult<T = unknown> =
   | { readonly ok: true; readonly value: T }
   | {
       readonly ok: false;
-      readonly error: { readonly code: string; readonly retryable: boolean };
+      readonly error: { readonly code: string; readonly retryable: boolean; readonly phase?: MemoryFailurePhase };
     };
 
 export interface MemoryCorePort {

@@ -23,7 +23,7 @@ export function trialControls(organization: Organization): SafeHtml {
   }
   const halted = trial?.state === "halted" ? html`<span class="muted">・${progress("trial.ended.halted", trial)}</span>` : EMPTY_HTML;
   const open = (organization.legacyTrialCandidates ?? 0) > 0 && organization.state !== "disabled"
-    ? html`<button type="button" class="btn" data-trial="open" data-trial-n="${organization.legacyUnlinked}">${t("trial.open")}</button>` : EMPTY_HTML;
+    ? html`<button type="button" class="btn" data-trial="open" data-trial-n="${organization.legacyTrialCandidates}">${t("trial.open")}</button>` : EMPTY_HTML;
   return html`<span class="trial-controls">${halted}${open}</span>`;
 }
 

@@ -86,7 +86,7 @@ test("U1: the trial controls sit outside <details> and are still there after a r
   assert.ok(idle.indexOf('data-trial="open"') > 0 && idle.indexOf('data-trial="open"') < detailsAt, "the open button is in the always-visible line");
   assert.ok(!idle.slice(detailsAt).includes("data-trial="), "nothing that drives the trial is inside the details");
   assert.ok(idle.includes("舊工作 90 筆暫停中（可小量試跑）"));
-  assert.ok(idle.includes('data-trial-n="90"'));
+  assert.ok(idle.includes('data-trial-n="80"'), "the dialog count is the candidate count");
 
   const running = await render(organization({ trial: trial() }));
   assert.ok(running.indexOf('data-trial="stop"') > 0 && running.indexOf('data-trial="stop"') < running.indexOf("<details"));
@@ -101,14 +101,14 @@ test("U1: the trial controls sit outside <details> and are still there after a r
   assert.ok(!(await render(organization({ state: "disabled" }))).includes('data-trial="open"'), "AI organization off: no button");
 });
 
-function scene(answers = []) {
+function scene(answers = [], trialN = "90") {
   const doc = new FakeDocument();
   const calls = [];
   let refreshed = 0;
   const listeners = [];
   const client = { async call(method, params) { calls.push({ method, params }); return answers.shift() ?? { ok: true, value: { ok: true, action: "start", adopted: 5, blocked: null } }; } };
   ui.bindLegacyTrial({ addEventListener: (_type, listener) => listeners.push(listener) }, { client, document: doc, refresh: async () => { refreshed += 1; }, newRequestId: () => "req-fixed-" + calls.length });
-  const click = (kind) => listeners[0]({ target: { closest: () => ({ dataset: { trial: kind, trialN: "90" } }) } });
+  const click = (kind) => listeners[0]({ target: { closest: () => ({ dataset: { trial: kind, trialN } }) } });
   const buttons = () => doc.body.querySelectorAll("button");
   const labelled = (text) => buttons().find((button) => button.textContent === text);
   return { doc, calls, click, buttons, labelled, refreshed: () => refreshed };
@@ -156,6 +156,8 @@ test("U2b: cancelling sends nothing, stop sends a stop, and a blocked or failed 
   assert.equal(s.calls.length, 2);
   assert.equal(s.refreshed(), 2);
   assert.ok(dialogText(s).includes("記憶庫忙碌中。稍後再試。"));
+  s.doc.dispatch(s.labelled("知道了"), "click", {});
+  await flush();
 });
 
 test("U3: every trial string exists, reads as Taiwan Traditional Chinese, and the new view files hold nothing a CSP forbids", async () => {
@@ -175,4 +177,17 @@ test("U3: every trial string exists, reads as Taiwan Traditional Chinese, and th
   const css = readFileSync(join(UI_ROOT, "styles/trial.css"), "utf8");
   assert.ok(!/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/iu.test(css), "colors come from tokens only");
   assert.ok(readFileSync(join(UI_ROOT, "styles/app.css"), "utf8").includes('@import "./trial.css";'));
+});
+
+test("R2: the count in the confirm dialog is the number that can be tried, not every paused legacy job", async () => {
+  const idle = await render(organization({ legacyUnlinked: 90, legacyTrialCandidates: 80 }));
+  assert.ok(idle.includes("舊工作 90 筆暫停中"), "the status line still counts every paused job");
+  assert.ok(idle.includes('data-trial-n="80"') && !idle.includes('data-trial-n="90"'), "the button carries the candidate count");
+  const s = scene([], "80");
+  s.click("open");
+  const shown = dialogText(s);
+  assert.ok(shown.includes("80 筆舊工作可以試跑"), "the dialog states the number the button carried");
+  assert.ok(!shown.includes("暫停中"), "the dialog no longer calls the number the paused total");
+  s.doc.dispatch(s.labelled("取消"), "click", {});
+  await flush();
 });

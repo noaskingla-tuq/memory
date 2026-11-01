@@ -11,7 +11,7 @@ export const TRIAL_STRINGS = {
   "trial.details.failures": "試跑失敗分組",
   "trial.details.failureLine": "{code}・階段 {phase}・主程式代碼 {host}・外掛自行判定 {local}・{count} 筆",
   "trial.dialog.title": "要小量試跑舊工作嗎？",
-  "trial.dialog.intro": "目前有 {n} 筆舊工作暫停中。試跑會從中挑出你選的筆數，各交給 AI 整理一次。",
+  "trial.dialog.intro": "目前有 {n} 筆舊工作可以試跑。試跑會從中挑出你選的筆數，各交給 AI 整理一次。",
   "trial.dialog.cost": "每筆約需 2 到 4 次 AI 回合，會消耗 codex 額度。",
   "trial.dialog.safety": "連續失敗 3 筆會自動停止，還沒試的會退回暫停；也可以隨時按停止。",
   "trial.dialog.cancel": "取消",

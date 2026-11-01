@@ -235,3 +235,79 @@ test("W14: a real error during the trial is shown as an error and is not covered
   assert.equal(status.lastError, "MODEL_TIMEOUT");
   assert.equal(status.errorPhase, "turn_timeout");
 });
+
+test("W15: the trial counts in the status line rise with each finished job, not when the whole batch ends", async (t) => {
+  const seen = [];
+  let worker;
+  const h = workerRig(t, { capture: async () => { seen.push(worker.status().trial.attempted); return ok(); } });
+  await seedLegacy(h, 4);
+  worker = h.create(); worker.start(); await worker.idle();
+  await begin(worker, START(4));
+  assert.deepEqual(seen, [0, 1, 2, 3], "each capture sees the jobs finished before it");
+  const done = (await worker.status()).trial;
+  assert.equal(done.attempted, 4);
+  assert.equal(done.committed, 4);
+});
+
+test("W16: a failed trial job shows in the running counts before the next job is sent", async (t) => {
+  const seen = [];
+  let worker;
+  let n = 0;
+  const h = workerRig(t, { capture: async () => { const mid = worker.status().trial; seen.push([mid.attempted, mid.failed]); n += 1; return n === 1 ? fail("MODEL_TIMEOUT", { phase: "turn_timeout" }) : ok(); } });
+  await seedLegacy(h, 3);
+  worker = h.create(); worker.start(); await worker.idle();
+  await begin(worker, START(3));
+  assert.deepEqual(seen, [[0, 0], [1, 1], [2, 1]]);
+});
+
+const seedStuckLegacy = (h, stuck, fresh) => seed(h.store, [
+  ...ids(stuck, "t").map((id) => legacyJob(id, { attempts: 3, lastError: "MODEL_TIMEOUT" })),
+  ...ids(fresh, "f").map((id) => legacyJob(id)),
+]);
+
+for (const mode of ["before-due", "due", "immediate"]) {
+  test(`W17 (${mode}): legacy jobs that already failed do not make the organization state an error or fill lastError`, async (t) => {
+    const h = workerRig(t);
+    if (mode === "due") h.at(5, 10);
+    if (mode === "immediate") h.setFrequency("immediate");
+    await seedStuckLegacy(h, 3, 4);
+    const worker = h.create(); worker.start(); await worker.idle();
+    let status = await worker.status();
+    assert.equal(status.state, "paused", "only legacy jobs: paused, never error");
+    assert.equal(status.lastError, null);
+    assert.equal(status.errorPhase, null);
+    assert.equal(status.legacyUnlinked, 7);
+    assert.equal(status.legacyTrialCandidates, 4);
+    await begin(worker, START(2));
+    status = await worker.status();
+    assert.equal(status.trial.committed, 2);
+    assert.equal(status.state, "paused", "a clean trial leaves the legacy jobs paused");
+    assert.equal(status.lastError, null);
+  });
+}
+
+test("W18: a release fault still shows when the only failed jobs are legacy ones", async (t) => {
+  const h = workerRig(t);
+  await seedStuckLegacy(h, 3, 2);
+  const worker = h.create(); worker.start(); await worker.idle();
+  worker.noteReleaseFault("pair-a", { code: "RESOURCE_BUSY", phase: "session_close", localCode: "close_timeout", retryable: true, at: 7 });
+  const status = await worker.status();
+  assert.equal(status.lastError, "RESOURCE_BUSY");
+  assert.equal(status.errorPhase, "session_close");
+  assert.equal(status.localErrorCode, "close_timeout");
+});
+
+test("W19: a real trial error is still an error, and it is the trial job's code and not a legacy job's", async (t) => {
+  const h = workerRig(t, { capture: async () => fail("MODEL_TIMEOUT", { phase: "turn_timeout" }) });
+  await seed(h.store, [
+    ...ids(2, "t").map((id) => legacyJob(id, { attempts: 2, lastError: "INTERNAL" })),
+    ...ids(4, "f").map((id) => legacyJob(id)),
+  ]);
+  const worker = h.create(); worker.start(); await worker.idle();
+  assert.equal((await worker.status()).state, "paused");
+  await begin(worker, START(1));
+  const status = await worker.status();
+  assert.equal(status.state, "error");
+  assert.equal(status.lastError, "MODEL_TIMEOUT");
+  assert.equal(status.errorPhase, "turn_timeout");
+});

@@ -131,7 +131,8 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     const pendingRows = rows.filter(({ job }) => job.state === "pending");
     const replyCount = pendingRows.filter(({ job }) => replyReady(resume, job)).length;
     const legacy = pendingRows.filter(({ job }) => job.resumeDisposition === "legacy_unlinked").length;
-    const firstError = pendingRows.find(({ job }) => job.lastError !== null || phaseOf(resume, job, now()).phase === "operator_reconcile");
+    // why: a legacy_unlinked job is never retried and stays out of the round, so its old error would be a permanent red light and would hide a release fault
+    const firstError = pendingRows.find(({ job }) => job.resumeDisposition !== "legacy_unlinked" && (job.lastError !== null || phaseOf(resume, job, now()).phase === "operator_reconcile"));
     const phase = firstError === undefined ? { phase: null, hostCode: null, localCode: null, partial: null } : phaseOf(resume, firstError.job, now());
     const lastSource = resume?.lastSourceRun;
     status = {
@@ -234,7 +235,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     }
     await updateStatus(rows, round === null ? null : { date: schedule.date, value: round });
     const state = await resumeState();
-    const previousFailure = rows.find(({ job }) => job.lastError !== null && job.state !== "skipped")?.job.lastError ?? null;
+    const previousFailure = rows.find(({ job }) => job.lastError !== null && job.state !== "skipped" && job.resumeDisposition !== "legacy_unlinked")?.job.lastError ?? null;
     status = { ...status, state: !options.enabled() ? "disabled" : previousFailure === null ? "idle" : previousFailure === "MODEL_NOT_CONFIGURED" || previousFailure === "MODEL_POLICY_DENIED" || previousFailure === "RESOURCE_BUSY" ? "paused" : "error" };
     if (!options.enabled()) return;
     const runFrequency = currentFrequency;
@@ -323,8 +324,13 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         await options.store.pruneOperation?.(key);
       }
       status = { ...status, lastError: nextState === "skipped" ? null : code, errorPhase: next.errorPhase ?? null, hostErrorCode: next.hostErrorCode ?? null, localErrorCode: next.localErrorCode ?? null, retryable: next.retryable ?? null, partialDelivered: next.partialDelivered ?? null, lastAttemptAt: attemptedAt, updatedAt: attemptedAt };
-      const halt = trialRow ? trialBreaker(await jobs(), trialBatch!) : null;
-      if (halt !== null) { trialEnded = true; await endTrial("halted", halt); }
+      if (trialRow && trial !== null) {
+        const latestRows = await jobs();
+        // why: the counts come from the job rows, so refreshing them after every job keeps the status line moving during a long trial
+        status = { ...status, trial: summarizeTrial(trial, latestRows) };
+        const halt = trialBreaker(latestRows, trialBatch!);
+        if (halt !== null) { trialEnded = true; await endTrial("halted", halt); }
+      }
     }
     if (trial?.state === "running" && !trialEnded) {
       if (stopRequested) await endTrial("stopped", null);
@@ -354,7 +360,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     } else {
       const latestRows = await jobs();
       await updateStatus(latestRows, null);
-      const error = latestRows.find(({ job }) => job.state === "pending" && job.lastError !== null)?.job.lastError ?? null;
+      const error = latestRows.find(({ job }) => job.state === "pending" && job.lastError !== null && job.resumeDisposition !== "legacy_unlinked")?.job.lastError ?? null;
       status = { ...status, state: !options.enabled() ? "disabled" : error === null ? (status.legacyUnlinked > 0 ? "paused" : "idle") : error === "OPERATOR_RECONCILE" || error === "MODEL_NOT_CONFIGURED" || error === "MODEL_POLICY_DENIED" || error === "RESOURCE_BUSY" ? "paused" : "error" };
     }
     if (!attempted && status.state === "running") status = { ...status, state: "idle" };

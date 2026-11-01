@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import type { OrganizationDailyRound, OrganizationResumeState, OrganizationResumeStorePort, PunchReceiptStorePort, PunchStateRecord } from "../../application/punchDataPorts.js";
 import { legacyModelCallKey, modelCallKey } from "../../application/modelInvocationScope.js";
 import type { MemoryModelOperation } from "../../application/modelPort.js";
+import { parseTrial, planAdoption, planRevert } from "./punchTrialStore.js";
 
 const DAILY_ROUND_HISTORY_LIMIT = 32;
 const DAILY_CLAIM_HISTORY_LIMIT = 32;
@@ -15,6 +16,7 @@ interface SavedState {
   organizationClaims?: { version: 1; dates: string[]; throughDate?: string };
   organizationQueueSequence?: number;
   organizationResume?: unknown;
+  organizationTrial?: unknown;
 }
 
 function validLocalDate(value: unknown): value is string {
@@ -195,6 +197,7 @@ function createLocalStore(dataDir: string, name: string, supportsOrganizationCla
       || raw.organizationClaims.dates.some((date) => !validLocalDate(date)) || new Set(raw.organizationClaims.dates).size !== raw.organizationClaims.dates.length
       || (raw.organizationClaims.throughDate !== undefined && !validLocalDate(raw.organizationClaims.throughDate)))) throw new Error("state_file_invalid");
     if (raw.organizationQueueSequence !== undefined && (!Number.isSafeInteger(raw.organizationQueueSequence) || raw.organizationQueueSequence < 0)) throw new Error("state_file_invalid");
+    if (parseTrial(raw.organizationTrial) === null) throw new Error("state_file_invalid");
     const migratedRecords: Record<string, PunchStateRecord> = { ...raw.records };
     for (const [key, record] of Object.entries(raw.records)) {
       const value = record.value;
@@ -423,6 +426,28 @@ function createLocalStore(dataDir: string, name: string, supportsOrganizationCla
       const key = hash(pair + "|" + operationId);
       const operation = resume.operations[key];
       return operation !== undefined && Object.values(operation.calls).some((call) => call.replyJson !== null && ["reply_ready", "commit_retry"].includes(call.phase));
+    },
+    async adoptLegacyJobs(request) {
+      if (!supportsOrganizationClaims) throw new Error("organization_trial_unsupported");
+      const current = read();
+      const resume = resumeState(current.organizationResume);
+      if (resume === null) throw new Error("organization_resume_incompatible");
+      const plan = planAdoption({ records: current.records, resume, trial: parseTrial(current.organizationTrial) ?? null, sequence: current.organizationQueueSequence ?? 0 }, request);
+      if (plan.write !== null) write({ ...current, records: plan.write.records as Record<string, PunchStateRecord>, organizationQueueSequence: plan.write.sequence, organizationTrial: plan.write.trial });
+      return plan.result;
+    },
+    async revertTrialJobs(batchId, end) {
+      const current = read();
+      const plan = planRevert(current.records, parseTrial(current.organizationTrial) ?? null, batchId, end);
+      if (plan === null) return 0;
+      write({ ...current, records: plan.records as Record<string, PunchStateRecord>, organizationTrial: plan.trial });
+      return plan.reverted;
+    },
+    async readTrial() {
+      return parseTrial(read().organizationTrial) ?? null;
+    },
+    async writeTrial(trial) {
+      write({ ...read(), organizationTrial: trial });
     },
     async sourceRun(run) {
       const current = read();

@@ -24,6 +24,8 @@ export interface Job {
   readonly retryable?: boolean | null;
   readonly partialDelivered?: boolean | null;
   readonly outcome?: "committed" | "empty_success" | "skipped" | null;
+  readonly adoptedBatchId?: string;
+  readonly adoptedAt?: number;
 }
 
 export function localRoundDate(at: number, configuredTime: string): { readonly date: string; readonly due: boolean } {

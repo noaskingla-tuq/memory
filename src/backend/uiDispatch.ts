@@ -1,4 +1,4 @@
-import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiMethodName } from "../contracts/uiContract.js";
+import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiLegacyTrialRequest, type UiMethodName } from "../contracts/uiContract.js";
 import { runAgentStats } from "../application/ui/agentStats.js";
 import { serializedBytes, UI_RESPONSE_BUDGET_BYTES } from "../application/ui/budget.js";
 import { runGet } from "../application/ui/detail.js";
@@ -15,6 +15,7 @@ import { MemoryServiceError } from "../domain/errors.js";
 import { callError } from "./contractErrors.js";
 import { PLUGIN_VERSION } from "./diagnose.js";
 import type { OrganizationStatus } from "../application/punchOrganization.js";
+import type { LegacyTrialResponse } from "../application/organizationTrial.js";
 
 export interface UiDispatchDeps {
   readonly storageStatus: () => string;
@@ -22,6 +23,7 @@ export interface UiDispatchDeps {
   readonly profile: ProfilePort;
   readonly organizationStatus?: () => OrganizationStatus;
   readonly onForgotten?: (agentId: string, memoryId: string) => Promise<void>;
+  readonly legacyTrial?: (request: UiLegacyTrialRequest) => Promise<LegacyTrialResponse>;
 }
 
 export function isUiMethod(method: unknown): method is UiMethodName {
@@ -42,6 +44,11 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   await clock.yieldNow();
   if (method === "ui.status") {
     return runStatus(services, clock, { version: PLUGIN_VERSION, storageStatus: deps.storageStatus(), uptimeSec: Math.round(process.uptime()), profile: deps.profile, ...(deps.organizationStatus === undefined ? {} : { organization: deps.organizationStatus() }) });
+  }
+  // why: the trial needs only the organization worker, so it answers even while the Cairn layout is unavailable
+  if (method === "ui.legacyTrial") {
+    if (deps.legacyTrial === undefined) return uiFailure("STORAGE_UNSUPPORTED");
+    try { return { ok: true, ...(await deps.legacyTrial(params as UiLegacyTrialRequest)) }; } catch { return uiFailure("STORAGE_BUSY"); }
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;

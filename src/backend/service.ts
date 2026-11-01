@@ -248,7 +248,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       case MEMORY_PLUGIN_METHODS.profileSync:
         return profileSync.handle(params);
       default:
-        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile, ...(organization === undefined ? {} : { organizationStatus: organization.status, onForgotten: organization.forgetSource }) });
+        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile, ...(organization === undefined ? {} : { organizationStatus: organization.status, onForgotten: organization.forgetSource, legacyTrial: organization.legacyTrial }) });
         throw callError("unknown_method", "Unknown method");
     }
   };

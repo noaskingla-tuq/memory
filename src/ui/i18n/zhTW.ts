@@ -2,9 +2,11 @@ import { DETAIL_STRINGS } from "./detailStrings.js";
 import { SETTINGS_STRINGS } from "./settingsStrings.js";
 import { SPACE_STRINGS } from "./zhTWSpace.js";
 import { TIMELINE_STRINGS } from "./timelineStrings.js";
+import { TRIAL_STRINGS } from "./legacyTrialStrings.js";
 
 export const STRINGS = {
   ...SPACE_STRINGS,
+  ...TRIAL_STRINGS,
   "app.title": "Cairn記憶管理",
   "status.loading": "讀取中…",
   "status.ok": "記憶服務運作中",
@@ -24,7 +26,7 @@ export const STRINGS = {
   "status.organization.phase.error": "AI 整理遇到問題",
   "status.organization.reason": "（失敗階段 {phase}・主程式代碼 {code}）",
   "status.organization.reasonLocal": "（失敗階段 {phase}・外掛自行判定 {code}）",
-  "status.organization.legacy": "待核對 {n} 筆舊工作",
+  "status.organization.legacy": "舊工作 {n} 筆暫停中（可小量試跑）",
   "status.organization.skipped": "來源略過 {n}",
   "status.organization.skippedUnknown": "來源略過未知",
   "status.organization.diagnostics": "整理與來源詳情",

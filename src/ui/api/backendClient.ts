@@ -26,7 +26,7 @@ export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_RETRY_DELAYS_MS: readonly number[] = [1000, 2000, 4000];
 
 // why: a forget that reached the backend before the platform squashed its failure into plugin_backend_unavailable must not run twice, and its outcome must never be dropped as stale
-const WRITE_METHODS: ReadonlySet<string> = new Set<UiMethodName>(["ui.forget"]);
+const WRITE_METHODS: ReadonlySet<string> = new Set<UiMethodName>(["ui.forget", "ui.legacyTrial"]);
 
 interface Job {
   readonly method: UiMethodName;

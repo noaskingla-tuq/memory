@@ -3,6 +3,7 @@ import type { BackendClient, BackendResult } from "../api/backendClient.js";
 import { EMPTY_HTML, html, mount, type MountTarget } from "../dom/html.js";
 import { t } from "../i18n/index.js";
 import { relativeTime } from "../i18n/relativeTime.js";
+import { trialControls, trialDetails } from "./legacyTrial.js";
 
 export const STATUS_POLL_MS = 30_000;
 
@@ -81,6 +82,7 @@ function renderResult(target: StatusTarget, result: BackendResult, nowMs: number
       <span class="muted">・${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}</span>
       <span class="muted">・${t("status.organization.summary", { admitted: organization.admitted ?? t("status.organization.unknown"), pending: organization.pending, replies: organization.replyReady, completed: organization.completed })}</span>
       ${organization.legacyUnlinked > 0 ? html`<span class="muted">・${t("status.organization.legacy", { n: organization.legacyUnlinked })}</span>` : EMPTY_HTML}
+      ${trialControls(organization)}
       <span class="muted">・${organization.diagnosticsAvailable === true ? t("status.organization.skipped", { n: organization.schemaSkipped ?? 0 }) : t("status.organization.skippedUnknown")}</span>
       <details class="organization-details">
         <summary>${t("status.organization.diagnostics")}</summary>
@@ -103,6 +105,7 @@ function renderResult(target: StatusTarget, result: BackendResult, nowMs: number
             watermark: organization.dailyRound.snapshotHighWatermark,
           })}</dd>
           <dt>${t("status.organization.lastError")}</dt><dd>${organization.lastError ?? t("status.organization.unknown")}</dd>
+          ${trialDetails(organization)}
         </dl>
       </details>` : EMPTY_HTML;
     mount(target, html`<p class="state" data-state="${warn ? "warn" : "ok"}" title="${detail}">${ready ? t("status.ok") : t("status.storageTrouble")}${ready ? html`<span class="muted">・${writeText(status, nowMs)}</span>` : EMPTY_HTML}${organizationText}</p>`);

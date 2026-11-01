@@ -8,6 +8,7 @@ export const UI_METHOD_NAMES = [
   "ui.get",
   "ui.forget",
   "ui.status",
+  "ui.legacyTrial",
 ] as const;
 
 export type UiMethodName = (typeof UI_METHOD_NAMES)[number];
@@ -40,6 +41,7 @@ export const UI_LIMITS = {
   representativeMax: 4,
   overviewSnippetChars: 120,
   listSnippetChars: 160,
+  legacyTrialMax: 50,
 } as const;
 
 const identifier = z.string().min(1).max(200);
@@ -122,6 +124,13 @@ export const uiForgetRequest = z
   .refine(refRule);
 
 export const uiStatusRequest = z.object({}).strict();
+
+const trialRequestId = z.string().min(8).max(64);
+
+export const uiLegacyTrialRequest = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("start"), requestId: trialRequestId, count: z.number().int().min(1).max(UI_LIMITS.legacyTrialMax) }).strict(),
+  z.object({ action: z.literal("stop"), requestId: trialRequestId }).strict(),
+]);
 
 /** 名稱表合併後的顯示欄位；名稱缺漏時 displayName 是降級名稱（agent：id 最後一段加（team key）；專案：「專案 」加 id 前 8 碼），name 只在名稱表有時才出現。 */
 export const uiAgentNamesSchema = z
@@ -293,6 +302,37 @@ export const uiGetSuccess = z
 
 export const uiForgetSuccess = z.object({ ok: z.literal(true), forgotten: z.boolean() }).strict();
 
+const trialHaltReason = z.object({ code: z.string(), phase: z.string().nullable(), hostCode: z.string().nullable(), localCode: z.string().nullable(), consecutive: count }).strict();
+const trialFailureGroup = z.object({ code: z.string(), phase: z.string().nullable(), hostCode: z.string().nullable(), localCode: z.string().nullable(), count }).strict();
+
+export const uiTrialSchema = z.object({
+  batchId: z.string(),
+  state: z.enum(["running", "completed", "halted", "stopped"]),
+  requested: count,
+  adopted: count,
+  attempted: count,
+  committed: count,
+  emptySuccess: count,
+  skipped: count,
+  failed: count,
+  untried: count,
+  startedAt: count,
+  endedAt: count.nullable(),
+  haltReason: trialHaltReason.nullable(),
+  failures: z.array(trialFailureGroup).max(5),
+}).strict();
+
+export const uiLegacyTrialSuccess = z.object({
+  ok: z.literal(true),
+  action: z.enum(["start", "stop"]),
+  requested: count,
+  adopted: count,
+  candidates: count,
+  skippedAmbiguous: count,
+  blocked: z.enum(["disabled", "trial_running", "no_candidates", "not_running"]).nullable(),
+  trial: uiTrialSchema.nullable(),
+}).strict();
+
 export const uiStatusSuccess = z
   .object({
     ok: z.literal(true),
@@ -322,6 +362,8 @@ export const uiStatusSuccess = z
       replyReady: count,
       completed: count,
       legacyUnlinked: count,
+      legacyTrialCandidates: count.optional(),
+      trial: uiTrialSchema.nullable().optional(),
       schemaSkipped: count.nullable(),
       diagnosticsAvailable: z.boolean().nullable(),
       sourceGeneration: z.string().nullable(),
@@ -370,6 +412,7 @@ export const UI_METHOD_SCHEMAS = {
   "ui.get": { request: uiGetRequest, success: uiGetSuccess },
   "ui.forget": { request: uiForgetRequest, success: uiForgetSuccess },
   "ui.status": { request: uiStatusRequest, success: uiStatusSuccess },
+  "ui.legacyTrial": { request: uiLegacyTrialRequest, success: uiLegacyTrialSuccess },
 } as const satisfies Record<UiMethodName, { request: z.ZodTypeAny; success: z.ZodTypeAny }>;
 
 export type UiFailure = z.infer<typeof uiFailureSchema>;
@@ -386,6 +429,8 @@ export type UiGetRequest = z.infer<typeof uiGetRequest>;
 export type UiForgetRequest = z.infer<typeof uiForgetRequest>;
 export type UiListRequest = z.infer<typeof uiListRequest>;
 export type UiSearchRequest = z.infer<typeof uiSearchRequest>;
+export type UiLegacyTrialRequest = z.infer<typeof uiLegacyTrialRequest>;
+export type UiTrial = z.infer<typeof uiTrialSchema>;
 
 export type UiParamsResult = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
 

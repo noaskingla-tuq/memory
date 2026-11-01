@@ -139,6 +139,49 @@ export interface OrganizationResumeState {
   };
 }
 
+export interface OrganizationTrialHaltReason {
+  readonly code: string;
+  readonly phase: string | null;
+  readonly hostCode: string | null;
+  readonly localCode: string | null;
+  readonly consecutive: number;
+}
+
+export interface OrganizationTrial {
+  readonly version: 1;
+  readonly batchId: string;
+  readonly requestId: string;
+  readonly requested: number;
+  readonly adopted: number;
+  readonly skippedAmbiguous: number;
+  readonly startedAt: number;
+  readonly state: "running" | "completed" | "halted" | "stopped";
+  readonly endedAt: number | null;
+  readonly haltReason: OrganizationTrialHaltReason | null;
+}
+
+export interface TrialAdoptionRequest {
+  readonly requestId: string;
+  readonly count: number;
+  readonly batchId: string;
+  readonly at: number;
+}
+
+export interface TrialAdoption {
+  readonly blocked: null | "trial_running" | "no_candidates";
+  readonly replayed: boolean;
+  readonly trial: OrganizationTrial | null;
+  readonly adopted: number;
+  readonly candidates: number;
+  readonly skippedAmbiguous: number;
+}
+
+export interface TrialEnd {
+  readonly state: "halted" | "stopped";
+  readonly endedAt: number;
+  readonly haltReason: OrganizationTrialHaltReason | null;
+}
+
 export interface OrganizationResumeStorePort extends PunchReceiptStorePort {
   enqueueJob(key: string, value: unknown, sourceKind: string, sourceId: string): Promise<number>;
   readResumeState(): Promise<OrganizationResumeState | null>;
@@ -154,6 +197,10 @@ export interface OrganizationResumeStorePort extends PunchReceiptStorePort {
   pruneOperation(operationKey: string): Promise<void>;
   hasRecoverableReply(pairKey: string, operationId: string): Promise<boolean>;
   sourceRun?(run: NonNullable<OrganizationResumeState["lastSourceRun"]>): Promise<void>;
+  adoptLegacyJobs(request: TrialAdoptionRequest): Promise<TrialAdoption>;
+  revertTrialJobs(batchId: string, end: TrialEnd): Promise<number>;
+  readTrial(): Promise<OrganizationTrial | null>;
+  writeTrial(trial: OrganizationTrial): Promise<void>;
 }
 
 export type PunchTerminalReceipt =

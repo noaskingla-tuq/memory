@@ -30,6 +30,7 @@ function assertPolicy(policy: MemoryModelPolicy): void {
 export type ReportModelFailure = (
   code: MemoryServiceError["code"],
   phase?: MemoryServiceError["phase"],
+  localCode?: string,
 ) => void;
 
 function reportStableFailure(
@@ -38,7 +39,7 @@ function reportStableFailure(
 ): void {
   const code = error instanceof MemoryServiceError ? error.code : undefined;
   if (code !== undefined) {
-    report?.(code, error instanceof MemoryServiceError ? error.phase : undefined);
+    report?.(code, error instanceof MemoryServiceError ? error.phase : undefined, error instanceof MemoryServiceError ? error.localCode : undefined);
   }
 }
 

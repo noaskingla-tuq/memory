@@ -10,6 +10,7 @@ type ModelFailureCode = string;
 interface ModelFailureContext {
   code?: ModelFailureCode;
   phase?: MemoryFailurePhase;
+  localCode?: string;
 }
 
 export function openCairnCore(
@@ -23,11 +24,12 @@ export function openCairnCore(
       : createCairnModelAdapter(
           modelBinding.agentId,
           modelBinding.port,
-          (code, phase) => {
+          (code, phase, localCode) => {
             const context = failures.getStore();
             if (context !== undefined) {
               context.code = code.toLowerCase();
               if (phase !== undefined) context.phase = phase;
+              if (localCode !== undefined) context.localCode = localCode;
             }
           },
         );
@@ -44,7 +46,7 @@ export function openCairnCore(
       if (!result.ok && context.code !== undefined) {
         return {
           ok: false as const,
-          error: { code: context.code, retryable: ["model_timeout", "resource_busy", "storage_busy"].includes(context.code), ...(context.phase === undefined ? {} : { phase: context.phase }) },
+          error: { code: context.code, retryable: ["model_timeout", "resource_busy", "storage_busy"].includes(context.code), ...(context.phase === undefined ? {} : { phase: context.phase }), ...(context.localCode === undefined ? {} : { localCode: context.localCode }) },
         };
       }
       return result;

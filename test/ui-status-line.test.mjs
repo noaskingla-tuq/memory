@@ -202,3 +202,94 @@ test("a hostile version or message cannot inject markup into the header", async 
   assert.ok(r.target.innerHTML.includes("&lt;img src=x onerror=alert(1)&gt;&quot;"));
   r.line.stop();
 });
+
+const failedOrganization = (overrides = {}) => ({
+  state: "error", admitted: 3, pending: 2, replyReady: 0, completed: 1, legacyUnlinked: 0,
+  schemaSkipped: 0, diagnosticsAvailable: true,
+  sourceGeneration: null, sourceHighWatermark: null, sourcePages: null, sourceScanned: null, sourceReceived: null, sourceEligible: null, sourceCheckpointed: null,
+  lastError: "MODEL_TIMEOUT", errorPhase: "turn_timeout", hostErrorCode: "stalled",
+  retryable: true, partialDelivered: false, lastAttemptAt: NOW, updatedAt: NOW, dailyRound: null,
+  ...overrides,
+});
+
+async function renderOrganization(organization) {
+  const r = rig({ results: [{ ok: true, value: statusValue({ organization }) }] });
+  r.line.start();
+  await r.flush();
+  r.line.stop();
+  return r.target.innerHTML;
+}
+
+test("an error or paused organization shows its failure phase and host error code in the status line itself", async () => {
+  const error = await renderOrganization(failedOrganization());
+  assert.ok(error.includes("AI 整理遇到問題（失敗階段 turn_timeout・主程式代碼 stalled）"), error);
+  const paused = await renderOrganization(failedOrganization({ state: "paused", lastError: "RESOURCE_BUSY", errorPhase: "session_close", hostErrorCode: "close_timeout" }));
+  assert.ok(paused.includes("AI 整理暫停（失敗階段 session_close・主程式代碼 close_timeout）"), paused);
+});
+
+test("a failed organization without phase or host code, and a status without those fields, render as unknown and never as undefined", async () => {
+  const nulls = await renderOrganization(failedOrganization({ errorPhase: null, hostErrorCode: null }));
+  assert.ok(nulls.includes("（失敗階段 未知・主程式代碼 未知）"));
+  const legacyShape = failedOrganization();
+  delete legacyShape.errorPhase;
+  delete legacyShape.hostErrorCode;
+  const omitted = await renderOrganization(legacyShape);
+  assert.ok(omitted.includes("（失敗階段 未知・主程式代碼 未知）"));
+  for (const html of [nulls, omitted]) {
+    assert.equal(html.includes("undefined"), false);
+    assert.equal(html.includes("null"), false);
+  }
+});
+
+test("healthy states and a pause caused only by legacy jobs carry no failure wording", async () => {
+  for (const organization of [
+    failedOrganization({ state: "idle", lastError: null, errorPhase: null, hostErrorCode: null }),
+    failedOrganization({ state: "running", lastError: null, errorPhase: null, hostErrorCode: null }),
+    failedOrganization({ state: "paused", legacyUnlinked: 4, lastError: null, errorPhase: null, hostErrorCode: null }),
+  ]) {
+    assert.equal((await renderOrganization(organization)).includes("失敗階段"), false);
+  }
+});
+
+test("failure wording from the host is escaped", async () => {
+  const html = await renderOrganization(failedOrganization({ errorPhase: "<b>x</b>", hostErrorCode: '"><img src=x>' }));
+  assert.equal(html.includes("<b>x</b>"), false);
+  assert.equal(html.includes("<img"), false);
+});
+
+const headlineOf = (html) => {
+  const start = html.indexOf("AI 整理遇到問題") >= 0 ? html.indexOf("AI 整理遇到問題") : html.indexOf("AI 整理暫停");
+  return html.slice(start, html.indexOf("</span>", start));
+};
+
+test("a code the plugin decided itself is labelled as such and never as a host code", async () => {
+  const local = await renderOrganization(failedOrganization({ state: "paused", lastError: "RESOURCE_BUSY", errorPhase: "session_close", hostErrorCode: null, localErrorCode: "close_timeout" }));
+  assert.ok(headlineOf(local).includes("（失敗階段 session_close・外掛自行判定 close_timeout）"), headlineOf(local));
+  assert.equal(headlineOf(local).includes("主程式代碼"), false);
+  const hostReported = await renderOrganization(failedOrganization({ state: "paused", lastError: "RESOURCE_BUSY", errorPhase: "session_close", hostErrorCode: "stalled", localErrorCode: null }));
+  assert.ok(headlineOf(hostReported).includes("（失敗階段 session_close・主程式代碼 stalled）"), "the phase name alone does not turn a host code into a plugin code");
+  const localOnly = await renderOrganization(failedOrganization({ state: "paused", lastError: null, errorPhase: null, hostErrorCode: null, localErrorCode: "close_timeout" }));
+  assert.ok(headlineOf(localOnly).includes("外掛自行判定 close_timeout"));
+});
+
+test("host strings in the headline are cut to 40 characters, still escaped, and the cut never splits a character", async () => {
+  const exact = "p".repeat(40);
+  const kept = await renderOrganization(failedOrganization({ errorPhase: exact, hostErrorCode: exact }));
+  assert.ok(headlineOf(kept).includes("失敗階段 " + exact + "・主程式代碼 " + exact + "）"), "40 characters are kept whole");
+
+  const long = await renderOrganization(failedOrganization({ errorPhase: "q".repeat(300), hostErrorCode: "<b>" + "x".repeat(500) }));
+  const headline = headlineOf(long);
+  assert.ok(headline.includes("失敗階段 " + "q".repeat(40) + "…・"), headline);
+  assert.equal(headline.includes("q".repeat(41)), false);
+  assert.equal(headline.includes("x".repeat(40)), false, "the second string is cut too");
+  assert.ok(headline.includes("&lt;b&gt;"), "escape still applies to the cut text");
+  assert.equal(headline.includes("<b>"), false);
+  assert.ok(headline.length < 400, "the headline stays short: " + headline.length);
+
+  const pairs = await renderOrganization(failedOrganization({ hostErrorCode: "😀".repeat(60) }));
+  assert.ok(headlineOf(pairs).includes("😀".repeat(40) + "…"));
+  assert.equal(/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/u.test(headlineOf(pairs)), false);
+
+  const local = await renderOrganization(failedOrganization({ hostErrorCode: null, localErrorCode: "c".repeat(200) }));
+  assert.equal(headlineOf(local).includes("c".repeat(41)), false);
+});

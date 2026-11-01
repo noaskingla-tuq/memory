@@ -26,6 +26,7 @@ export interface OrganizationStatus {
   readonly lastError: string | null;
   readonly errorPhase: string | null;
   readonly hostErrorCode: string | null;
+  readonly localErrorCode: string | null;
   readonly retryable: boolean | null;
   readonly partialDelivered: boolean | null;
   readonly lastAttemptAt: number | null;
@@ -40,6 +41,14 @@ export interface OrganizationStatus {
     readonly completedMembers: number;
     readonly deferredMembers: number;
   };
+}
+
+export interface OrganizationReleaseFault {
+  readonly code: string;
+  readonly phase: string;
+  readonly localCode: string | null;
+  readonly retryable: boolean;
+  readonly at: number;
 }
 
 interface Job {
@@ -58,6 +67,7 @@ interface Job {
   readonly lastAttemptAt?: number | null;
   readonly errorPhase?: string | null;
   readonly hostErrorCode?: string | null;
+  readonly localErrorCode?: string | null;
   readonly retryable?: boolean | null;
   readonly partialDelivered?: boolean | null;
   readonly outcome?: "committed" | "empty_success" | "skipped" | null;
@@ -122,8 +132,10 @@ function failedModelAttemptInRound(state: OrganizationResumeState | null, job: J
     && localRoundDate(call.updatedAt, dailyTime).date === date);
 }
 
-function phaseOf(state: OrganizationResumeState | null, job: Job, at = Date.now()): { phase: string | null; journalPhase: string | null; hostCode: string | null; partial: boolean | null } {
-  if (state === null) return { phase: job.errorPhase ?? null, journalPhase: null, hostCode: job.hostErrorCode ?? null, partial: job.partialDelivered ?? null };
+// why: a code the plugin decided itself is not a host reply, so while it is set no older journal call may supply a host code
+function phaseOf(state: OrganizationResumeState | null, job: Job, at = Date.now(), attemptLocalCode?: string | null): { phase: string | null; journalPhase: string | null; hostCode: string | null; localCode: string | null; partial: boolean | null } {
+  const localCode = (attemptLocalCode === undefined ? job.localErrorCode : attemptLocalCode) ?? null;
+  if (state === null) return { phase: job.errorPhase ?? null, journalPhase: null, hostCode: localCode === null ? job.hostErrorCode ?? null : null, localCode, partial: job.partialDelivered ?? null };
   const key = operationKey(pairKey(job.actor.agentId, job.actor.projectId), job.input.operationId);
   const calls = Object.values(state.operations[key]?.calls ?? {}).sort((left, right) => right.updatedAt - left.updatedAt);
   const latest = calls[0];
@@ -133,7 +145,8 @@ function phaseOf(state: OrganizationResumeState | null, job: Job, at = Date.now(
   return {
     phase: expired ? "operator_reconcile" : job.errorPhase ?? (commitRetry ? "commit" : null),
     journalPhase: latest?.phase ?? null,
-    hostCode: latest?.hostErrorCode ?? job.hostErrorCode ?? null,
+    hostCode: localCode === null ? latest?.hostErrorCode ?? job.hostErrorCode ?? null : null,
+    localCode,
     partial: latest?.partialDelivered ?? job.partialDelivered ?? null,
   };
 }
@@ -158,12 +171,14 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
   let knownKeys: Set<string> | undefined;
   let active: Promise<void> | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
+  // why: a failed host-session release happens after the job result is final, so no job row carries it; each pair keeps its own record and the map order is recency
+  const releaseFaults = new Map<string, OrganizationReleaseFault>();
   let status: OrganizationStatus = {
     state: "disabled", admitted: 0, pending: 0, replyReady: 0, completed: 0, legacyUnlinked: 0,
     schemaSkipped: null, diagnosticsAvailable: null, lastError: null, errorPhase: null,
     sourceGeneration: null, sourceHighWatermark: null, sourcePages: null, sourceScanned: null,
     sourceReceived: null, sourceEligible: null, sourceCheckpointed: null,
-    hostErrorCode: null, retryable: null, partialDelivered: null, lastAttemptAt: null, updatedAt: null, dailyRound: null,
+    hostErrorCode: null, localErrorCode: null, retryable: null, partialDelivered: null, lastAttemptAt: null, updatedAt: null, dailyRound: null,
   };
   const frequency = (): "daily" | "immediate" => options.frequency?.() === "immediate" ? "immediate" : "daily";
   const resumeState = async (): Promise<OrganizationResumeState | null> => options.store.readResumeState === undefined ? null : options.store.readResumeState();
@@ -182,6 +197,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
           || (job.lastAttemptAt !== undefined && !(job.lastAttemptAt === null || Number.isSafeInteger(job.lastAttemptAt)))
           || (job.errorPhase !== undefined && !(job.errorPhase === null || typeof job.errorPhase === "string"))
           || (job.hostErrorCode !== undefined && !(job.hostErrorCode === null || typeof job.hostErrorCode === "string"))
+          || (job.localErrorCode !== undefined && !(job.localErrorCode === null || typeof job.localErrorCode === "string"))
           || (job.retryable !== undefined && !(job.retryable === null || typeof job.retryable === "boolean"))
           || (job.partialDelivered !== undefined && !(job.partialDelivered === null || typeof job.partialDelivered === "boolean"))
           || (job.outcome !== undefined && !(job.outcome === null || ["committed", "empty_success", "skipped"].includes(job.outcome)))) throw new Error("organization_state_invalid");
@@ -199,7 +215,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     const replyCount = pendingRows.filter(({ job }) => replyReady(resume, job)).length;
     const legacy = pendingRows.filter(({ job }) => job.resumeDisposition === "legacy_unlinked").length;
     const firstError = pendingRows.find(({ job }) => job.lastError !== null || phaseOf(resume, job, now()).phase === "operator_reconcile");
-    const phase = firstError === undefined ? { phase: null, hostCode: null, partial: null } : phaseOf(resume, firstError.job, now());
+    const phase = firstError === undefined ? { phase: null, hostCode: null, localCode: null, partial: null } : phaseOf(resume, firstError.job, now());
     const lastSource = resume?.lastSourceRun;
     status = {
       ...status,
@@ -221,6 +237,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       lastError: firstError === undefined ? null : firstError.job.lastError ?? (phase.phase === "operator_reconcile" ? "OPERATOR_RECONCILE" : null),
       errorPhase: phase.phase ?? firstError?.job.errorPhase ?? null,
       hostErrorCode: phase.hostCode,
+      localErrorCode: phase.localCode,
       retryable: firstError?.job.retryable ?? null,
       partialDelivered: phase.partial ?? firstError?.job.partialDelivered ?? null,
       lastAttemptAt: firstError?.job.lastAttemptAt ?? null,
@@ -311,8 +328,9 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         : null;
       const nextState: Job["state"] = terminalOutcome !== null ? "completed" : code === "MEMORY_SUPPRESSED" ? "skipped" : "pending";
       const latestResume = await resumeState();
-      const errorInfo = nextState === "pending" ? phaseOf(latestResume, job, now()) : { phase: null, journalPhase: null, hostCode: null, partial: null };
       const reportedPhase = !result.ok ? result.error.phase ?? null : classificationFailed ? "cairn_schema" : null;
+      const attemptLocalCode = !result.ok ? result.error.localCode ?? null : null;
+      const errorInfo = nextState === "pending" ? phaseOf(latestResume, job, now(), attemptLocalCode) : { phase: null, journalPhase: null, hostCode: null, localCode: null, partial: null };
       const next: Job = {
         ...job,
         state: nextState,
@@ -327,6 +345,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
           ? "commit"
           : errorInfo.phase ?? (code === null ? null : code === "STORAGE_BUSY" ? "commit" : "model")),
         hostErrorCode: errorInfo.hostCode,
+        localErrorCode: errorInfo.localCode,
         retryable: nextState === "pending" ? (result.ok ? code !== null : result.error.retryable) : null,
         partialDelivered: errorInfo.partial,
         outcome: terminalOutcome ?? (nextState === "skipped" ? "skipped" : null),
@@ -353,7 +372,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       if (nextState !== "pending" && options.store.completeJobAndPruneOperation === undefined) {
         await options.store.pruneOperation?.(key);
       }
-      status = { ...status, lastError: nextState === "skipped" ? null : code, errorPhase: next.errorPhase ?? null, hostErrorCode: next.hostErrorCode ?? null, retryable: next.retryable ?? null, partialDelivered: next.partialDelivered ?? null, lastAttemptAt: attemptedAt, updatedAt: attemptedAt };
+      status = { ...status, lastError: nextState === "skipped" ? null : code, errorPhase: next.errorPhase ?? null, hostErrorCode: next.hostErrorCode ?? null, localErrorCode: next.localErrorCode ?? null, retryable: next.retryable ?? null, partialDelivered: next.partialDelivered ?? null, lastAttemptAt: attemptedAt, updatedAt: attemptedAt };
     }
     if (round !== null && runFrequency === "daily" && options.store.updateDailyRound !== undefined) {
       const latestRows = await jobs();
@@ -387,7 +406,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
   const wake = (): void => {
     if (stopped || !started) return;
     if (active !== null) { requested = true; return; }
-    active = run().catch(() => { status = { ...status, state: "error", lastError: "STORAGE_BUSY", errorPhase: "state" }; }).finally(() => {
+    active = run().catch(() => { status = { ...status, state: "error", lastError: "STORAGE_BUSY", errorPhase: "state", hostErrorCode: null, localErrorCode: null }; }).finally(() => {
       active = null;
       if (requested && !stopped) { requested = false; wake(); }
     });
@@ -401,7 +420,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         actor: { agentId: punch.agentId, projectId: punch.projectId, sessionId: punch.sessionId ?? "no-session", providerId: punch.providerId ?? "unknown" },
         input: { scope: punch.projectId === null ? "personal" : "project", operationId: "organize:" + punchOperationId(punch.id), messages: buildPunchSourceMessages(punch) },
         state: "pending", attempts: 0, nextAttemptAt: 0, lastError: null, resumeDisposition: "eligible", lastAttemptDate: null,
-        lastAttemptAt: null, errorPhase: null, hostErrorCode: null, retryable: null, partialDelivered: null, outcome: null,
+        lastAttemptAt: null, errorPhase: null, hostErrorCode: null, localErrorCode: null, retryable: null, partialDelivered: null, outcome: null,
       };
       if (options.store.enqueueJob !== undefined) await options.store.enqueueJob(punch.id, job, "work-record", punch.id);
       else await options.store.writeBatch([{ key: punch.id, value: job, expectedRevision: null, sourceKind: "work-record", sourceId: punch.id }]);
@@ -432,7 +451,20 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     resumeStartup() { if (!started || stopped || startupReady) return; startupReady = true; requested = false; wake(); },
     wake,
     settingsChanged() { retryNow = true; wake(); },
-    status: (): OrganizationStatus => ({ ...status, ...(!options.enabled() ? { state: "disabled" as const } : {}) }),
+    noteReleaseFault(pair: string, fault: OrganizationReleaseFault | null) {
+      releaseFaults.delete(pair);
+      if (fault !== null) releaseFaults.set(pair, fault);
+    },
+    status: (): OrganizationStatus => {
+      const current: OrganizationStatus = { ...status, ...(!options.enabled() ? { state: "disabled" as const } : {}) };
+      const releaseFault = [...releaseFaults.values()].pop() ?? null;
+      // why: a job's own failure is the more specific cause, so the release fault only fills an otherwise clean status
+      if (releaseFault === null || current.state === "disabled" || current.lastError !== null) return current;
+      return {
+        ...current, state: current.state === "idle" ? "paused" : current.state, lastError: releaseFault.code, errorPhase: releaseFault.phase,
+        hostErrorCode: null, localErrorCode: releaseFault.localCode, retryable: releaseFault.retryable, lastAttemptAt: releaseFault.at, updatedAt: releaseFault.at,
+      };
+    },
     async idle() { while (active !== null) await active; },
     async stop() { stopped = true; if (timer !== undefined) clearInterval(timer); await active; },
   };

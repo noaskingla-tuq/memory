@@ -25,7 +25,7 @@ export const MEMORY_ERROR_CODES = [
 ] as const;
 
 export type MemoryErrorCode = (typeof MEMORY_ERROR_CODES)[number];
-export type MemoryFailurePhase = "discovery" | "session_open" | "session_resume" | "task_binding" | "send_unknown" | "turn" | "turn_timeout" | "reply_contract" | "cairn_schema" | "commit" | "state" | "policy" | "quota" | "cancelled";
+export type MemoryFailurePhase = "discovery" | "session_open" | "session_resume" | "task_binding" | "send_unknown" | "turn" | "turn_timeout" | "reply_contract" | "cairn_schema" | "commit" | "state" | "policy" | "quota" | "cancelled" | "session_close";
 
 export type MemoryResult<T> =
   | { readonly ok: true; readonly value: T; readonly requestId: string }
@@ -37,6 +37,7 @@ export type MemoryResult<T> =
         readonly retryable: boolean;
         readonly requestId: string;
         readonly phase?: MemoryFailurePhase;
+        readonly localCode?: string;
       };
     };
 
@@ -57,18 +58,22 @@ export class MemoryServiceError extends Error {
   readonly code: MemoryErrorCode;
   readonly retryable: boolean;
   readonly phase?: MemoryFailurePhase;
+  // why: a code the plugin decided itself (for example its own timer), kept apart from codes the host reported
+  readonly localCode?: string;
 
   constructor(
     code: MemoryErrorCode,
     message: string,
     retryable = RETRYABLE.has(code),
     phase?: MemoryFailurePhase,
+    localCode?: string,
   ) {
     super(message);
     this.name = "MemoryServiceError";
     this.code = code;
     this.retryable = retryable;
     this.phase = phase;
+    this.localCode = localCode;
   }
 }
 
@@ -94,7 +99,7 @@ const CAIRN_ERROR_MAP: Readonly<Record<string, MemoryErrorCode>> = {
   storage_error: "INTERNAL",
 };
 
-export function mapCairnError(code: string, phase?: MemoryFailurePhase): MemoryServiceError {
+export function mapCairnError(code: string, phase?: MemoryFailurePhase, localCode?: string): MemoryServiceError {
   const mapped = CAIRN_ERROR_MAP[code] ?? "INTERNAL";
   const inferredPhase: MemoryFailurePhase | undefined =
     code === "storage_busy" || code === "storage_error" ? "commit"
@@ -103,7 +108,7 @@ export function mapCairnError(code: string, phase?: MemoryFailurePhase): MemoryS
           : code === "model_not_configured" ? "policy"
             : code === "model_policy_denied" || code === "context_budget_exceeded" ? "policy"
               : undefined;
-  return new MemoryServiceError(mapped, "Memory operation failed: " + mapped, undefined, phase ?? inferredPhase);
+  return new MemoryServiceError(mapped, "Memory operation failed: " + mapped, undefined, phase ?? inferredPhase, localCode);
 }
 
 export function failure(requestId: string, error: unknown): MemoryFailure {
@@ -119,6 +124,7 @@ export function failure(requestId: string, error: unknown): MemoryFailure {
       retryable: normalized.retryable,
       requestId,
       ...(normalized.phase === undefined ? {} : { phase: normalized.phase }),
+      ...(normalized.localCode === undefined ? {} : { localCode: normalized.localCode }),
     },
   };
 }

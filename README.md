@@ -22,6 +22,8 @@ TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.3.6，fu
 
 模型回覆 journal 與 session map 只存於 plugin-owned `punch-organization.json`，限制每回覆 16 KiB、每 operation 256 KiB、未完成回覆合計 1 MiB；Cairn job 結束與 operation journal 移除在同一本機原子提交中完成。超過 7 天仍未完成的 recovery 保留資料並顯示待操作員核對，不會靜默丟棄。Host 擁有 conversation text 與權限授權；本機 UI、診斷、telemetry 不顯示 session／turn／source ID、模型 prompt 或回覆文字。
 
+已知限制：某個 operation 先 turn 逾時、其 host session 的 close 又逾時後，該 pair 的未完成 operation 會被擋住（`RESOURCE_BUSY`／`session_resume`），也不會 resume 舊 session，直到超過 7 天的 `operator_reconcile` 才解開；這是以資料不遺失為優先的取捨。
+
 ## 目錄
 
 ```

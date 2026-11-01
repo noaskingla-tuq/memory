@@ -47,6 +47,26 @@ function detailTime(value: number | null): string {
   return value === null ? t("status.organization.unknown") : new Date(value).toISOString();
 }
 
+const HEADLINE_VALUE_LIMIT = 40;
+
+// why: the host decides these strings and the schema gives them no length, so the one-line headline keeps only a bounded prefix
+function clip(value: string): string {
+  const characters = Array.from(value);
+  return characters.length <= HEADLINE_VALUE_LIMIT ? value : characters.slice(0, HEADLINE_VALUE_LIMIT).join("") + "…";
+}
+
+// why: older or partial status payloads may omit the failure fields, so each falls back to the unknown label instead of printing undefined
+function failureReason(organization: NonNullable<UiStatus["organization"]>): string {
+  if (organization.state !== "error" && organization.state !== "paused") return "";
+  // why: a pause caused only by legacy jobs is not a failure and has nothing to explain
+  if (organization.state === "paused" && organization.lastError == null && organization.errorPhase == null && organization.hostErrorCode == null && organization.localErrorCode == null) return "";
+  const unknown = t("status.organization.unknown");
+  const phase = clip(organization.errorPhase ?? unknown);
+  // why: a code the plugin decided itself must not read as something the host reported
+  if (organization.localErrorCode != null) return t("status.organization.reasonLocal", { phase, code: clip(organization.localErrorCode) });
+  return t("status.organization.reason", { phase, code: clip(organization.hostErrorCode ?? unknown) });
+}
+
 // why: the container carries the overall state too, because the real-Electron harness and any outside probe read #status[data-state] rather than its children
 function renderResult(target: StatusTarget, result: BackendResult, nowMs: number): void {
   if (result.ok && isStatus(result.value)) {
@@ -58,7 +78,7 @@ function renderResult(target: StatusTarget, result: BackendResult, nowMs: number
     target.dataset.state = warn ? "warn" : "ok";
     const detail = t("status.detail", { version: status.version, storage: status.storage.status });
     const organizationText = organization !== undefined ? html`
-      <span class="muted">・${t(`status.organization.phase.${organization.state}`)}</span>
+      <span class="muted">・${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}</span>
       <span class="muted">・${t("status.organization.summary", { admitted: organization.admitted ?? t("status.organization.unknown"), pending: organization.pending, replies: organization.replyReady, completed: organization.completed })}</span>
       ${organization.legacyUnlinked > 0 ? html`<span class="muted">・${t("status.organization.legacy", { n: organization.legacyUnlinked })}</span>` : EMPTY_HTML}
       <span class="muted">・${organization.diagnosticsAvailable === true ? t("status.organization.skipped", { n: organization.schemaSkipped ?? 0 }) : t("status.organization.skippedUnknown")}</span>
@@ -67,6 +87,7 @@ function renderResult(target: StatusTarget, result: BackendResult, nowMs: number
         <dl>
           <dt>${t("status.organization.phase")}</dt><dd>${organization.errorPhase ?? t("status.organization.unknown")}</dd>
           <dt>${t("status.organization.hostCode")}</dt><dd>${organization.hostErrorCode ?? t("status.organization.unknown")}</dd>
+          <dt>${t("status.organization.localCode")}</dt><dd>${organization.localErrorCode ?? t("status.organization.unknown")}</dd>
           <dt>${t("status.organization.retry")}</dt><dd>${organization.retryable === null ? t("status.organization.unknown") : organization.retryable ? t("status.organization.yes") : t("status.organization.no")}</dd>
           <dt>${t("status.organization.partial")}</dt><dd>${organization.partialDelivered === null ? t("status.organization.unknown") : organization.partialDelivered ? t("status.organization.yes") : t("status.organization.no")}</dd>
           <dt>${t("status.organization.lastAttempt")}</dt><dd>${detailTime(organization.lastAttemptAt)}</dd>

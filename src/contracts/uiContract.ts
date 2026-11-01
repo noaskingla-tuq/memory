@@ -334,6 +334,7 @@ export const uiStatusSuccess = z
       lastError: z.string().nullable(),
       errorPhase: z.string().nullable(),
       hostErrorCode: z.string().nullable(),
+      localErrorCode: z.string().nullable().optional(),
       retryable: z.boolean().nullable(),
       partialDelivered: z.boolean().nullable(),
       lastAttemptAt: count.nullable(),

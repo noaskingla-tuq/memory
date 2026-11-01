@@ -33,7 +33,7 @@ type ToolInput =
 
 function unwrap(result: CoreResult): unknown {
   if (result.ok) return result.value;
-  throw mapCairnError(result.error.code, result.error.phase);
+  throw mapCairnError(result.error.code, result.error.phase, result.error.localCode);
 }
 
 function receipt(

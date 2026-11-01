@@ -5,7 +5,7 @@ export type CoreResult<T = unknown> =
   | { readonly ok: true; readonly value: T }
   | {
       readonly ok: false;
-      readonly error: { readonly code: string; readonly retryable: boolean; readonly phase?: MemoryFailurePhase };
+      readonly error: { readonly code: string; readonly retryable: boolean; readonly phase?: MemoryFailurePhase; readonly localCode?: string };
     };
 
 export interface MemoryCorePort {

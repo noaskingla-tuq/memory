@@ -30,6 +30,7 @@ import { createTeamuqTaskBinding } from "../application/teamuqTaskBinding.js";
 import { createTeamuqTaskStore } from "../adapters/storage/teamuqTaskStore.js";
 import { createLocalPunchOrganizationStore, createLocalPunchReceiptStore } from "../adapters/storage/punchStateStore.js";
 import { createPunchOrganizationWorker } from "../application/punchOrganization.js";
+import { pairKey } from "../application/modelInvocationScope.js";
 import { createMigratingPunchReceiptStore } from "./punchStateMigration.js";
 import { readOrganizationSettings } from "./organizationSettings.js";
 
@@ -44,6 +45,7 @@ export interface BackendOptions {
   readonly uiNow?: () => number;
   readonly uiReceiptChunk?: number;
   readonly organizationNow?: () => number;
+  readonly hostSessionCloseTimeoutMs?: number;
   readonly profilePath?: string;
   readonly profileIo?: ProfileIo;
   readonly host?: PluginHostApiV1;
@@ -95,7 +97,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   // why: a host without the Program API (older Core) gets no binding, so its AI turns never carry a taskId and never call Program
   const teamuqTask = options.host?.program === undefined ? undefined : createTeamuqTaskBinding({ program: options.host.program, store: createTeamuqTaskStore(dirname(options.dataRoot)), profile });
   const organizationStore = options.host === undefined ? undefined : createLocalPunchOrganizationStore(dirname(options.dataRoot));
-  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask, organizationStore);
+  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask, organizationStore, options.hostSessionCloseTimeoutMs);
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
   const organization = organizationStore === undefined ? undefined : createPunchOrganizationWorker({
@@ -108,7 +110,16 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       const active = ensure();
       try { return await active.application.execute("memory_capture", job.input, job.actor, job.memoryId, job.allowModelSend ?? true); }
       finally {
-        await model?.releasePair(job.actor.agentId, job.actor.projectId).catch(() => undefined);
+        const pair = pairKey(job.actor.agentId, job.actor.projectId);
+        try {
+          await model?.releasePair(job.actor.agentId, job.actor.projectId);
+          organization?.noteReleaseFault(pair, null);
+        } catch (error) {
+          // why: the job result stays as it is, but a close that timed out must still show in the organization status
+          if (error instanceof MemoryServiceError && error.phase !== undefined) {
+            organization?.noteReleaseFault(pair, { code: error.code, phase: error.phase, localCode: error.localCode ?? null, retryable: error.retryable, at: (options.organizationNow ?? Date.now)() });
+          }
+        }
         active.ui.index.markDirty(job.actor.agentId);
       }
     },

@@ -14,6 +14,8 @@ const REPLY_LIMIT = 16_384;
 const JOURNAL_OPERATION_LIMIT = 2_000;
 const SESSION_LIMIT = 512;
 const IDLE_ROTATION_MS = 30 * 24 * 60 * 60_000;
+const SESSION_CLOSE_TIMEOUT_MS = 15_000;
+const CLOSE_TIMEOUT_LOCAL_CODE = "close_timeout";
 
 type EffectiveAiOptions = Awaited<ReturnType<PluginBackendAiApiV1["getOptions"]>> & { capabilities?: { closedSessionResume?: boolean } };
 type ResumeOpenOptions = { resume: string; taskId?: string } | { providerId: string; modelId: string; system: string; taskId?: string };
@@ -24,8 +26,8 @@ interface PairSession {
   readonly record: OrganizationSessionRecord;
 }
 
-const serviceError = (code: MemoryServiceError["code"], message: string, retryable?: boolean, phase?: MemoryFailurePhase): MemoryServiceError =>
-  new MemoryServiceError(code, message, retryable, phase);
+const serviceError = (code: MemoryServiceError["code"], message: string, retryable?: boolean, phase?: MemoryFailurePhase, localCode?: string): MemoryServiceError =>
+  new MemoryServiceError(code, message, retryable, phase, localCode);
 
 function stateError(): MemoryServiceError {
   return serviceError("STORAGE_BUSY", "Memory recovery state is unavailable", undefined, "state");
@@ -76,11 +78,14 @@ export function createHostMemoryModelPort(
   timeoutMs = 90_000,
   task?: TeamuqTaskBinding,
   resumeStore?: OrganizationResumeStorePort,
+  closeTimeoutMs = SESSION_CLOSE_TIMEOUT_MS,
 ): MemoryModelPort & { interrupt(): void; releasePair(agentId: string, projectId: string | null): Promise<void>; cancel(): Promise<void> } {
   const resumeAi = ai as unknown as ResumeAi;
   const active = new Set<AbortController>();
   const sessions = new Map<string, PairSession>();
   const locks = new Map<string, Promise<void>>();
+  // why: a host session whose close timed out may still be open, so it must never be resumed
+  const abandoned = new Set<string>();
   let hostSlot: Promise<void> = Promise.resolve();
   let disposed = false;
 
@@ -103,15 +108,53 @@ export function createHostMemoryModelPort(
     finally { release(); }
   };
 
+  // why: a host close() that never settles must not hold the pair lock or host slot, so the wait is bounded
+  const closeWithin = async (session: PluginBackendAiSessionV1): Promise<"closed" | "timeout"> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        session.close().then(() => "closed" as const),
+        new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), closeTimeoutMs); }),
+      ]);
+    } finally { clearTimeout(timer); }
+  };
+
+  const closeQuietly = (session: PluginBackendAiSessionV1): Promise<void> => closeWithin(session).then((outcome) => {
+    if (outcome === "timeout") abandoned.add(session.sessionId);
+  }, () => undefined);
+
+  // why: the saved record outlives this process state, so it must stop reading as an active session that can be resumed
+  const invalidateSaved = async (pair: string, hostSessionId: string): Promise<void> => {
+    if (resumeStore === undefined) return;
+    try {
+      await resumeStore.transactResumeState((state) => {
+        const saved = state.sessions[pair];
+        return saved === undefined || saved.hostSessionId !== hostSessionId || saved.state !== "active"
+          ? state
+          : { ...state, sessions: { ...state.sessions, [pair]: { ...saved, state: "invalidated" } } };
+      });
+    } catch {
+      // why: the in-memory abandoned set still blocks the resume, and the close timeout is the failure worth reporting
+    }
+  };
+
+  // why: a timed-out handle is abandoned so the next job does not wait on the same stuck close again
+  const retireSession = async (pair: string, entry: PairSession, failureMessage: string): Promise<void> => {
+    let outcome: "closed" | "timeout";
+    try { outcome = await closeWithin(entry.session); }
+    catch { throw serviceError("RESOURCE_BUSY", failureMessage); }
+    sessions.delete(pair);
+    if (outcome === "timeout") {
+      abandoned.add(entry.session.sessionId);
+      await invalidateSaved(pair, entry.session.sessionId);
+      throw serviceError("RESOURCE_BUSY", "Memory host session close timed out", undefined, "session_close", CLOSE_TIMEOUT_LOCAL_CODE);
+    }
+  };
+
   const closeOtherPairs = async (activePair: string): Promise<void> => {
     for (const [pair, entry] of [...sessions]) {
       if (pair === activePair) continue;
-      try {
-        await entry.session.close();
-        sessions.delete(pair);
-      } catch {
-        throw serviceError("RESOURCE_BUSY", "An idle memory session could not release the host session slot");
-      }
+      await retireSession(pair, entry, "An idle memory session could not release the host session slot");
     }
   };
 
@@ -261,11 +304,11 @@ export function createHostMemoryModelPort(
     if (resumeStore === undefined) {
       const session = await openFreshSession();
       if (controller.signal.aborted || disposed) {
-        await session.close().catch(() => undefined);
+        await closeQuietly(session);
         throw serviceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled");
       }
       if (session.effective.providerId !== providerId || session.effective.modelId !== modelId || deniedModel(session.effective.providerId) || deniedModel(session.effective.modelId)) {
-        await session.close().catch(() => undefined);
+        await closeQuietly(session);
         throw serviceError("MODEL_POLICY_DENIED", "Memory model selection changed", false);
       }
       return { session, record: { version: 1, pairKey: pair, agentId: invocation.canonicalAgentId, projectId: invocation.sourceProjectId, hostSessionId: session.sessionId, baseSystemVersion: BASE_SYSTEM_VERSION, baseSystemSha256: sha256(BASE_SYSTEM), taskId, providerId, modelId, policyRevision, openedAt: Date.now(), lastUsedAt: Date.now(), turnCount: 0, state: "active" } };
@@ -283,7 +326,7 @@ export function createHostMemoryModelPort(
     if (otherOperationUnresolved) throw serviceError("RESOURCE_BUSY", "Another memory operation for this pair needs recovery", undefined, "session_resume");
     if (saved === undefined && operationUnresolved) throw serviceError("RESOURCE_BUSY", "An unresolved memory operation has no resumable session", undefined, "session_resume");
     let rotate = saved !== undefined && (
-      saved.state !== "active" || saved.agentId !== invocation.canonicalAgentId || saved.projectId !== invocation.sourceProjectId
+      saved.state !== "active" || abandoned.has(saved.hostSessionId) || saved.agentId !== invocation.canonicalAgentId || saved.projectId !== invocation.sourceProjectId
       || saved.providerId !== providerId || saved.modelId !== modelId || saved.policyRevision !== policyRevision
       || saved.taskId !== taskId || saved.baseSystemVersion !== BASE_SYSTEM_VERSION || saved.baseSystemSha256 !== sha256(BASE_SYSTEM)
       || Date.now() - saved.lastUsedAt >= IDLE_ROTATION_MS
@@ -308,9 +351,9 @@ export function createHostMemoryModelPort(
         await persistSession({ ...saved, state: (error as { code?: string } | null)?.code === "session_not_found" ? "expired" : "invalidated" });
         throw publicError(error, "session_resume");
       }
-      if (controller.signal.aborted || disposed) { await resumed.close().catch(() => undefined); throw serviceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled"); }
+      if (controller.signal.aborted || disposed) { await closeQuietly(resumed); throw serviceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled"); }
       if (resumed.sessionId !== saved.hostSessionId || resumed.effective.providerId !== saved.providerId || resumed.effective.modelId !== saved.modelId) {
-        await resumed.close().catch(() => undefined);
+        await closeQuietly(resumed);
         await persistSession({ ...saved, state: "invalidated" });
         throw serviceError("MODEL_POLICY_DENIED", "The resumed memory session identity changed", false, "session_resume");
       }
@@ -320,14 +363,11 @@ export function createHostMemoryModelPort(
       return { session: resumed, record };
     }
     const old = sessions.get(pair);
-    if (rotate && old !== undefined) {
-      try { await old.session.close(); sessions.delete(pair); }
-      catch { throw serviceError("RESOURCE_BUSY", "The old memory session could not be retired before rotation"); }
-    }
+    if (rotate && old !== undefined) await retireSession(pair, old, "The old memory session could not be retired before rotation");
     const created = await openFreshSession();
-    if (controller.signal.aborted || disposed) { await created.close().catch(() => undefined); throw serviceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled"); }
+    if (controller.signal.aborted || disposed) { await closeQuietly(created); throw serviceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled"); }
     if (created.effective.providerId !== providerId || created.effective.modelId !== modelId || deniedModel(created.effective.providerId) || deniedModel(created.effective.modelId)) {
-      await created.close().catch(() => undefined);
+      await closeQuietly(created);
       throw serviceError("MODEL_POLICY_DENIED", "Memory model selection changed", false);
     }
     const record: OrganizationSessionRecord = {
@@ -336,9 +376,9 @@ export function createHostMemoryModelPort(
       taskId, providerId, modelId, policyRevision, openedAt: Date.now(), lastUsedAt: Date.now(), turnCount: 0, state: "active",
     };
     try { await persistSession(record); }
-    catch (error) { await created.close().catch(() => undefined); throw error; }
+    catch (error) { await closeQuietly(created); throw error; }
     sessions.set(pair, { session: created, record });
-    if (old !== undefined && old.session !== created) await old.session.close().catch(() => undefined);
+    if (old !== undefined && old.session !== created) await closeQuietly(old.session);
     return { session: created, record };
   };
 
@@ -473,7 +513,7 @@ export function createHostMemoryModelPort(
       listenerOff?.(); removeAbort?.();
       input.signal.removeEventListener("abort", onAbort);
       active.delete(controller);
-      if (resumeStore === undefined) await session?.close().catch(() => undefined);
+      if (resumeStore === undefined && session !== undefined) await closeQuietly(session);
     }
 
     async function thisRun(
@@ -635,14 +675,13 @@ export function createHostMemoryModelPort(
       await withPairLock(pair, () => withHostSlot(async () => {
         const entry = sessions.get(pair);
         if (entry === undefined) return;
-        try { await entry.session.close(); sessions.delete(pair); }
-        catch { throw serviceError("RESOURCE_BUSY", "The idle memory session could not be closed"); }
+        await retireSession(pair, entry, "The idle memory session could not be closed");
       }));
     },
     async cancel() {
       disposed = true;
       for (const controller of active) controller.abort();
-      await Promise.all([...sessions.values()].map(({ session }) => session.close().catch(() => undefined)));
+      await Promise.all([...sessions.values()].map(({ session }) => closeQuietly(session)));
       sessions.clear();
     },
   };

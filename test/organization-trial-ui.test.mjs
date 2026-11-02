@@ -79,11 +79,11 @@ test("C3: ui.legacyTrial is a write, so a platform failure is neither retried no
   assert.deepEqual(calls, ["ui.legacyTrial"]);
 });
 
-test("U1: the trial controls sit outside <details> and are still there after a redraw", async () => {
+test("U1: the trial controls sit in the status panel outside <details> and are still there after a redraw", async () => {
   const idle = await render(organization());
   const detailsAt = idle.indexOf("<details");
   assert.ok(detailsAt > 0);
-  assert.ok(idle.indexOf('data-trial="open"') > 0 && idle.indexOf('data-trial="open"') < detailsAt, "the open button is in the always-visible line");
+  assert.ok(idle.indexOf('data-trial="open"') > 0 && idle.indexOf('data-trial="open"') < detailsAt, "the open button is above the details, not inside them");
   assert.ok(!idle.slice(detailsAt).includes("data-trial="), "nothing that drives the trial is inside the details");
   assert.ok(idle.includes("舊工作 90 筆暫停中（可小量試跑）"));
   assert.ok(idle.includes('data-trial-n="80"'), "the dialog count is the candidate count");

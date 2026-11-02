@@ -1,0 +1,117 @@
+.hdr-status {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.status-compact {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.status-compact .state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-compact .btn {
+  flex: none;
+  padding: 2px var(--sp-2);
+  font-size: 12px;
+}
+
+.hdr-status .state[data-state="error"]::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--sp-2);
+  border-radius: 50%;
+  background: var(--error-strong);
+}
+
+.status-toggle {
+  flex: none;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.status-toggle:hover,
+.status-toggle[aria-expanded="true"] {
+  border-color: var(--border);
+  background: var(--surface-muted);
+}
+
+.status-panel {
+  position: absolute;
+  top: calc(100% + var(--sp-2));
+  right: 0;
+  z-index: 6;
+  width: min(34rem, calc(100vw - 2 * var(--sp-4)));
+  max-height: calc(100vh - 6rem);
+  overflow: auto;
+  padding: var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.status-items {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status-items li {
+  overflow-wrap: anywhere;
+}
+
+.status-items .muted {
+  color: var(--text-secondary-strong);
+}
+
+.status-advice {
+  margin: 0;
+}
+
+.organization-details {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
+}
+
+.organization-details summary {
+  cursor: pointer;
+}
+
+.organization-details dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-3);
+  margin: var(--sp-2) 0 0;
+}
+
+.organization-details dt {
+  color: var(--text-secondary-strong);
+}
+
+.organization-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

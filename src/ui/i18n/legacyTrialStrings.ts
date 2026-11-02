@@ -1,6 +1,7 @@
 export const TRIAL_STRINGS = {
   "trial.open": "小量試跑…",
   "trial.stop": "停止",
+  "trial.compact": "試跑 {done}/{adopted}",
   "trial.running": "試跑 {done}/{adopted}（寫入 {committed}・無需記憶 {empty}・失敗 {failed}）",
   "trial.ended.completed": "試跑完成 {done}/{adopted}（寫入 {committed}・無需記憶 {empty}・失敗 {failed}）",
   "trial.ended.halted": "試跑已自動停止 {done}/{adopted}（寫入 {committed}・無需記憶 {empty}・失敗 {failed}）",

@@ -257,9 +257,11 @@ test("failure wording from the host is escaped", async () => {
   assert.equal(html.includes("<img"), false);
 });
 
+// why: the failure reason lives in the panel item, not in the compact line, so the headline is read from the panel
 const headlineOf = (html) => {
-  const start = html.indexOf("AI 整理遇到問題") >= 0 ? html.indexOf("AI 整理遇到問題") : html.indexOf("AI 整理暫停");
-  return html.slice(start, html.indexOf("</span>", start));
+  const panel = html.slice(html.indexOf('id="status-panel"'));
+  const start = panel.indexOf("AI 整理遇到問題") >= 0 ? panel.indexOf("AI 整理遇到問題") : panel.indexOf("AI 整理暫停");
+  return panel.slice(start, panel.indexOf("</li>", start));
 };
 
 test("a code the plugin decided itself is labelled as such and never as a host code", async () => {

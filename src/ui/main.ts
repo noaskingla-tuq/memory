@@ -12,7 +12,7 @@ import { bindHomeEvents } from "./views/homeEvents.js";
 import { createMemorySpace, type SpaceTargets } from "./views/memorySpaceController.js";
 import { SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
 import { bindSpaceEvents } from "./views/spaceEvents.js";
-import { createStatusLine } from "./views/statusLine.js";
+import { bindStatusToggle, createStatusLine } from "./views/statusLine.js";
 import { bindLegacyTrial } from "./views/legacyTrial.js";
 import { createTeamHome, type HomeTargets, type Preferences } from "./views/teamHomeController.js";
 import { homeShell } from "./views/teamHomeView.js";
@@ -504,6 +504,7 @@ element("nav-settings").textContent = t("nav.settings");
 element("status").addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest("[data-retry]") !== null) void status.refresh();
 });
+bindStatusToggle(element("status"), status);
 bindLegacyTrial(element("status"), { client, refresh: status.refresh, background: () => view });
 document.addEventListener("click", onInternalClick, true);
 window.addEventListener("hashchange", onHashChange);

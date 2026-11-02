@@ -15,16 +15,16 @@ function progress(key: StringKey, trial: Trial): string {
   return t(key, { done: trial.attempted, adopted: trial.adopted, committed: trial.committed, empty: trial.emptySuccess, failed: trial.failed });
 }
 
-// why: these controls sit in the always-visible line, not inside <details>, because the status line is redrawn every 30 seconds and a redraw closes the details
+// why: these controls stay outside <details> because the status line is redrawn every 30 seconds and a redraw closes the details
 export function trialControls(organization: Organization): SafeHtml {
   const trial = organization.trial ?? null;
   if (trial?.state === "running") {
-    return html`<span class="trial-controls"><span class="muted">・${progress("trial.running", trial)}</span><button type="button" class="btn" data-trial="stop">${t("trial.stop")}</button></span>`;
+    return html`<span class="trial-controls"><span class="muted">${progress("trial.running", trial)}</span><button type="button" class="btn" data-trial="stop">${t("trial.stop")}</button></span>`;
   }
-  const halted = trial?.state === "halted" ? html`<span class="muted">・${progress("trial.ended.halted", trial)}</span>` : EMPTY_HTML;
+  const halted = trial?.state === "halted" ? html`<span class="muted">${progress("trial.ended.halted", trial)}</span>` : EMPTY_HTML;
   const open = (organization.legacyTrialCandidates ?? 0) > 0 && organization.state !== "disabled"
     ? html`<button type="button" class="btn" data-trial="open" data-trial-n="${organization.legacyTrialCandidates}">${t("trial.open")}</button>` : EMPTY_HTML;
-  return html`<span class="trial-controls">${halted}${open}</span>`;
+  return halted === EMPTY_HTML && open === EMPTY_HTML ? EMPTY_HTML : html`<span class="trial-controls">${halted}${open}</span>`;
 }
 
 export function trialDetails(organization: Organization): SafeHtml {

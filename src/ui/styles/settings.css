@@ -28,8 +28,14 @@
 }
 
 .settings-page {
-  width: min(100%, 48rem);
+  width: 100%;
+  max-width: 1200px;
   margin: 0 auto;
+}
+
+/* why: main is capped for the overview, so the settings page lifts that cap to let its cards use the width */
+main:has(.settings-page) {
+  max-width: calc(1200px + 2 * var(--sp-4));
 }
 
 .settings-intro {
@@ -62,7 +68,7 @@
 
 .setting-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr);
   gap: var(--sp-4);
   align-items: start;
   padding: var(--sp-3) 0;
@@ -76,6 +82,10 @@
 .setting-copy,
 .setting-control {
   min-width: 0;
+}
+
+.setting-control {
+  max-width: 32rem;
 }
 
 .setting-copy label {
@@ -300,9 +310,6 @@
 @media (max-width: 47.999rem) {
   .hdr-status {
     order: 2;
-    max-width: 100%;
-    margin-left: auto;
-    overflow-wrap: anywhere;
   }
 
   .hdr-nav {

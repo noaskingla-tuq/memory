@@ -111,3 +111,40 @@ test("activate serves remember and inspect when node --permission allows only th
   assert.equal(report.second.value.memory.id, report.first.value.memory.id);
   assert.deepEqual(report.listed.value.memories.map((memory) => memory.id), [report.first.value.memory.id]);
 });
+
+test("the link round trip and its data directories work when node --permission allows only the repository and the data directory", (t) => {
+  const base = scratch(t);
+  const dataDir = join(base, "plugins", "data", "teamuq.memory");
+  mkdirSync(dataDir, { recursive: true });
+  const script = join(base, "link-probe.mjs");
+  const entry = pathToFileURL(join(REPO_ROOT, "out", "backend", "entry.js")).href;
+  writeFileSync(
+    script,
+    [
+      `import { activate } from ${JSON.stringify(entry)};`,
+      `const handle = activate({ pluginId: "teamuq.memory", dataDir: ${JSON.stringify(dataDir)}, assetPacks: {}, allowAddons: false });`,
+      'const who = { source: { kind: "plugin", pluginId: "probe.plugin" }, category: "teamuq.memory@1" };',
+      'const group = { id: "memory-store" };',
+      'await handle.link.open({ linkId: "l1", who, group, mode: "call", channel: { closed: false, emit: async () => undefined } });',
+      'const call = (id, method, ...args) => handle.link.call({ id, method, args, who, group, linkId: "l1" });',
+      'const remembered = await call("1", "remember", { payload: { text: "probe" }, key: "k" });',
+      'const recalled = await call("2", "recall", { limit: 5 });',
+      'const sources = await handle.call("ui.linkSources", {});',
+      'const forgotten = await call("3", "forget", { all: true });',
+      "await handle.dispose();",
+      "process.stderr.write(JSON.stringify({ remembered: remembered.value, recalled: recalled.value.items.length, sources: sources.sources.length, forgotten: forgotten.value }));",
+    ].join("\n"),
+  );
+  const result = spawnSync(
+    process.execPath,
+    ["--permission", `--allow-fs-read=${REPO_ROOT}`, `--allow-fs-read=${script}`, `--allow-fs-read=${dataDir}`, `--allow-fs-write=${dataDir}`, script],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000 },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stderr.split("\n").filter((line) => line.startsWith("{")).at(-1));
+  assert.deepEqual(report.remembered, { id: "k", created: true });
+  assert.equal(report.recalled, 1);
+  assert.equal(report.sources, 1);
+  assert.deepEqual(report.forgotten, { forgotten: 1 });
+  assert.equal(existsSync(join(dataDir, "memory-cairn-v1")), true);
+});

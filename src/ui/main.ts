@@ -9,6 +9,9 @@ import { itemKey } from "./state/timeline.js";
 import { parseRoute, type Route } from "./router.js";
 import { createDetail } from "./views/detailController.js";
 import { bindHomeEvents } from "./views/homeEvents.js";
+import { createLinked, LINKED_STALE_MS, type LinkedTargets } from "./views/linkedController.js";
+import { bindLinkedEvents } from "./views/linkedEvents.js";
+import { LINKED_IDS, linkedShell } from "./views/linkedView.js";
 import { createMemorySpace, type SpaceTargets } from "./views/memorySpaceController.js";
 import { SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
 import { bindSpaceEvents } from "./views/spaceEvents.js";
@@ -69,6 +72,12 @@ const home = createTeamHome({ client, now, preferences, agentAvatar: agentAvatar
 const space = createMemorySpace({ client, now });
 const settings = createSettingsState(settingsClient());
 
+const linked = createLinked({
+  client,
+  now,
+  backgrounds: () => [document.querySelector<HTMLElement>("header.hdr"), document.querySelector<HTMLElement>("main")].filter((found): found is HTMLElement => found !== null),
+});
+
 const timeline = createTimeline({ client, now, onOpenDetail: (ref) => void detail.open(ref) });
 
 // why: the drawer makes the whole page inert while it is open, and a card is found again by its key because the list is re-rendered after a forget
@@ -128,6 +137,7 @@ function sameRoute(left: Route, right: Route): boolean {
 
 function hashOf(route: Route): string {
   if (route.name === "settings") return "#/settings";
+  if (route.name === "linked") return "#/linked";
   if (route.name === "agent") return `#/agent/${encodeURIComponent(route.agentId)}`;
   return "#/";
 }
@@ -137,14 +147,18 @@ function updateNavigation(route: Route): void {
   const nav = element("primary-nav");
   const overview = element("nav-overview");
   const settingsLink = element("nav-settings");
+  const linkedLink = element("nav-linked");
   brand.setAttribute("aria-label", t("nav.brandHome"));
   nav.setAttribute("aria-label", t("nav.label"));
   overview.textContent = t("nav.overview");
   settingsLink.textContent = t("nav.settings");
+  linkedLink.textContent = t("nav.linked");
   overview.removeAttribute("aria-current");
   settingsLink.removeAttribute("aria-current");
+  linkedLink.removeAttribute("aria-current");
   if (route.name === "home") overview.setAttribute("aria-current", "page");
   else if (route.name === "agent") overview.setAttribute("aria-current", "location");
+  else if (route.name === "linked") linkedLink.setAttribute("aria-current", "page");
   else settingsLink.setAttribute("aria-current", "page");
 }
 
@@ -194,6 +208,20 @@ function showAgent(agentId: string): void {
   document.getElementById(SPACE_TITLE_ID)?.focus();
 }
 
+function linkedTargets(): LinkedTargets {
+  return { body: element(LINKED_IDS.body) };
+}
+
+function showLinked(): void {
+  home.attach(null);
+  timeline.attach(null);
+  mount(view, linkedShell());
+  linked.attach(linkedTargets());
+  void linked.refreshIfStale(LINKED_STALE_MS);
+  window.scrollTo(0, 0);
+  document.getElementById(LINKED_IDS.title)?.focus();
+}
+
 function showSettings(): void {
   home.attach(null);
   timeline.attach(null);
@@ -208,12 +236,15 @@ function route(): void {
   if (previous !== null && sameRoute(previous, next)) return;
   if (previous?.name === "home") homeScroll = window.scrollY;
   detail.close({ force: true });
+  linked.closeDrawer({ force: true });
+  if (previous?.name === "linked") linked.attach(null);
   if (previous?.name === "agent") space.close();
   current = next;
   currentHash = hashOf(next);
   updateNavigation(next);
   if (next.name === "agent") showAgent(next.agentId);
   else if (next.name === "settings") showSettings();
+  else if (next.name === "linked") showLinked();
   else showHome(previous?.name === "agent" ? previous.agentId : undefined);
 }
 
@@ -233,6 +264,16 @@ bindHomeEvents(view, {
   },
   setTeam: (value) => home.setTeam(value),
   setSort: (value) => home.setSort(value),
+});
+
+bindLinkedEvents(view, {
+  reload: () => void linked.reload(),
+  toggle: (source) => void linked.toggle(source),
+  more: (source) => void linked.more(source),
+  retry: (source) => void linked.retry(source),
+  open: (source, id) => void linked.open(source, id),
+  forgetSource: (source) => void linked.forgetSource(source),
+  removeDamaged: (fileId) => void linked.removeDamaged(fileId),
 });
 
 bindSpaceEvents(view, {

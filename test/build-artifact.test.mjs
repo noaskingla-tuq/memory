@@ -188,6 +188,14 @@ test("verify-artifact rejects a missing Cairn file, a smuggled test directory an
   assert.ok(failedChecks(unlicensed).includes("cairn/LICENSE is present"));
 });
 
+test("verify-artifact resolves a directory URL joined with a file name and rejects a missing file or a bare directory URL", async (t) => {
+  const RESOLVES = "every relative import and asset URL of a staged .mjs resolves inside the artifact";
+  const missingWorker = await tamperedArtifact(t, (stageDir) => rmSync(join(stageDir, "cairn", "core", "context-product-worker.mjs")));
+  assert.ok(failedChecks(missingWorker).includes(RESOLVES));
+  const bare = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "cairn/core/context-product-reader-pool.mjs", (text) => `${text}\nvoid new URL('.', import.meta.url);\n`));
+  assert.ok(failedChecks(bare).includes(RESOLVES));
+});
+
 test("verify-artifact rejects a manifest that permits a Core older than the pinned public API", async (t) => {
   const report = await tamperedArtifact(t, (stageDir) => {
     const file = join(stageDir, "manifest.json");

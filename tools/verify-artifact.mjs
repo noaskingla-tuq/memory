@@ -12,6 +12,8 @@ const STATIC_IMPORT = /^[ \t]*(?:import|export)\s[^;'"`]*?\bfrom\s*(['"])([^'"]+
 const SIDE_EFFECT_IMPORT = /^[ \t]*import\s*(['"])([^'"]+)\1/gmu
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu
 const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
+// why: Cairn builds a worker path as new URL('.', import.meta.url).href + '<file>.mjs'; the directory form alone names no file, so the checked target is the joined file name
+const DIRECTORY_ASSET = /new URL\(\s*(['"])\.\1\s*,\s*import\.meta\.url\s*\)\.href\s*\+\s*(['"])([^'"]+)\2/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
 // why: providing teamuq.memory@1 over the link and dropping backend:invoke are only valid from Core 1.8.2, whose public kit the SDK and CLI are synced to
 const MIN_CORE_VERSION = '>=1.8.2'
@@ -162,7 +164,10 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   const unresolved = []
   for (const name of names.filter((entry) => entry.endsWith('.mjs'))) {
     const own = text(name)
-    const targets = [...specifiersOf(own).filter((specifier) => specifier.startsWith('.')), ...[...own.matchAll(URL_ASSET)].map((match) => match[2])]
+    const directoryAssets = [...own.matchAll(DIRECTORY_ASSET)].map((match) => `./${match[3]}`)
+    const assetTargets = [...own.matchAll(URL_ASSET)].map((match) => match[2])
+    if (assetTargets.filter((target) => target === '.').length > directoryAssets.length) unresolved.push(`${name} -> . (directory URL without a file name)`)
+    const targets = [...specifiersOf(own).filter((specifier) => specifier.startsWith('.')), ...assetTargets.filter((target) => target !== '.'), ...directoryAssets]
     const bare = specifiersOf(own).filter((specifier) => !specifier.startsWith('.') && !specifier.startsWith('node:'))
     for (const target of targets) if (!entries.has(posix.normalize(posix.join(posix.dirname(name), target)))) unresolved.push(`${name} -> ${target}`)
     for (const specifier of bare) unresolved.push(`${name} -> ${specifier} (bare)`)

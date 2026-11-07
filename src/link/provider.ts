@@ -152,18 +152,29 @@ export function createProvider({ category, dataClass, maxSessions, modules, file
       const handler = Object.hasOwn(mod.methods, method) ? mod.methods[method] : undefined;
       if (handler === undefined) throw refuse("not_supported");
       calls.rate(who, mod.group.id);
-      const run = async (): Promise<CallResult> => {
+      const handlerContext = { ...link.ctx, ...(data === undefined ? {} : { data }) };
+      const run = (): CallResult | Promise<CallResult> => {
         const wait = probe?.beforeCall?.(input);
-        if (wait !== undefined) await wait;
+        if (wait !== undefined) {
+          return Promise.resolve(wait).then(() => {
+            probe?.executed?.(input);
+            return handler(args, handlerContext);
+          });
+        }
         probe?.executed?.(input);
-        return handler(args, { ...link.ctx, ...(data === undefined ? {} : { data }) });
+        return handler(args, handlerContext);
       };
       const releaseCall = calls.begin();
+      let result: CallResult | Promise<CallResult>;
       try {
-        return await (mod.sideEffects.includes(method) ? calls.once(linkId, input.id, args, run) : run());
-      } finally {
+        result = mod.sideEffects.includes(method) ? calls.once(linkId, input.id, args, run) : run();
+      } catch (error) {
         releaseCall();
+        throw error;
       }
+      if (result instanceof Promise) return result.finally(releaseCall);
+      releaseCall();
+      return result;
     },
 
     async message(identity, message, data) {

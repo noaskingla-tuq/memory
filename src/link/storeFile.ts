@@ -42,11 +42,11 @@ export interface FileStat {
 }
 
 export interface StoreIo {
-  list(): Promise<string[]>;
-  stat(fileId: string): Promise<FileStat | undefined>;
-  read(fileId: string): Promise<string>;
-  write(fileId: string, text: string): Promise<void>;
-  remove(fileId: string): Promise<void>;
+  list(): string[];
+  stat(fileId: string): FileStat | undefined;
+  read(fileId: string): string;
+  write(fileId: string, text: string): void;
+  remove(fileId: string): void;
 }
 
 export type LoadedFile =
@@ -118,13 +118,13 @@ export function classifyWriteError(error: unknown): StoreError {
   return new StoreError(typeof code === "string" && RETRYABLE_WRITE_CODES.has(code) ? "provider_not_ready" : "provider_error");
 }
 
-export async function loadFile(io: StoreIo, fileId: string): Promise<LoadedFile> {
-  const stat = await io.stat(fileId);
+export function loadFile(io: StoreIo, fileId: string): LoadedFile {
+  const stat = io.stat(fileId);
   if (stat === undefined) return { kind: "absent" };
   if (!stat.regular || stat.size > MAX_FILE_BYTES) return { kind: "corrupt" };
   let text: string;
   try {
-    text = await io.read(fileId);
+    text = io.read(fileId);
   } catch (error) {
     const code = (error as { code?: unknown } | null)?.code;
     if (code === "ENOENT") return { kind: "absent" };
@@ -148,7 +148,7 @@ export function createFsIo(dataDir: string): StoreIo {
     if (!FILE_NAME.test(`${fileId}.json`)) throw new StoreError("provider_error", "file_id_invalid");
   };
   return {
-    async list() {
+    list() {
       if (rootState() === "absent") return [];
       return readdirSync(root)
         .filter((name) => FILE_NAME.test(name))
@@ -156,18 +156,18 @@ export function createFsIo(dataDir: string): StoreIo {
         .slice(0, MAX_LISTED_FILES)
         .map((name) => name.slice(0, -5));
     },
-    async stat(fileId) {
+    stat(fileId) {
       guardName(fileId);
       if (rootState() === "absent") return undefined;
       const stat = lstatSync(pathOf(fileId), { throwIfNoEntry: false });
       if (stat === undefined) return undefined;
       return { size: stat.size, mtimeMs: stat.mtimeMs, regular: stat.isFile() && !stat.isSymbolicLink() };
     },
-    async read(fileId) {
+    read(fileId) {
       guardName(fileId);
       return readFileSync(pathOf(fileId), "utf8");
     },
-    async write(fileId, text) {
+    write(fileId, text) {
       guardName(fileId);
       mkdirSync(root, { recursive: true });
       rootState();
@@ -188,7 +188,7 @@ export function createFsIo(dataDir: string): StoreIo {
         if (lstatSync(temporary, { throwIfNoEntry: false }) !== undefined) unlinkSync(temporary);
       }
     },
-    async remove(fileId) {
+    remove(fileId) {
       guardName(fileId);
       if (rootState() === "absent") return;
       const target = pathOf(fileId);

@@ -17,14 +17,14 @@ function memoryIo(initial = {}) {
   const files = new Map(Object.entries(initial));
   return {
     files,
-    async list() { return [...files.keys()]; },
-    async stat(id) { return files.has(id) ? { size: 1000, mtimeMs: 1, regular: true } : undefined; },
-    async read(id) {
+    list() { return [...files.keys()]; },
+    stat(id) { return files.has(id) ? { size: 1000, mtimeMs: 1, regular: true } : undefined; },
+    read(id) {
       if (!files.has(id)) throw Object.assign(new Error("missing"), { code: "ENOENT" });
       return files.get(id);
     },
-    async write(id, text) { files.set(id, text); },
-    async remove(id) { files.delete(id); },
+    write(id, text) { files.set(id, text); },
+    remove(id) { files.delete(id); },
   };
 }
 
@@ -245,7 +245,7 @@ test("T-4.7: a failing write keeps the item and reports retryable only for trans
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const real = createFsIo(base);
   const failure = { code: undefined };
-  const io = { ...real, async write(id, text) { if (failure.code !== undefined) throw Object.assign(new Error("injected"), { code: failure.code }); return real.write(id, text); }, async remove(id) { if (failure.code !== undefined) throw Object.assign(new Error("injected"), { code: failure.code }); return real.remove(id); } };
+  const io = { ...real, write(id, text) { if (failure.code !== undefined) throw Object.assign(new Error("injected"), { code: failure.code }); return real.write(id, text); }, remove(id) { if (failure.code !== undefined) throw Object.assign(new Error("injected"), { code: failure.code }); return real.remove(id); } };
   const link = startLink(t, { base, io });
   const call = await link.connect("w");
   await call("remember", { payload: "keep", key: "k" });

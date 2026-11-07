@@ -373,6 +373,10 @@ export function createLinked(deps: LinkedDeps): Linked {
         set({ ...withPanel(view, source, { loadingMore: false }), notice: noticeError(result.ok ? ({ ...describeError("malformed_response", "client"), ok: false, superseded: false, attempts: 1 }) : result, t("lk.notice.failed")) });
         return [];
       }
+      if (latest.revision !== null && page.revision !== latest.revision) {
+        await loadFirst(source, false);
+        return [];
+      }
       const merged = mergeItems(latest.items, page.items);
       set(withPanel(view, source, { items: merged, nextCursor: page.nextCursor, total: page.total, revision: page.revision, loadingMore: false }));
       return page.items.map((item) => item.id).filter((id) => !latest.items.some((old) => old.id === id));

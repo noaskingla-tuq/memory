@@ -24,9 +24,10 @@ test("request schemas are strict and bounded", () => {
   assert.equal(accepts("ui.linkList", { source }), true);
   assert.equal(parseUiParams("ui.linkList", { source }).value.limit, 12);
   assert.equal(accepts("ui.linkList", { source: "core", limit: 24, cursor: "c" }), true);
-  for (const bad of [{ source, limit: 0 }, { source, limit: 25 }, { source, limit: 1.5 }, { source, cursor: "" }, { source, cursor: "c".repeat(1025) }, { source, extra: 1 }, { source: "plugin:" }, { source: "plugin:a\u0007" }, { source: "plugin:a\u007f" }, { source: `plugin:${"a".repeat(191)}` }, { source: "Core" }, {}]) {
+  for (const bad of [{ source, limit: 0 }, { source, limit: 25 }, { source, limit: 1.5 }, { source, cursor: "" }, { source, cursor: "c".repeat(1025) }, { source, extra: 1 }, { source: "plugin:" }, { source: "plugin:a\u0007" }, { source: "plugin:a\u007f" }, { source: `plugin:${"a".repeat(194)}` }, { source: "Core" }, {}]) {
     assert.equal(accepts("ui.linkList", bad), false, JSON.stringify(bad));
   }
+  assert.equal(accepts("ui.linkList", { source: `plugin:${"a".repeat(193)}` }), true);
   assert.equal(accepts("ui.linkGet", { source, id: "k" }), true);
   assert.equal(accepts("ui.linkGet", { source, id: "k".repeat(129) }), false);
   assert.equal(accepts("ui.linkGet", { source, id: "" }), false);
@@ -42,11 +43,12 @@ test("real answers satisfy their success schemas and any extra field is refused"
   const link = startLink(t);
   const call = await link.connect("x.y");
   await call("remember", { payload: { text: "你好" }, key: "k", tags: ["t"], ttlSec: 60 });
+  const itemRev = (await link.ui("ui.linkList", { source: "plugin:x.y" })).items[0].rev;
   const answers = {
     "ui.linkSources": await link.ui("ui.linkSources", {}),
     "ui.linkList": await link.ui("ui.linkList", { source: "plugin:x.y" }),
     "ui.linkGet": await link.ui("ui.linkGet", { source: "plugin:x.y", id: "k" }),
-    "ui.linkForget": await link.ui("ui.linkForget", { action: "item", source: "plugin:x.y", id: "k", expectedItemRev: 1 }),
+    "ui.linkForget": await link.ui("ui.linkForget", { action: "item", source: "plugin:x.y", id: "k", expectedItemRev: itemRev }),
   };
   for (const method of LINK_METHODS) {
     assert.equal(answers[method].ok, true, method);

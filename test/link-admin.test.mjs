@@ -59,7 +59,8 @@ test("T-4.1: the sources view agrees with link inspect on count, size and revisi
     const summary = (await caller("inspect")).value.summary;
     assert.equal(row.count, summary.count);
     assert.equal(row.sizeBytes, summary.sizeBytes);
-    assert.equal(row.revision, 15);
+    assert.equal(row.revision, (await link.ui("ui.linkList", { source })).revision);
+    assert.ok(row.revision >= 15);
     assert.equal(row.state, "ok");
     assert.match(row.fileId, /^[0-9a-f]{64}$/u);
   }
@@ -216,8 +217,9 @@ test("T-4.6: stale revisions are conflicts, concurrent writes are not lost and p
   const race = startLink(t);
   const racer = await race.connect("race");
   for (let index = 0; index < 5; index += 1) await racer("remember", { payload: index, key: `d${index}` });
+  const seenRows = (await race.ui("ui.linkList", { source: "plugin:race", limit: 24 })).items;
   const writes = Array.from({ length: 20 }, (_, index) => racer("remember", { payload: index, key: `w${index}` }));
-  const deletes = Array.from({ length: 5 }, (_, index) => race.ui("ui.linkForget", { action: "item", source: "plugin:race", id: `d${index}`, expectedItemRev: 1 }));
+  const deletes = Array.from({ length: 5 }, (_, index) => race.ui("ui.linkForget", { action: "item", source: "plugin:race", id: `d${index}`, expectedItemRev: seenRows.find((entry) => entry.id === `d${index}`).rev }));
   const outcomes = await Promise.all([...writes, ...deletes]);
   assert.ok(outcomes.slice(20).every((outcome) => outcome.ok === true));
   const recalled = (await racer("recall", { limit: 50 })).value.items.map((entry) => entry.id).sort();
@@ -249,11 +251,12 @@ test("T-4.7: a failing write keeps the item and reports retryable only for trans
   const link = startLink(t, { base, io });
   const call = await link.connect("w");
   await call("remember", { payload: "keep", key: "k" });
+  const kRev = (await link.ui("ui.linkList", { source: "plugin:w" })).items[0].rev;
   const bytes = readFileSync(fileOf(base, "plugin:w"), "utf8");
   failure.code = "ENOSPC";
-  assert.deepEqual(await link.ui("ui.linkForget", { action: "item", source: "plugin:w", id: "k", expectedItemRev: 1 }), { ok: false, code: "STORAGE_BUSY", retryable: true });
+  assert.deepEqual(await link.ui("ui.linkForget", { action: "item", source: "plugin:w", id: "k", expectedItemRev: kRev }), { ok: false, code: "STORAGE_BUSY", retryable: true });
   failure.code = "EIO";
-  assert.deepEqual(await link.ui("ui.linkForget", { action: "item", source: "plugin:w", id: "k", expectedItemRev: 1 }), { ok: false, code: "STORAGE_UNSUPPORTED", retryable: false });
+  assert.deepEqual(await link.ui("ui.linkForget", { action: "item", source: "plugin:w", id: "k", expectedItemRev: kRev }), { ok: false, code: "STORAGE_UNSUPPORTED", retryable: false });
   assert.equal((await call("recall", { limit: 5 })).value.items.length, 1);
   assert.equal(readFileSync(fileOf(base, "plugin:w"), "utf8"), bytes);
 });

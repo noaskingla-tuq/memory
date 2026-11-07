@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { refuse } from "./errors.js";
+import { isRefusal, refuse } from "./errors.js";
 import { liveItems, newItemId, type LinkStore } from "./linkStore.js";
 import type { CallResult, GroupModule, HandlerContext } from "./provider.js";
-import { StoreError, partitionKeyOf, payloadBytes, type LinkItem } from "./storeFile.js";
+import { StoreError, isValidPartitionKey, partitionKeyOf, payloadBytes, type LinkItem } from "./storeFile.js";
 
 export const MEMORY_FEATURES = Object.freeze(["inspect", "diagnose", "tags", "ttl", "upsert-by-key", "text-query"]);
 export const MEMORY_GROUP_LIMITS = Object.freeze({ maxPayloadChars: 12288, maxRecallLimit: 50, maxForgetIds: 100 });
@@ -54,7 +54,8 @@ function translate(error: unknown): unknown {
     if (error.code === "quota_exceeded" || error.code === "provider_not_ready" || error.code === "provider_error") return refuse(error.code);
     return refuse(error.code === "disposed" ? "provider_not_ready" : "provider_error");
   }
-  return error;
+  // why: anything that is not a deliberate refusal (EACCES from stat, a bug) must not reach Core with its own message, which can carry a local path
+  return isRefusal(error) ? error : refuse("provider_error");
 }
 
 function schemaAccepts(method: string, args: unknown): boolean {
@@ -120,7 +121,11 @@ export function createMemoryStoreGroup(options: MemoryGroupOptions): GroupModule
   const idFactory = options.idFactory ?? newItemId;
   const activeMethods = options.methods ?? ALL_METHODS;
   const has = (feature: string): boolean => activeFeatures.includes(feature);
-  const sourceOf = (ctx: HandlerContext): string => partitionKeyOf(ctx.who);
+  const sourceOf = (ctx: HandlerContext): string => {
+    const key = partitionKeyOf(ctx.who);
+    if (!isValidPartitionKey(key)) throw invalid();
+    return key;
+  };
 
   const remember: Handler = async (args, ctx) => {
     const body = request(args, ["payload", "key", "tags", "ttlSec"]);

@@ -6,6 +6,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { createFiles } from "../out/link/fileService.js";
 import { createLinkStore } from "../out/link/linkStore.js";
+import { createFsIo, fileIdOf, partitionKeyOf } from "../out/link/storeFile.js";
+import { parseUiParams } from "../out/contracts/uiContract.js";
 import { createMemoryStoreGroup } from "../out/link/memoryStoreGroup.js";
 import { createProvider } from "../out/link/provider.js";
 
@@ -18,7 +20,7 @@ function setup(t, options = {}) {
   const base = options.base ?? mkdtempSync(join(tmpdir(), "teamuq-link-provider-"));
   const clock = { now: 1_000_000 };
   const now = () => clock.now;
-  const store = createLinkStore({ dataDir: base, now, ...(options.limits === undefined ? {} : { limits: options.limits }) });
+  const store = createLinkStore({ dataDir: base, now, ...(options.limits === undefined ? {} : { limits: options.limits }), ...(options.io === undefined ? {} : { io: options.io }) });
   const files = createFiles({ dataDir: base, now });
   const group = createMemoryStoreGroup({ store, ...(options.group ?? {}) });
   const provider = createProvider({ category: "teamuq.memory@1", dataClass: "local", maxSessions: options.maxSessions ?? 4, modules: [group], files, now, callRatePerSecond: options.rate ?? 1000, callBurst: options.burst ?? 1000 });
@@ -391,4 +393,47 @@ test("a call that is still waiting does count against maxSessions", async (t) =>
   await assert.rejects(send("2"), refused("capability_busy"));
   held[0]();
   assert.deepEqual((await first).value, { items: [] });
+});
+
+test("F4: a native exception from the file layer reaches the consumer as provider_error without its message or path", async (t) => {
+  const base = mkdtempSync(join(tmpdir(), "teamuq-link-native-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const real = createFsIo(base);
+  const broken = { on: false };
+  const leak = "EACCES: permission denied, stat 'C:/Users/secret-user/AppData/memory-link-v1/file.json'";
+  const io = { ...real, stat(id) { if (broken.on) throw Object.assign(new Error(leak), { code: "EACCES" }); return real.stat(id); } };
+  const { connect } = setup(t, { base, io });
+  const call = await connect("a");
+  await call("remember", { payload: "ok", key: "k" });
+  broken.on = true;
+  const fresh = await connect("never-loaded");
+  for (const attempt of [() => fresh("recall", { limit: 5 }), () => fresh("inspect"), () => call("diagnose")]) {
+    await assert.rejects(attempt(), (error) => error.code === "provider_error" && !/secret|EACCES|stat|AppData/u.test(error.message));
+  }
+  for (const attempt of [() => call("remember", { payload: "again" })]) {
+    await assert.rejects(attempt(), (error) => ["provider_error", "provider_not_ready"].includes(error.code) && !/secret|EACCES|stat|AppData/u.test(error.message));
+  }
+  broken.on = false;
+  assert.equal((await call("recall", { limit: 5 })).value.items.length, 1);
+});
+
+test("F3: a plugin id that cannot be stored and shown again is refused before anything is written", async (t) => {
+  const { base, connect } = setup(t, { maxSessions: 64 });
+  const longest = "x".repeat(193);
+  const ok = await connect(longest);
+  assert.equal((await ok("remember", { payload: "fits", key: "k" })).value.created, true);
+  const key = partitionKeyOf({ source: { kind: "plugin", pluginId: longest } });
+  assert.equal(key.length, 200);
+  assert.equal(parseUiParams("ui.linkList", { source: key }).ok, true);
+  const reopened = createLinkStore({ dataDir: base });
+  t.after(() => reopened.dispose());
+  assert.equal(reopened.describeFile(fileIdOf(key)).state, "ok");
+  assert.equal(reopened.snapshot(key).items.length, 1);
+  const before = readdirSync(join(base, "memory-link-v1")).sort();
+  for (const pluginId of ["x".repeat(194), "x".repeat(300), "a\u0007b", "a\u007fb", ""]) {
+    const bad = await connect(pluginId);
+    await assert.rejects(bad("remember", { payload: "no", key: "k" }), refused("capability_request_invalid"), String(pluginId.length));
+    await assert.rejects(bad("recall", { limit: 1 }), refused("capability_request_invalid"));
+  }
+  assert.deepEqual(readdirSync(join(base, "memory-link-v1")).sort(), before);
 });

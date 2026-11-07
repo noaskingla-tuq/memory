@@ -13,14 +13,16 @@ const SIDE_EFFECT_IMPORT = /^[ \t]*import\s*(['"])([^'"]+)\1/gmu
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/gu
 const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
-// why: this plugin only needs host APIs available since Core 1.7.12; its SDK and CLI are synced to the public 1.7.15 devkit
-const MIN_CORE_VERSION = '>=1.7.12'
+// why: providing teamuq.memory@1 over the link and dropping backend:invoke are only valid from Core 1.8.2, whose public kit the SDK and CLI are synced to
+const MIN_CORE_VERSION = '>=1.8.2'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'
 const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metadata.json'), 'utf8'))
 const UI_ENTRY = 'ui/index.html'
 const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css', 'cairn-icon.png']
-const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'ai:chat', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'program:data:projects:write', 'program:data:tasks:write', 'project-directory:read', 'settings:plugin', 'ui:view', 'work-records:read']
+const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'ai:chat', 'data:legacy-migrate', 'network:loopback', 'plugin-state:read', 'program:data:projects:write', 'program:data:tasks:write', 'project-directory:read', 'settings:plugin', 'ui:view', 'work-records:read']
+const EXPECTED_PROVIDES = [{ capability: 'teamuq.memory@1', permission: 'cap:memory', transport: 'link', maxSessions: 4, dataClass: 'local' }]
+const EXPECTED_RESIDENCY = { default: 'on-demand', warmKeepSec: 180 }
 const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.legacyTrial', 'ui.linkForget', 'ui.linkGet', 'ui.linkList', 'ui.linkSources', 'ui.list', 'ui.overview', 'ui.search', 'ui.status']
 const EXPECTED_MAX_SESSIONS = 4
 // why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin
@@ -132,7 +134,7 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   const compactUiHtml = uiHtml.replace(/\s+/gu, ' ')
   const headerHasLinkedBrandAndNavigation = compactUiHtml.includes('<a id="brand-home" class="hdr-brand" href="#/" aria-label="Cairn記憶管理，回到總覽"> <img class="hdr-logo" src="../cairn-icon.png" width="24" height="24" alt=""> <h1 id="title">Cairn記憶管理</h1> </a>') && compactUiHtml.includes('<nav id="primary-nav" class="hdr-nav" aria-label="主要導覽"> <a id="nav-overview" href="#/">總覽</a> <a id="nav-linked" href="#/linked">外掛記憶</a> <a id="nav-settings" href="#/settings">設定</a> </nav>')
   check('UI title, linked brand, fixed overview/linked/settings navigation and decorative logo are localized and use the bundled PNG', uiHtml.includes('<title>Cairn記憶管理</title>') && headerHasLinkedBrandAndNavigation && entries.has('cairn-icon.png') && text('ui/app.js').includes('Cairn記憶管理'))
-  check('manifest permissions are exactly the eight UI methods, host data grants and legacy migration grant, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
+  check('manifest permissions are exactly the UI grant, host data grants, legacy migration grant and loopback for the link, and data is kept on uninstall', Array.isArray(manifest.permissions) && JSON.stringify([...manifest.permissions].sort()) === JSON.stringify(EXPECTED_PERMISSIONS) && manifest.data?.uninstall === 'keep', JSON.stringify(manifest.permissions))
   const legacySources = RELEASE_METADATA.legacyDataSources ?? []
   const migrations = manifest.data?.legacyMigrations ?? []
   check('manifest requires the supported host data API and declares the opaque Cairn migration source/target bound by release metadata', RELEASE_METADATA.schemaVersion === 1 && RELEASE_METADATA.pluginId === PLUGIN_ID && legacySources.length === 1 && legacySources[0].sourceId === 'memory-cairn-v1' && legacySources[0].relativePath === 'memory-cairn-v1' && JSON.stringify(manifest.hostApis) === JSON.stringify([{ id: 'teamuq.host-data', range: '^1.1.0' }]) && migrations.length === 1 && migrations[0].id === 'cairn-v1' && migrations[0].source === legacySources[0].sourceId && migrations[0].target === legacySources[0].relativePath, JSON.stringify({ hostApis: manifest.hostApis, legacyMigrations: migrations, releaseMetadata: RELEASE_METADATA }))
@@ -143,6 +145,10 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   check('manifest backendMethods do not list memory.profile.sync@1: Core pushes the name table through its own gate and the view never calls it', !methods.some((method) => String(method).includes('profile.sync')), methods.join(', '))
   const resources = manifest.resources ?? {}
   check('manifest resources follow the S0 recommendation', resources.cpuThreads === 1 && resources.maxSessions === EXPECTED_MAX_SESSIONS && resources.idleUnloadSec === 180 && Object.entries(RESOURCE_RANGES).every(([field, [low, high]]) => resources[field] >= low && resources[field] <= high), JSON.stringify(resources))
+  check('manifest does not declare backend:invoke (a composed plugin that provides a capability must not)', !(manifest.permissions ?? []).includes('backend:invoke'), JSON.stringify(manifest.permissions))
+  check('manifest provides exactly teamuq.memory@1 over the link with dataClass local and the same session count as resources', JSON.stringify(manifest.provides) === JSON.stringify(EXPECTED_PROVIDES) && manifest.provides?.[0]?.maxSessions === EXPECTED_MAX_SESSIONS, JSON.stringify(manifest.provides))
+  check('manifest residency is on-demand with a 180 second warm keep, matching the former idle unload', JSON.stringify(manifest.residency) === JSON.stringify(EXPECTED_RESIDENCY), JSON.stringify(manifest.residency))
+  check('manifest description says the memories are local, that AI organization hands work records to the chosen AI provider, and no longer claims all data stays local', typeof manifest.description === 'string' && !manifest.description.includes('資料留在本機') && manifest.description.includes('AI 提供者') && manifest.description.includes('只存在本機'), String(manifest.description))
   check(dev ? `manifest version is a 1.0.x patch above package.json version ${packageJson.version} (dev-pack --bump-patch)` : `manifest version equals package.json version ${packageJson.version}`, dev ? isPatchAbove(manifest.version, packageJson.version) : manifest.version === packageJson.version, String(manifest.version))
   check(`manifest pluginApi is set and minCoreVersion is ${MIN_CORE_VERSION}`, typeof manifest.pluginApi === 'string' && manifest.minCoreVersion === MIN_CORE_VERSION, `${manifest.pluginApi} ${manifest.minCoreVersion}`)
 

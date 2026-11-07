@@ -165,6 +165,7 @@ function guardPath(path: string): CairnReaderFailure | null {
     const file = statOrNull(path);
     if (file === null) return "not_found";
     if (file.isSymbolicLink() || !file.isFile()) return "unsafe_path";
+    if (file.size === 0 && (statOrNull(`${path}-wal`)?.size ?? 0) === 0) return "not_found";
     const parent = statOrNull(dirname(path));
     if (parent === null) return "not_found";
     if (parent.isSymbolicLink() || !parent.isDirectory()) return "unsafe_path";

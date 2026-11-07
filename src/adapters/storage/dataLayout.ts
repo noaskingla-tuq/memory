@@ -39,6 +39,12 @@ import {
 export const CAIRN_COMMIT = "7197d80035a015db195d7724729926f8749afd32";
 export const CAIRN_CORE_TREE = "81de091fcd364ae24daf9328e209d67ab934fe97";
 
+// why: the adapter creates an empty file just before Cairn initialises it, so a zero-byte file with no WAL content means no database yet, not a damaged one
+function holdsData(path: string): boolean {
+  const size = (file: string): number => statSync(file, { throwIfNoEntry: false })?.size ?? 0;
+  return size(path) > 0 || size(`${path}-wal`) > 0;
+}
+
 function comparablePath(path: string): string {
   const absolute = resolve(path);
   return process.platform === "win32" ? absolute.toLowerCase() : absolute;
@@ -379,7 +385,7 @@ export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
       for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
         assertRegularFile(this.realRoot, path, "Memory database");
       }
-      return existsSync(databasePath) ? { agentHash, databasePath, state: "ready" } : { agentHash, databasePath: null, state: "no_database" };
+      return holdsData(databasePath) ? { agentHash, databasePath, state: "ready" } : { agentHash, databasePath: null, state: "no_database" };
     } catch (error) {
       const unsafe = error instanceof MemoryServiceError && error.code === "STORAGE_UNSAFE";
       return { agentHash, databasePath: null, state: unsafe ? "unsafe" : "unreadable" };
@@ -402,7 +408,7 @@ export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
     readonly stored: StoredIdentity;
     readonly fromCommit: string;
   }): void {
-    if (existsSync(input.databasePath)) {
+    if (holdsData(input.databasePath)) {
       backupAgentDatabase(
         {
           backupsRoot: this.backupsRoot,

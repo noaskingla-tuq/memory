@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { closeSync, openSync } from "node:fs";
 import { openMemoryCore } from "cairn-memory/core/index.mjs";
 import type { CoreResult, MemoryCorePort } from "../../application/ports.js";
 import type { MemoryModelPort } from "../../application/modelPort.js";
@@ -13,10 +14,20 @@ interface ModelFailureContext {
   localCode?: string;
 }
 
+// why: Cairn creates a missing database by spawning a child process, which node --permission refuses, so the empty file is created here and Cairn then initialises it in-process
+function ensureDatabaseFile(path: string): void {
+  try {
+    closeSync(openSync(path, "wx", 0o600));
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== "EEXIST") throw error;
+  }
+}
+
 export function openCairnCore(
   path: string,
   modelBinding?: { readonly agentId: string; readonly port: MemoryModelPort },
 ): MemoryCorePort {
+  ensureDatabaseFile(path);
   const failures = new AsyncLocalStorage<ModelFailureContext>();
   const model =
     modelBinding === undefined

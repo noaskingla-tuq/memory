@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.0，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.8.2，釘選 Cairn e3e3761（套件版本 0.3.3，預設 schema 18）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.1，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.8.2，釘選 Cairn e3e3761（套件版本 0.3.3，預設 schema 18）。
 
 > 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
 
@@ -74,7 +74,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
 - inspect：以整個回應 `Buffer.byteLength(JSON.stringify(response), "utf8")`、60,000 bytes 為預算；超過就把 limit 對半、重查，直到符合。回 `nextCursor`（list 取 `nextCursor`，get 取 `nextReceiptCursor`）與 `appliedLimit`，呼叫端續頁必須用 `appliedLimit`。`limit` 沒給時明確用 6。降到 1 仍超過拋 `result_too_large`。Cairn cursor 綁定簽發時的 limit，帶 cursor 的續頁超過預算無法對半，同樣拋 `result_too_large`。
 - 每個回應在回傳前都用 vendored 回應 schema 解析（失敗拋 `internal`）；`diagnose` 不含任何路徑，`storage.status` 為 `ready` 或小寫的錯誤碼（如 `storage_unsafe`）。
-- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.4.0`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
+- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.4.1`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
 - 資料層的祖先目錄檢查只從 `dataDir` 往下走（`CairnDataLayout` 的 `trustedBase`）：`--permission` 下外掛讀不到 `dataDir` 以上的任何路徑，往上 lstat 會被拒（實測回 `STORAGE_BUSY`）。`dataDir` 以下仍拒絕 symlink／junction；`dataDir` 以上的重導向（例如 macOS `/var`）視為 host 的事。不傳 `trustedBase` 時維持從根目錄往下檢查。
 
 ## 記憶提供者（link）
@@ -241,10 +241,10 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 ## 打包與簽章（P3）
 
 ```powershell
-node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.4.0.tuqplugin
+node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.4.1.tuqplugin
 node tools/build.mjs --stage-only           # 只做 stage 與 devkit validate
 node tools/build.mjs --key <file.key.pem>   # 真金鑰：互動輸入 passphrase，預設 --anchors core
-node tools/verify-artifact.mjs dist/teamuq.memory-1.4.0.tuqplugin --pub-file dist/signer.pub.json
+node tools/verify-artifact.mjs dist/teamuq.memory-1.4.1.tuqplugin --pub-file dist/signer.pub.json
 ```
 
 build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock）→ esbuild 打 `stage/backend.mjs`（zod 內聯；`cairn-memory/core/index.mjs` 改成外部相對路徑 `./cairn/core/index.mjs`，其他 `cairn-memory` import 一律報錯）→ `stage-cairn` → 由 `plugin/manifest.template.json` 產 manifest → devkit `validate` → `release`（devkit `pack`＋`verify`）→ `verify-artifact`。

@@ -1,4 +1,4 @@
-import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiLegacyTrialRequest, type UiMethodName } from "../contracts/uiContract.js";
+import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiLegacyTrialRequest, type UiLinkForgetRequest, type UiLinkGetRequest, type UiLinkListRequest, type UiMethodName } from "../contracts/uiContract.js";
 import { runAgentStats } from "../application/ui/agentStats.js";
 import { serializedBytes, UI_RESPONSE_BUDGET_BYTES } from "../application/ui/budget.js";
 import { runGet } from "../application/ui/detail.js";
@@ -10,6 +10,8 @@ import { runOverview } from "../application/ui/overview.js";
 import { runStatus } from "../application/ui/status.js";
 import { createClock } from "../application/ui/timeSlice.js";
 import type { ProfilePort } from "../application/ui/profilePort.js";
+import type { LinkAdminPort } from "../application/ui/linkAdminPort.js";
+import { runLinkForget, runLinkGet, runLinkList, runLinkSources } from "../application/ui/linkAdmin.js";
 import type { UiServices } from "../application/ui/uiServices.js";
 import { MemoryServiceError } from "../domain/errors.js";
 import { callError } from "./contractErrors.js";
@@ -24,6 +26,7 @@ export interface UiDispatchDeps {
   readonly organizationStatus?: () => OrganizationStatus;
   readonly onForgotten?: (agentId: string, memoryId: string) => Promise<void>;
   readonly legacyTrial?: (request: UiLegacyTrialRequest) => Promise<LegacyTrialResponse>;
+  readonly link?: LinkAdminPort;
 }
 
 export function isUiMethod(method: unknown): method is UiMethodName {
@@ -49,6 +52,14 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   if (method === "ui.legacyTrial") {
     if (deps.legacyTrial === undefined) return uiFailure("STORAGE_UNSUPPORTED");
     try { return { ok: true, ...(await deps.legacyTrial(params as UiLegacyTrialRequest)) }; } catch { return uiFailure("STORAGE_BUSY"); }
+  }
+  // why: link memories live outside the Cairn layout, so these four answer even while the Cairn layout is unavailable
+  if (method === "ui.linkSources" || method === "ui.linkList" || method === "ui.linkGet" || method === "ui.linkForget") {
+    if (deps.link === undefined) return uiFailure("STORAGE_UNSUPPORTED");
+    if (method === "ui.linkSources") return runLinkSources(deps.link);
+    if (method === "ui.linkList") return runLinkList(params as UiLinkListRequest, deps.link);
+    if (method === "ui.linkGet") return runLinkGet(params as UiLinkGetRequest, deps.link);
+    return runLinkForget(params as UiLinkForgetRequest, deps.link);
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;

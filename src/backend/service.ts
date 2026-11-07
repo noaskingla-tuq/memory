@@ -33,6 +33,7 @@ import { createPunchOrganizationWorker } from "../application/punchOrganization.
 import { pairKey } from "../application/modelInvocationScope.js";
 import { createMigratingPunchReceiptStore } from "./punchStateMigration.js";
 import { readOrganizationSettings } from "./organizationSettings.js";
+import type { LinkAdminPort } from "../application/ui/linkAdminPort.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
@@ -50,6 +51,7 @@ export interface BackendOptions {
   readonly profileIo?: ProfileIo;
   readonly host?: PluginHostApiV1;
   readonly settings?: PluginBackendContextV1["settings"];
+  readonly linkAdmin?: LinkAdminPort;
 }
 
 export interface MemoryBackend {
@@ -248,7 +250,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       case MEMORY_PLUGIN_METHODS.profileSync:
         return profileSync.handle(params);
       default:
-        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile, ...(organization === undefined ? {} : { organizationStatus: organization.status, onForgotten: organization.forgetSource, legacyTrial: organization.legacyTrial }) });
+        if (isUiMethod(method)) return dispatchUi(method, params, { storageStatus, services: uiServices, profile, ...(options.linkAdmin === undefined ? {} : { link: options.linkAdmin }), ...(organization === undefined ? {} : { organizationStatus: organization.status, onForgotten: organization.forgetSource, legacyTrial: organization.legacyTrial }) });
         throw callError("unknown_method", "Unknown method");
     }
   };

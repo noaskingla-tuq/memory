@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.0，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.8.2，釘選 Cairn v1-preview.3（套件版本 0.3.2，預設 schema 18）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.0，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.8.2，釘選 Cairn e3e3761（套件版本 0.3.3，預設 schema 18）。
 
 > 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
 
@@ -236,7 +236,7 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 - 備份後開庫失敗：回 `STORAGE_UNSUPPORTED`（identity 不變，備份保留）。identity 改寫失敗：回 `STORAGE_BUSY`，下次啟動會再備份、再開庫、再改寫。
 - 改寫後，只認舊 commit 的（精確比對）plugin 會拒開這個庫；plugin rollback 不會自動還原資料，要還原就用備份目錄手動換回。
 - `accepted[]` 在 `CairnDataLayout` 建構時讀 `cairn-pin.json`（預設路徑相對 `out/adapters/storage`，即 repo 根）；檔案不可讀或格式錯誤回 `DEPENDENCY_INCOMPATIBLE`（fail closed）。backend entry 以 `pinPath` 傳入（見「後端入口」）。
-- 新增 accepted commit 的步驟：加進 `cairn-pin.json` 的 `accepted[]`；以該 commit 的 Cairn 安裝後跑 `npm run build:ts && node tools/make-legacy-fixture.mjs` 產出 `test/fixtures/legacy-db/<commit>/`；`verify-source-untouched` 與測試會檢查每個 accepted 項目都有 fixture 且可開啟。目前 `accepted[]` 包含三個 commit：`83a10c3b7664b1f67485a19e7d84d24dcb3041a5`、`0c7aa20a9cb490bac4d15eca28b2036823a5f48e`、`7197d80035a015db195d7724729926f8749afd32`；升級路徑另以「identity 寫成假舊 commit、DB 為現行格式」模擬。
+- 新增 accepted commit 的步驟：加進 `cairn-pin.json` 的 `accepted[]`；以該 commit 的 Cairn 安裝後跑 `npm run build:ts && node tools/make-legacy-fixture.mjs` 產出 `test/fixtures/legacy-db/<commit>/`；`verify-source-untouched` 與測試會檢查每個 accepted 項目都有 fixture 且可開啟。目前 `accepted[]` 包含四個 commit：`83a10c3b7664b1f67485a19e7d84d24dcb3041a5`、`0c7aa20a9cb490bac4d15eca28b2036823a5f48e`、`7197d80035a015db195d7724729926f8749afd32`、`e3e376138c3708c003bcf06584070f8b002d232a`；升級路徑另以「identity 寫成假舊 commit、DB 為現行格式」模擬。
 
 ## 打包與簽章（P3）
 

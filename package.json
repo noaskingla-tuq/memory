@@ -26,7 +26,7 @@
     "perf:ui": "node tools/perf-ui.mjs"
   },
   "dependencies": {
-    "cairn-memory": "git+https://github.com/Cairn-ink/cairn-memory.git#7197d80035a015db195d7724729926f8749afd32",
+    "cairn-memory": "git+https://github.com/Cairn-ink/cairn-memory.git#e3e376138c3708c003bcf06584070f8b002d232a",
     "zod": "3.25.76"
   },
   "devDependencies": {

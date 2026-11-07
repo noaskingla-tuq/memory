@@ -36,8 +36,8 @@ import {
   type BackupHooks,
 } from "./upgradeBackup.js";
 
-export const CAIRN_COMMIT = "7197d80035a015db195d7724729926f8749afd32";
-export const CAIRN_CORE_TREE = "81de091fcd364ae24daf9328e209d67ab934fe97";
+export const CAIRN_COMMIT = "e3e376138c3708c003bcf06584070f8b002d232a";
+export const CAIRN_CORE_TREE = "77afb2a71b62e2fde19d4973fce22074be355b03";
 
 // why: the adapter creates an empty file just before Cairn initialises it, so a zero-byte file with no WAL content means no database yet, not a damaged one
 function holdsData(path: string): boolean {

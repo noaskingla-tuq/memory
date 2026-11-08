@@ -73,6 +73,40 @@ test("closeQuietly adds a session whose close() throws to the abandoned set, so 
   const state = await store.readResumeState();
   await store.writeResumeState({ ...state, operations: { ...state.operations, [stranded.operation.operationKey]: stranded.operation } });
   assert.equal(Object.values(saved)[0]?.hostSessionId, "fresh-1");
+  assert.equal(Object.values(saved)[0]?.state, "invalidated", "the saved record stops reading as an active session, so a restart cannot resume it");
   assert.deepEqual(await invokeScoped(port, actor, "job1"), REPLY);
   assert.equal(fake.state.resumed, 0, "the abandoned session was not resumed");
+});
+
+test("a close that times out in closeQuietly also invalidates the saved record", async (t) => {
+  const fake = host({ close: () => new Promise(() => {}) });
+  const { store } = tempStore(t, "close-hang-");
+  const actor = actorOf("sw/a", "p1");
+  const port = createHostMemoryModelPort(fake.ai, () => readOrganizationSettings({ organizationEnabled: true }), undefined, store, 40, { graceMs: 20, backstopMs: 60_000 });
+  t.after(() => port.cancel());
+  const controller = new AbortController();
+  const slow = store.transactResumeState.bind(store);
+  let armed = true;
+  store.transactResumeState = async (fn) => { if (armed) { armed = false; await sleep(150); } return slow(fn); };
+  const first = invokeScoped(port, actor, "job1", { value: 1 }, controller.signal).then(() => "ok", () => "err");
+  await sleep(60);
+  controller.abort();
+  await first;
+  await sleep(450);
+  assert.deepEqual(fake.state.closes, ["fresh-1"]);
+  assert.equal(Object.values((await store.readResumeState()).sessions)[0]?.state, "invalidated");
+});
+
+test("a stuck close of pair A is reported to pair A only, never by a call of pair B", async (t) => {
+  const fake = host({ close: (id) => id === "fresh-1" ? new Promise(() => {}) : Promise.resolve() });
+  const { store } = tempStore(t, "close-pair-");
+  const a = actorOf("sw/a", "p1");
+  const b = actorOf("sw/b", "p1");
+  const port = createHostMemoryModelPort(fake.ai, () => readOrganizationSettings({ organizationEnabled: true }), undefined, store, 40, { graceMs: 20, backstopMs: 60_000 });
+  t.after(() => port.cancel());
+  assert.deepEqual(await invokeScoped(port, a, "jobA"), REPLY);
+  assert.deepEqual(await invokeScoped(port, b, "jobB"), REPLY, "pair B is not failed with the close fault of pair A");
+  await port.releasePair("sw/b", "p1");
+  await assert.rejects(port.releasePair("sw/a", "p1"), { code: "RESOURCE_BUSY", localCode: "close_timeout" });
+  await port.releasePair("sw/a", "p1");
 });

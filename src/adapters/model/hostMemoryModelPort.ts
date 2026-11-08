@@ -1,6 +1,7 @@
 import type { PluginBackendAiApiV1, PluginBackendAiSessionV1 } from "@teamuq/plugin-sdk";
 import { MemoryServiceError, type MemoryFailurePhase } from "../../domain/errors.js";
 import type { MemoryModelInvocationContext, MemoryModelOperation, MemoryModelPolicy, MemoryModelPort } from "../../application/modelPort.js";
+import { FINAL_OUTPUT_CODES, needsRecovery } from "../../application/callResolution.js";
 import { legacyModelCallKey, modelCallKey, modelRequestSha256, operationKey, pairKey, sha256 } from "../../application/modelInvocationScope.js";
 import type { OrganizationCallRecord, OrganizationOperationRecord, OrganizationSessionRecord, OrganizationResumeStorePort } from "../../application/punchDataPorts.js";
 import type { OrganizationSettings } from "../../backend/organizationSettings.js";
@@ -116,19 +117,19 @@ export function createHostMemoryModelPort(
     } finally { clearTimeout(timer); }
   };
 
-  const closeQuietly = (session: PluginBackendAiSessionV1): Promise<void> => closeWithin(session).then((outcome) => {
-    if (outcome === "timeout") abandoned.add(session.sessionId);
-  }, () => { abandoned.add(session.sessionId); });
+  const closeQuietly = (session: PluginBackendAiSessionV1): Promise<void> => closeWithin(session).then(
+    (outcome) => outcome === "timeout" ? lose(session.sessionId) : undefined,
+    () => lose(session.sessionId),
+  );
+  const lose = (hostSessionId: string): Promise<void> => { abandoned.add(hostSessionId); return invalidateSaved(hostSessionId); };
 
-  // why: the saved record outlives this process state, so it must stop reading as an active session that can be resumed
-  const invalidateSaved = async (pair: string, hostSessionId: string): Promise<void> => {
+  // why: the saved record outlives this process state, so it must stop reading as an active session that can be resumed; the session id alone finds the pair
+  const invalidateSaved = async (hostSessionId: string): Promise<void> => {
     if (resumeStore === undefined) return;
     try {
       await resumeStore.transactResumeState((state) => {
-        const saved = state.sessions[pair];
-        return saved === undefined || saved.hostSessionId !== hostSessionId || saved.state !== "active"
-          ? state
-          : { ...state, sessions: { ...state.sessions, [pair]: { ...saved, state: "invalidated" } } };
+        const stale = Object.entries(state.sessions).filter(([, saved]) => saved.hostSessionId === hostSessionId && saved.state === "active");
+        return stale.length === 0 ? state : { ...state, sessions: { ...state.sessions, ...Object.fromEntries(stale.map(([pair, saved]) => [pair, { ...saved, state: "invalidated" as const }])) } };
       });
     } catch {
       // why: the in-memory abandoned set still blocks the resume, and the close timeout is the failure worth reporting
@@ -143,8 +144,7 @@ export function createHostMemoryModelPort(
         if (Object.keys(next).length > SESSION_LIMIT) {
           const removable = Object.entries(next)
             .filter(([key]) => key !== record.pairKey && !Object.values(state.operations).some((operation) =>
-              operation.pairKey === key && Object.values(operation.calls).some((call) => ["prepared", "sent", "reply_ready", "commit_retry", "send_unknown"].includes(call.phase)
-                || call.phase === "failed" && !(call.retryable && !call.partialDelivered))))
+              operation.pairKey === key && Object.values(operation.calls).some(needsRecovery)))
             .sort((left, right) => left[1].lastUsedAt - right[1].lastUsedAt)[0];
           if (removable === undefined) throw new Error("resume_capacity");
           delete next[removable[0]];
@@ -271,7 +271,7 @@ export function createHostMemoryModelPort(
     catch { outcome = "timeout"; }
     if (outcome !== "timeout") return;
     abandoned.add(session.sessionId);
-    await invalidateSaved(pair, session.sessionId);
+    await invalidateSaved(session.sessionId);
     stuckClose.push({ pair, error: serviceError("RESOURCE_BUSY", "Memory host session close timed out", undefined, "session_close", CLOSE_TIMEOUT_LOCAL_CODE) });
   };
 
@@ -375,7 +375,7 @@ export function createHostMemoryModelPort(
           throw serviceError("RESOURCE_BUSY", "Memory send outcome needs reconciliation", undefined, "send_unknown");
         }
         if (callInfo?.prior?.phase === "failed" && !(callInfo.prior.retryable && !callInfo.prior.partialDelivered)) {
-          throw callInfo.prior.hostErrorCode === "reply_too_long" || callInfo.prior.hostErrorCode === "empty_reply"
+          throw FINAL_OUTPUT_CODES.includes(callInfo.prior.hostErrorCode ?? "")
             ? serviceError("MODEL_OUTPUT_INVALID", "The previous memory reply failed validation", false, "reply_contract")
             : serviceError("RESOURCE_BUSY", "The previous memory turn requires reconciliation", false);
         }
@@ -436,7 +436,7 @@ export function createHostMemoryModelPort(
         ? keyedWork()
         : withPairLock(pair, () => withHostSlot(async () => {
           if (before.signal.aborted || disposed) throw cancelledError();
-          const fault = stuckClose.shift(); if (fault !== undefined) throw fault.error;
+          const at = stuckClose.findIndex((entry) => entry.pair === pair); if (at >= 0) throw stuckClose.splice(at, 1)[0]!.error;
           return keyedWork();
         }, before.signal));
       // why: the pair lock and the host slot belong to this tail until the host turn ends, even after the caller was told the call timed out

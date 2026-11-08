@@ -1,4 +1,6 @@
-export const JSON_PARSE_CODE = "json_parse";
+import { JSON_PARSE_CODE } from "../../application/callResolution.js";
+
+export { JSON_PARSE_CODE };
 // why: a model that keeps returning broken JSON must not burn quota for ever, so the same request gets at most this many extra turns
 export const JSON_PARSE_RETRY_LIMIT = 2;
 

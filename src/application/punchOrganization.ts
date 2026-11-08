@@ -7,7 +7,7 @@ import type { MemoryResult } from "../domain/errors.js";
 import { failure } from "../domain/errors.js";
 import { memoryActorSchema } from "../../vendor/teamuq-contract/contract.mjs";
 import { operationKey, pairKey } from "./modelInvocationScope.js";
-import { dailyRoundStatus, failedModelAttemptInRound, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
+import { dailyRoundStatus, failedModelAttemptInRound, hasFinalOutputFailure, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
 import { captureOutcome, captureWithContinuation, isPairBlocked, replyProgress } from "./organizationQueue.js";
 import { AWAIT_CAP_MS, STALL_LOCAL_CODE, awaitUnlessStopped, createStallGuard, stallOutcome } from "./organizationStall.js";
 import { createStartupGate, type StartupEvent, type StartupRelease } from "./organizationStartup.js";
@@ -311,18 +311,20 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       // why: another operation of this pair holds it, which says nothing about this job, so it keeps its attempt count and its day
       if (isPairBlocked(result)) { if (agentRow) agentRun.record(job.punchId, "blocked"); continue; }
       const { code, classificationFailed, terminalOutcome } = captureOutcome(result);
-      const nextState: Job["state"] = terminalOutcome !== null ? "completed" : code === "MEMORY_SUPPRESSED" ? "skipped" : "pending";
       const latestResume = await resumeState();
+      // why: a reply the model finished and got wrong can never be sent again, so the job ends here with its error kept and frees the pair's other work
+      const outputDead = terminalOutcome === null && code === "MODEL_OUTPUT_INVALID" && hasFinalOutputFailure(latestResume, job);
+      const nextState: Job["state"] = terminalOutcome !== null ? "completed" : code === "MEMORY_SUPPRESSED" || outputDead ? "skipped" : "pending";
       const reportedPhase = !result.ok ? result.error.phase ?? null : classificationFailed ? "cairn_schema" : null;
       const attemptLocalCode = !result.ok ? result.error.localCode ?? null : null;
-      const errorInfo = nextState === "pending" ? phaseOf(latestResume, job, now(), attemptLocalCode) : { phase: null, journalPhase: null, hostCode: null, localCode: null, partial: null };
+      const errorInfo = nextState === "pending" || outputDead ? phaseOf(latestResume, job, now(), attemptLocalCode) : { phase: null, journalPhase: null, hostCode: null, localCode: null, partial: null };
       const next: Job = {
         ...job,
         state: nextState,
         input: nextState === "pending" ? job.input : { ...job.input, messages: [] },
         attempts: job.attempts + 1,
         nextAttemptAt: code === null ? 0 : nextState === "pending" ? attemptedAt + Math.min(3_600_000, 30_000 * 2 ** Math.min(job.attempts, 7)) : 0,
-        lastError: nextState === "skipped" ? null : code,
+        lastError: nextState === "skipped" && !outputDead ? null : code,
         resumeDisposition: nextState === "pending" ? job.resumeDisposition ?? "eligible" : "resolved",
         lastAttemptDate: date,
         lastAttemptAt: attemptedAt,
@@ -358,7 +360,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         await options.store.pruneOperation?.(key);
       }
       if (agentRow) agentRun.record(job.punchId, nextState !== "pending" ? "done" : "failed", code);
-      status = { ...status, lastError: nextState === "skipped" ? null : code, errorPhase: next.errorPhase ?? null, hostErrorCode: next.hostErrorCode ?? null, localErrorCode: next.localErrorCode ?? null, retryable: next.retryable ?? null, partialDelivered: next.partialDelivered ?? null, lastAttemptAt: attemptedAt, updatedAt: attemptedAt };
+      status = { ...status, lastError: nextState === "skipped" && !outputDead ? null : code, errorPhase: next.errorPhase ?? null, hostErrorCode: next.hostErrorCode ?? null, localErrorCode: next.localErrorCode ?? null, retryable: next.retryable ?? null, partialDelivered: next.partialDelivered ?? null, lastAttemptAt: attemptedAt, updatedAt: attemptedAt };
       if (trialRow && trial !== null) {
         const latestRows = await jobs();
         // why: the counts come from the job rows, so refreshing them after every job keeps the status line moving during a long trial

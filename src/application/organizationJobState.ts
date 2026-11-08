@@ -2,6 +2,7 @@ import type { OrganizationDailyRound, OrganizationResumeState } from "./punchDat
 import type { MemoryActor } from "../contracts/actor.js";
 import type { MemoryCaptureInput } from "./toolContract.js";
 import { operationKey, pairKey } from "./modelInvocationScope.js";
+import { isFinalOutputFailure } from "./callResolution.js";
 import type { OrganizationStatus } from "./punchOrganization.js";
 
 export interface Job {
@@ -57,6 +58,11 @@ export function replyReady(state: OrganizationResumeState | null, job: Job): boo
     && operation.operationId === job.input.operationId && operation.agentId === job.actor.agentId && operation.projectId === job.actor.projectId
     && Object.values(operation.calls).some((call) => call.operationKey === key && call.pairKey === pair
       && call.replyJson !== null && ["reply_ready", "commit_retry"].includes(call.phase));
+}
+
+export function hasFinalOutputFailure(state: OrganizationResumeState | null, job: Job): boolean {
+  const operation = state?.operations[operationKey(pairKey(job.actor.agentId, job.actor.projectId), job.input.operationId)];
+  return operation !== undefined && Object.values(operation.calls).some(isFinalOutputFailure);
 }
 
 export function failedModelAttemptInRound(state: OrganizationResumeState | null, job: Job, date: string, dailyTime: string): boolean {

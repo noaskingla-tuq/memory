@@ -1,6 +1,6 @@
 {
   "name": "teamuq-plugin-memory",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "private": true,
   "description": "TeamUQ full-trust memory plugin (backend entry, Cairn adapter, memory application and domain)",
   "type": "module",

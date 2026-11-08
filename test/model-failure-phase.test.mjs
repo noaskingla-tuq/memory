@@ -28,7 +28,7 @@ function modelAi({ replyText = '{"items":[]}', waitForReply = false } = {}) {
   let listener;
   let sends = 0;
   const session = {
-    sessionId: "phase-test-session", effective: { providerId: "mock", modelId: "allowed", effort: null }, turn: null,
+    sessionId: "phase-test-session", effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null }, turn: null,
     onEvent(next) { listener = next; return () => { listener = undefined; }; },
     async send() {
       sends++;
@@ -47,8 +47,8 @@ function modelAi({ replyText = '{"items":[]}', waitForReply = false } = {}) {
     api: {
       async getOptions() {
         return {
-          providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }],
-          defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" },
+          providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }],
+          defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" },
           limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 },
         };
       },

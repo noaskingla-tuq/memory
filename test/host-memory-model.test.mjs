@@ -10,10 +10,10 @@ import { currentMemoryInvocation, legacyModelCallKey, operationKey, pairKey, sha
 
 export function mockAi(overrides = {}) {
   const counters = { opened: 0, closed: 0, off: 0, interrupted: 0, sent: 0 };
-  const options = { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } };
+  const options = { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } };
   let listener;
   const session = {
-    sessionId: "mock-session", effective: { providerId: "mock", modelId: "allowed" }, turn: null,
+    sessionId: "mock-session", effective: { providerId: "codex", modelId: "gpt-6-luna" }, turn: null,
     onEvent(next) { listener = next; return () => { counters.off++; listener = undefined; }; },
     async send(input) {
       counters.sent++;
@@ -45,7 +45,7 @@ async function invokeScoped(port, actor, operationId, operation, system, input) 
 
 function durableAi({ holdSends = false } = {}) {
   const counters = { opened: 0, resumes: 0, sent: 0, closed: 0, activeSessions: 0, maxActiveSessions: 0, activeSends: 0, maxInFlight: 0 };
-  const options = { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } };
+  const options = { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } };
   const sessions = new Map();
   const openInputs = [];
   const sent = [];
@@ -65,7 +65,7 @@ function durableAi({ holdSends = false } = {}) {
     counters.activeSessions += 1;
     counters.maxActiveSessions = Math.max(counters.maxActiveSessions, counters.activeSessions);
     const session = {
-      sessionId, closed: false, effective: { providerId: "mock", modelId: "allowed", effort: null }, turn: null,
+      sessionId, closed: false, effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null }, turn: null,
       onEvent(next) { listener = next; return () => { listener = undefined; }; },
       async send({ text }) {
         counters.sent += 1;
@@ -445,8 +445,8 @@ test("legacy call keys recover only when every stored fingerprint matches", asyn
     let gatedDiscoveryCalls = 0;
     let gatedOpenCalls = 0;
     const gatedOptions = {
-      providers: [{ id: "mock", state: mode === "provider" ? "unavailable" : "ready", models: [{ id: "allowed", isDefault: true }] }],
-      defaultProviderId: "mock",
+      providers: [{ id: "codex", state: mode === "provider" ? "unavailable" : "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }],
+      defaultProviderId: "codex",
       capabilities: { closedSessionResume: mode !== "closed-resume" },
       quota: { state: mode === "quota" ? "exhausted" : "ok" },
       limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 },
@@ -654,7 +654,7 @@ test("unknown send delivery is journaled and a retry does not issue a second sen
   let listener;
   const session = {
     sessionId: "unknown-send-session",
-    effective: { providerId: "mock", modelId: "allowed", effort: null },
+    effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null },
     turn: null,
     onEvent(next) { listener = next; return () => { listener = undefined; }; },
     async send() { counters.sent += 1; throw Object.assign(new Error("transport disconnected"), { code: "plugin_host_unavailable" }); },
@@ -662,7 +662,7 @@ test("unknown send delivery is journaled and a retry does not issue a second sen
     async interrupt() {},
   };
   const ai = {
-    async getOptions() { return { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } }; },
+    async getOptions() { return { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } }; },
     async openSession() { return session; },
   };
   const actor = { agentId: "sw/a", projectId: "source", sessionId: "task", providerId: "mock" };
@@ -687,7 +687,7 @@ test("provider partial delivery stays correlated and cannot be retried automatic
   const counters = { sent: 0 };
   const session = {
     sessionId: "partial-session",
-    effective: { providerId: "mock", modelId: "allowed", effort: null },
+    effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null },
     turn: null,
     onEvent(listener) { this.listener = listener; return () => { this.listener = undefined; }; },
     async send() {
@@ -699,7 +699,7 @@ test("provider partial delivery stays correlated and cannot be retried automatic
     async interrupt() {},
   };
   const ai = {
-    async getOptions() { return { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } }; },
+    async getOptions() { return { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } }; },
     async openSession() { return session; },
   };
   const actor = { agentId: "sw/a", projectId: "source", sessionId: "task", providerId: "mock" };

@@ -13,6 +13,11 @@ const labels: Readonly<Record<SettingKey, StringKey>> = {
   organizationDailyTime: "settings.dailyTime.label",
 };
 
+const pickerLabels: Readonly<Record<"organizationProvider" | "organizationModel", StringKey>> = {
+  organizationProvider: "settings.provider.labelSelect",
+  organizationModel: "settings.model.labelSelect",
+};
+
 function checkboxInput(disabled: boolean, checked: boolean): SafeHtml {
   if (checked) {
     return disabled
@@ -121,13 +126,14 @@ function textField(snapshot: SettingsSnapshot, key: "organizationProvider" | "or
   const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
   const describedBy = `${helpId} ${effectId} ${statusId}`;
   const value = snapshot.draft?.[key] as string ?? "";
-  const control = choices.status === "ready"
+  const picker = choices.status === "ready";
+  const control = picker
     ? provider
       ? providerSelect(choices.options, value, describedBy, disabled)
       : modelSelect(choices.options, snapshot.draft?.organizationProvider ?? "", value, describedBy, disabled)
     : textInput(id, key, value, t(provider ? "settings.provider.placeholder" : "settings.model.placeholder"), describedBy, disabled || choices.status === "pending");
   return html`<div class="setting-row">
-    <div class="setting-copy"><label for="${id}">${t(labels[key])}</label><p id="${helpId}">${t(provider ? "settings.provider.help" : "settings.model.help")}</p><p id="${effectId}">${t(provider ? "settings.provider.effect" : "settings.model.effect")}</p>${conflictCopy(snapshot, key)}</div>
+    <div class="setting-copy"><label for="${id}">${t(picker ? pickerLabels[key] : labels[key])}</label><p id="${helpId}">${t(picker ? (provider ? "settings.provider.helpSelect" : "settings.model.helpSelect") : (provider ? "settings.provider.help" : "settings.model.help"))}</p><p id="${effectId}">${t(picker ? (provider ? "settings.provider.effectSelect" : "settings.model.effectSelect") : (provider ? "settings.provider.effect" : "settings.model.effect"))}</p>${conflictCopy(snapshot, key)}</div>
     <div class="setting-control">${control}<p id="${statusId}" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }

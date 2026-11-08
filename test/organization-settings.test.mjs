@@ -5,8 +5,8 @@ import { readOrganizationSettings } from "../out/backend/organizationSettings.js
 test("organization scheduling defaults consistently to daily at local 02:00", () => {
   assert.deepEqual(readOrganizationSettings(), {
     enabled: true,
-    providerId: "",
-    modelId: "",
+    providerId: "codex",
+    modelId: "gpt-6-luna",
     contextBudget: 32768,
     frequency: "daily",
     dailyTime: "02:00",
@@ -16,8 +16,8 @@ test("organization scheduling defaults consistently to daily at local 02:00", ()
 test("organization scheduling defensively normalizes invalid legacy frequency and daily time", () => {
   assert.deepEqual(readOrganizationSettings({ organizationFrequency: "weekly", organizationDailyTime: "24:00" }), {
     enabled: true,
-    providerId: "",
-    modelId: "",
+    providerId: "codex",
+    modelId: "gpt-6-luna",
     contextBudget: 32768,
     frequency: "daily",
     dailyTime: "02:00",

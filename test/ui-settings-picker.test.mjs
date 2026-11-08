@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadUiModule } from "./uiViewHarness.mjs";
+import { readOrganizationSettings } from "../out/backend/organizationSettings.js";
 
 const ui = await loadUiModule(
   "api/aiOptionsClient.ts",
@@ -55,7 +56,7 @@ test("provider menu lists the default entry first, every provider, and marks not
   const markup = ui.settingsPage(state.view(), await choicesOf()).value;
   const provider = optionsOf(selectOf(markup, "settings-provider"));
   assert.deepEqual(provider.map((o) => o.value), ["", "codex", "claude", "gemini", "ready2"]);
-  assert.equal(provider[0].text, "預設（使用目前可用的提供者）");
+  assert.equal(provider[0].text, "預設（GPT-6-Luna，目前無法使用）", "luna is not in the codex list of OPTIONS");
   assert.ok(provider[0].selected);
   assert.deepEqual(provider.map((o) => o.disabled), [false, false, true, true, false]);
   assert.equal(provider[2].text, "Claude（未登入）");
@@ -77,19 +78,73 @@ test("model menu starts with the provider default and lists the selected provide
   const { state } = await loaded({ organizationProvider: "codex", organizationModel: "gpt-b" });
   const models = optionsOf(selectOf(ui.settingsPage(state.view(), await choicesOf()).value, "settings-model"));
   assert.deepEqual(models.map((o) => o.value), ["", "gpt-a", "gpt-b"]);
-  assert.equal(models[0].text, "預設（提供者的預設模型）");
+  assert.equal(models[0].text, "預設（GPT-6-Luna，目前無法使用）");
   assert.deepEqual(models.map((o) => o.selected), [false, false, true]);
   assert.equal(models[1].text, "Label gpt-a");
 });
 
-test("with the default provider the model menu uses the defaultProviderId provider, else the first ready one", async () => {
+test("with the default provider the model menu lists codex whatever the host default provider is", async () => {
   const { state } = await loaded({});
-  const withDefault = optionsOf(selectOf(ui.settingsPage(state.view(), await choicesOf()).value, "settings-model"));
-  assert.deepEqual(withDefault.map((o) => o.value), ["", "s-1"]);
-  const noDefault = optionsOf(selectOf(ui.settingsPage(state.view(), await choicesOf({ ...OPTIONS, defaultProviderId: null })).value, "settings-model"));
-  assert.deepEqual(noDefault.map((o) => o.value), ["", "gpt-a", "gpt-b"]);
-  const notReadyDefault = optionsOf(selectOf(ui.settingsPage(state.view(), await choicesOf({ ...OPTIONS, defaultProviderId: "claude" })).value, "settings-model"));
-  assert.deepEqual(notReadyDefault.map((o) => o.value), ["", "gpt-a", "gpt-b"]);
+  for (const defaultProviderId of ["ready2", null, "claude"]) {
+    const menu = optionsOf(selectOf(ui.settingsPage(state.view(), await choicesOf({ ...OPTIONS, defaultProviderId })).value, "settings-model"));
+    assert.deepEqual(menu.map((o) => o.value), ["", "gpt-a", "gpt-b"]);
+  }
+});
+
+const WITH_LUNA = { ...OPTIONS, providers: OPTIONS.providers.map((p) => p.id === "codex" ? { ...p, models: [model("gpt-6-luna", true), ...p.models] } : p) };
+
+test("when luna is listed the default entries name codex and GPT-6-Luna without a warning", async () => {
+  const { state } = await loaded({});
+  const markup = ui.settingsPage(state.view(), await choicesOf(WITH_LUNA)).value;
+  assert.equal(optionsOf(selectOf(markup, "settings-provider"))[0].text, "預設（codex／GPT-6-Luna）");
+  const models = optionsOf(selectOf(markup, "settings-model"));
+  assert.equal(models[0].text, "預設（GPT-6-Luna）");
+  assert.ok(!markup.includes("目前無法使用"));
+});
+
+test("the default entry says luna is unavailable when codex is not ready or lacks the model", async () => {
+  const { state } = await loaded({});
+  const notReady = { ...WITH_LUNA, providers: WITH_LUNA.providers.map((p) => p.id === "codex" ? { ...p, state: "not_logged_in" } : p) };
+  const missing = { ...OPTIONS, providers: OPTIONS.providers.filter((p) => p.id !== "codex") };
+  for (const raw of [notReady, missing, OPTIONS]) {
+    const markup = ui.settingsPage(state.view(), await choicesOf(raw)).value;
+    assert.equal(optionsOf(selectOf(markup, "settings-provider"))[0].text, "預設（GPT-6-Luna，目前無法使用）");
+    assert.equal(optionsOf(selectOf(markup, "settings-model"))[0].text, "預設（GPT-6-Luna，目前無法使用）");
+  }
+});
+
+test("another provider keeps the provider-default model entry", async () => {
+  const { state } = await loaded({ organizationProvider: "ready2" });
+  const models = optionsOf(selectOf(ui.settingsPage(state.view(), await choicesOf(WITH_LUNA)).value, "settings-model"));
+  assert.equal(models[0].text, "預設（提供者的預設模型）");
+});
+
+test("the menu mode copy never tells the user to leave a field empty or to type an ID", async () => {
+  const { state } = await loaded({});
+  const markup = ui.settingsPage(state.view(), await choicesOf(WITH_LUNA)).value;
+  const rows = [...markup.matchAll(/<div class="setting-row">[\s\S]*?<\/div>\s*<\/div>/gu)].map((m) => m[0]).filter((row) => /settings-(provider|model)"/u.test(row));
+  assert.equal(rows.length, 2);
+  for (const row of rows) {
+    const text = row.replace(/<select[\s\S]*?<\/select>/u, "");
+    assert.ok(!/留空|清空欄位|ID/u.test(text), text);
+  }
+  assert.ok(rows[0].includes('<label for="settings-provider">AI 提供者</label>'));
+  assert.ok(rows[1].includes('<label for="settings-model">模型</label>'));
+});
+
+test("the text box fallback names the plugin default in its placeholders", async () => {
+  const { state } = await loaded({});
+  const markup = ui.settingsPage(state.view(), { status: "unavailable" }).value;
+  assert.equal(markup.split('placeholder="留空使用外掛預設（codex／gpt-6-luna）"').length, 3);
+});
+
+test("an empty provider resolves to the same provider and model the backend uses", async () => {
+  const backend = readOrganizationSettings({});
+  const options = await ui.createAiOptionsClient(() => ({ getOptions: async () => WITH_LUNA })).load();
+  assert.equal(ui.effectiveProvider(options, "")?.id, backend.providerId);
+  assert.ok(ui.effectiveProvider(options, "")?.models.some((m) => m.id === backend.modelId));
+  for (const id of ["ready2", "codex"]) assert.equal(ui.effectiveProvider(options, id)?.id, readOrganizationSettings({ organizationProvider: id }).providerId);
+  assert.equal(readOrganizationSettings({ organizationProvider: "ready2" }).modelId, "", "another provider with an empty model keeps the host choice");
 });
 
 test("choosing the default entries saves empty strings", async () => {
@@ -109,12 +164,12 @@ test("changing provider resets a model that the new list does not contain and ke
   ui.changeProvider(state, choices, "ready2");
   assert.equal(state.view().draft.organizationProvider, "ready2");
   assert.equal(state.view().draft.organizationModel, "");
-  const kept = await loaded({ organizationProvider: "ready2", organizationModel: "s-1" });
+  const dropped = await loaded({ organizationProvider: "ready2", organizationModel: "s-1" });
+  ui.changeProvider(dropped.state, choices, "");
+  assert.equal(dropped.state.view().draft.organizationModel, "", "the empty provider means codex, which lacks s-1");
+  const kept = await loaded({ organizationProvider: "codex", organizationModel: "gpt-a" });
   ui.changeProvider(kept.state, choices, "");
-  assert.equal(kept.state.view().draft.organizationModel, "s-1", "the default provider is ready2 so s-1 survives");
-  const reset = await loaded({ organizationProvider: "codex", organizationModel: "gpt-a" });
-  ui.changeProvider(reset.state, choices, "");
-  assert.equal(reset.state.view().draft.organizationModel, "", "the default provider lists s-1 only");
+  assert.equal(kept.state.view().draft.organizationModel, "gpt-a", "the empty provider means codex, which lists gpt-a");
   const empty = await loaded({ organizationProvider: "codex", organizationModel: "" });
   ui.changeProvider(empty.state, choices, "ready2");
   assert.deepEqual(empty.state.view().dirtyKeys, ["organizationProvider"]);

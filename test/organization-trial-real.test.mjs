@@ -14,7 +14,7 @@ function feed() {
     id: "row" + index, punchId: "p" + index, agentId: index % 2 === 0 ? "sw/a" : "sw/b", projectId: null, sessionId: "s" + index, providerId: "mock", model: "allowed", punchType: "main",
     startedAtMs: Date.now() - 500000, endedAtMs: Date.now() - 200000, name: "Request " + index, description: "Outcome " + index,
   }));
-  const options = { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
+  const options = { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
   // why: the mock answers every turn with an empty extraction, so the real Cairn chain runs and each job costs a countable number of turns
   const ai = {
     async getOptions() { return options; },
@@ -22,7 +22,7 @@ function feed() {
       counters.opened += 1;
       let listener;
       const session = {
-        sessionId: openOptions?.resume ?? "session-" + counters.opened, effective: { providerId: "mock", modelId: "allowed", effort: null }, turn: null,
+        sessionId: openOptions?.resume ?? "session-" + counters.opened, effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null }, turn: null,
         onEvent(next) { listener = next; return () => { listener = undefined; }; },
         async send() {
           counters.sent += 1;

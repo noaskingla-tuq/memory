@@ -303,7 +303,7 @@ test("a durable retryable failed turn blocks same-day daily resend across a job-
   const counters = { sent: 0, opened: 0, resumed: 0 };
   let listener;
   const session = {
-    sessionId: "daily-failed-session", effective: { providerId: "mock", modelId: "allowed", effort: null }, turn: null,
+    sessionId: "daily-failed-session", effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null }, turn: null,
     onEvent(next) { listener = next; return () => { listener = undefined; }; },
     async send() {
       counters.sent += 1;
@@ -317,8 +317,8 @@ test("a durable retryable failed turn blocks same-day daily resend across a job-
   const ai = {
     async getOptions() {
       return {
-        providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }],
-        defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" },
+        providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }],
+        defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" },
         limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 },
       };
     },
@@ -588,10 +588,10 @@ function hostRig(initialValues = { organizationEnabled: false }) {
     projectDirectory: { async readPage() { return { snapshot, entries: [{ id: "project", name: "Synthetic project", archived: false }], nextCursor: null }; } },
     pluginState: { async readPage() { throw Object.assign(new Error("retired"), { code: "plugin_state_retired" }); } },
     ai: {
-      async getOptions() { return { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 10000 } }; },
+      async getOptions() { return { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 10000 } }; },
       async openSession() {
         let listener;
-        return { sessionId: "host-session-1", effective: { providerId: "mock", modelId: "allowed" }, turn: null, onEvent(next) { listener = next; return () => { listener = undefined; }; },
+        return { sessionId: "host-session-1", effective: { providerId: "codex", modelId: "gpt-6-luna" }, turn: null, onEvent(next) { listener = next; return () => { listener = undefined; }; },
           async send({ text }) {
             aiCalls++;
             const envelope = JSON.parse(text);
@@ -737,7 +737,7 @@ test("R-AC06-002 multi-stage crash recovery replays saved prefix without same-da
   let listener;
   const session = {
     sessionId: "r3-multistage-session",
-    effective: { providerId: "mock", modelId: "allowed", effort: null },
+    effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null },
     turn: null,
     onEvent(next) { listener = next; return () => { if (listener === next) listener = undefined; }; },
     async send({ text }) {
@@ -766,8 +766,8 @@ test("R-AC06-002 multi-stage crash recovery replays saved prefix without same-da
     async getOptions() {
       counters.discoveries += 1;
       return {
-        providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }],
-        defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" },
+        providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }],
+        defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" },
         limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 },
       };
     },

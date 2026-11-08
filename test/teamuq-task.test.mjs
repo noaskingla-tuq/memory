@@ -36,7 +36,7 @@ function fakeAi(openFailure = () => null) {
   const opens = [];
   const ai = {
     async getOptions() {
-      return { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000 } };
+      return { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000 } };
     },
     async openSession(input) {
       opens.push(input);
@@ -45,7 +45,7 @@ function fakeAi(openFailure = () => null) {
       let listener;
       return {
         sessionId: `s${opens.length}`,
-        effective: { providerId: "mock", modelId: "allowed", effort: null },
+        effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null },
         turn: null,
         onEvent(next) { listener = next; return () => { listener = undefined; }; },
         async send() {
@@ -273,7 +273,7 @@ const devkitHost = (t) => {
   t.after(() => host.close());
   return host;
 };
-const devkitPort = (host, profile) => createHostMemoryModelPort(host.backend.host.ai, enabled, undefined, createTeamuqTaskBinding({ program: host.backend.host.program, store: null, profile, now: () => host.clock.now() }));
+const devkitPort = (host, profile) => createHostMemoryModelPort(host.backend.host.ai, () => readOrganizationSettings({ organizationProvider: "scripted" }), undefined, createTeamuqTaskBinding({ program: host.backend.host.program, store: null, profile, now: () => host.clock.now() }));
 const scripted = (host, port, agentId) => {
   host.ai.next(JSON_REPLY);
   return invoke(port, agentId);

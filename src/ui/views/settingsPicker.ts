@@ -1,6 +1,7 @@
 import { html, type SafeHtml } from "../dom/html.js";
 import { t, type StringKey } from "../i18n/index.js";
 import type { SettingsState } from "../state/settings.js";
+import { ORGANIZATION_DEFAULT_MODEL, ORGANIZATION_DEFAULT_PROVIDER } from "../../contracts/organizationDefaults.js";
 import type { AiModelChoice, AiOptionsView, AiProviderChoice, AiProviderState } from "../api/aiOptionsClient.js";
 
 export type AiChoices =
@@ -16,11 +17,15 @@ const STATE_LABELS: Readonly<Record<Exclude<AiProviderState, "ready">, StringKey
   not_supported_yet: "settings.provider.state.notSupportedYet",
 };
 
-// why: mirrors the backend, which uses the named provider when it is given and otherwise the default provider if ready, then the first ready one
+// why: mirrors organizationSettings, where an empty provider means the plugin default
 export function effectiveProvider(options: AiOptionsView, providerId: string): AiProviderChoice | undefined {
-  if (providerId !== "") return options.providers.find((provider) => provider.id === providerId);
-  const ready = options.providers.filter((provider) => provider.state === "ready");
-  return ready.find((provider) => provider.id === options.defaultProviderId) ?? ready[0];
+  const wanted = providerId === "" ? ORGANIZATION_DEFAULT_PROVIDER : providerId;
+  return options.providers.find((provider) => provider.id === wanted);
+}
+
+export function defaultModelUsable(options: AiOptionsView): boolean {
+  const provider = effectiveProvider(options, "");
+  return provider?.state === "ready" && provider.models.some((model) => model.id === ORGANIZATION_DEFAULT_MODEL);
 }
 
 export function modelsFor(options: AiOptionsView, providerId: string): readonly AiModelChoice[] {
@@ -52,7 +57,7 @@ function select(id: string, key: string, describedBy: string, disabled: boolean,
 export function providerSelect(options: AiOptionsView, value: string, describedBy: string, disabled: boolean): SafeHtml {
   const known = options.providers.some((provider) => provider.id === value);
   const items = [
-    option("", t("settings.provider.default"), value === "", false),
+    option("", t(defaultModelUsable(options) ? "settings.provider.default" : "settings.default.unusable"), value === "", false),
     ...options.providers.map((provider) => {
       const label = provider.state === "ready" ? provider.label : t("settings.choice.unusable", { label: provider.label, reason: t(STATE_LABELS[provider.state as Exclude<AiProviderState, "ready">]) });
       return option(provider.id, label, provider.id === value, provider.state !== "ready");
@@ -62,11 +67,16 @@ export function providerSelect(options: AiOptionsView, value: string, describedB
   return select("settings-provider", "organizationProvider", describedBy, disabled, items);
 }
 
+function modelDefaultKey(options: AiOptionsView, providerId: string): StringKey {
+  if ((providerId === "" ? ORGANIZATION_DEFAULT_PROVIDER : providerId) !== ORGANIZATION_DEFAULT_PROVIDER) return "settings.model.default";
+  return defaultModelUsable(options) ? "settings.model.defaultPlugin" : "settings.default.unusable";
+}
+
 export function modelSelect(options: AiOptionsView, providerId: string, value: string, describedBy: string, disabled: boolean): SafeHtml {
   const models = modelsFor(options, providerId);
   const known = models.some((model) => model.id === value);
   const items = [
-    option("", t("settings.model.default"), value === "", false),
+    option("", t(modelDefaultKey(options, providerId)), value === "", false),
     ...models.map((model) => option(model.id, model.label, model.id === value, false)),
     ...(value === "" || known ? [] : [option(value, t("settings.choice.missing", { id: value }), true, false)]),
   ];

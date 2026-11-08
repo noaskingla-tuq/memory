@@ -18,8 +18,8 @@ test("dispose cancels an in-flight host model, removes subscriptions and preserv
     agentDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
     projectDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
     ai: {
-      async getOptions() { return { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 10000 } }; },
-      async openSession() { return { sessionId: "host-session", effective: { providerId: "mock", modelId: "allowed" }, turn: null,
+      async getOptions() { return { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 10000 } }; },
+      async openSession() { return { sessionId: "host-session", effective: { providerId: "codex", modelId: "gpt-6-luna" }, turn: null,
         onEvent() { return () => { counters.off++; }; }, async send() { signalStarted(); return { turnId: "t" }; },
         async interrupt() { counters.interrupted++; }, async close() { counters.closed++; },
       }; },

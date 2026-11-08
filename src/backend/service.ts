@@ -102,7 +102,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   // why: a host without the Program API (older Core) gets no binding, so its AI turns never carry a taskId and never call Program
   const teamuqTask = options.host?.program === undefined ? undefined : createTeamuqTaskBinding({ program: options.host.program, store: createTeamuqTaskStore(dirname(options.dataRoot)), profile });
   const organizationStore = options.host === undefined ? undefined : createLocalPunchOrganizationStore(dirname(options.dataRoot));
-  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, undefined, teamuqTask, organizationStore, options.hostSessionCloseTimeoutMs);
+  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, teamuqTask, organizationStore, options.hostSessionCloseTimeoutMs);
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
   const organization = organizationStore === undefined ? undefined : createPunchOrganizationWorker({
@@ -110,6 +110,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     enabled: () => organizationSettings().enabled,
     frequency: () => organizationSettings().frequency,
     dailyTime: () => organizationSettings().dailyTime,
+    ...(model === undefined ? {} : { awaitPending: (job: { readonly actor: { readonly agentId: string; readonly projectId: string | null } }) => model.awaitPair(job.actor.agentId, job.actor.projectId), waiting: () => model.waiting() }),
     ...(options.organizationNow === undefined ? {} : { now: options.organizationNow }),
     async capture(job) {
       const active = ensure();

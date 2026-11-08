@@ -66,7 +66,7 @@ test("a close() that never settles is abandoned after the limit, recorded as ses
   const dir = mkdtempSync(join(tmpdir(), "memory-close-timeout-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const h = hangingCloseAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, createLocalPunchOrganizationStore(dir), CLOSE_LIMIT_MS);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, createLocalPunchOrganizationStore(dir), CLOSE_LIMIT_MS);
   assert.deepEqual(await invokeScoped(port, actorOf("sw/a"), "organize:one"), { items: [] });
 
   const startedAt = Date.now();
@@ -90,7 +90,7 @@ test("after a close timed out, the same pair opens a new session instead of resu
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = hangingCloseAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store, CLOSE_LIMIT_MS);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store, CLOSE_LIMIT_MS);
   assert.deepEqual(await invokeScoped(port, actorOf("sw/a"), "organize:one"), { items: [] });
   // why: the worker prunes a finished operation, and an unpruned one would block the pair for a reason unrelated to resume
   await store.pruneOperation(operationKey(pairKey("sw/a", "close-project"), "organize:one"));
@@ -116,7 +116,7 @@ test("after a close timed out, the same pair opens a new session instead of resu
 
 test("without a resume store the per-invoke close is bounded too and the value is still returned", async () => {
   const h = hangingCloseAi({ hangAll: true });
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, undefined, CLOSE_LIMIT_MS);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, undefined, CLOSE_LIMIT_MS);
   const startedAt = Date.now();
   const value = await port.invoke({ agentId: "a", policy: port.resolvePolicy("a"), operation: "extract", system: "JSON please", input: {}, maxOutputTokens: 1024, signal: new AbortController().signal });
   assert.deepEqual(value, { items: [] });
@@ -129,7 +129,7 @@ test("cancel() and releasePair() do not hang on a stuck close", async (t) => {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const h = hangingCloseAi({ hangAll: true });
   const open = async () => {
-    const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, createLocalPunchOrganizationStore(mkdtempSync(join(dir, "s-"))), CLOSE_LIMIT_MS);
+    const port = createHostMemoryModelPort(h.ai, enabled, undefined, createLocalPunchOrganizationStore(mkdtempSync(join(dir, "s-"))), CLOSE_LIMIT_MS);
     await invokeScoped(port, actorOf("sw/a"), "organize:one");
     return port;
   };
@@ -155,7 +155,7 @@ test("the organization worker records the close timeout with its phase and plugi
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = hangingCloseAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store, CLOSE_LIMIT_MS);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store, CLOSE_LIMIT_MS);
   const worker = createPunchOrganizationWorker({
     store, enabled: () => true, frequency: () => "immediate", now: () => Date.now(),
     capture: async (job) => {
@@ -321,13 +321,13 @@ test("each pair keeps its own close timeout record: another pair's successful re
 });
 
 // why: this pins an accepted trade-off, not an ideal: an unfinished operation whose session could not be confirmed closed is never resumed, so it waits for the 7-day operator reconcile
-test("after a turn timeout and then a close timeout, the retry sends on a fresh session and never resumes the old one", async (t) => {
+test("after a hard cancel and then a close timeout, the retry sends on a fresh session and never resumes the old one", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "memory-close-unresolved-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const opens = [];
   const options = { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
-  // why: the turn never answers, so the 300 ms turn limit fires, and the only session ever opened never confirms its close
+  // why: the turn never answers and is stopped by hand, and the only session ever opened never confirms its close
   const ai = {
     async getOptions() { return options; },
     async openSession(openOptions) {
@@ -341,15 +341,22 @@ test("after a turn timeout and then a close timeout, the retry sends on a fresh 
       };
     },
   };
-  const port = createHostMemoryModelPort(ai, enabled, 300, undefined, store, CLOSE_LIMIT_MS);
+  const port = createHostMemoryModelPort(ai, enabled, undefined, store, CLOSE_LIMIT_MS);
   const actor = actorOf("sw/a");
-  await assert.rejects(invokeScoped(port, actor, "organize:x"), (error) => error.code === "MODEL_TIMEOUT" && error.phase === "turn_timeout");
+  const stopped = async () => {
+    const call = invokeScoped(port, actor, "organize:x");
+    const rejection = assert.rejects(call, (error) => error.code === "RESOURCE_BUSY" && error.phase === "cancelled");
+    for (let i = 0; i < 40; i += 1) await new Promise((resolve) => setImmediate(resolve));
+    port.interrupt();
+    await rejection;
+  };
+  await stopped();
   await assert.rejects(port.releasePair(actor.agentId, actor.projectId), (error) => error.code === "RESOURCE_BUSY" && error.phase === "session_close");
   const opensBefore = opens.length;
 
   const firstCalls = Object.values(Object.values((await store.readResumeState()).operations)[0].calls);
-  assert.deepEqual(firstCalls.map((call) => [call.phase, call.hostErrorCode, call.retryable, call.partialDelivered]), [["failed", "cancelled_local", true, false]], "the timed-out call is closed, not left sent");
-  await assert.rejects(invokeScoped(port, actor, "organize:x"), (error) => error.code === "MODEL_TIMEOUT" && error.phase === "turn_timeout");
+  assert.deepEqual(firstCalls.map((call) => [call.phase, call.hostErrorCode, call.retryable, call.partialDelivered]), [["failed", "cancelled_local", true, false]], "the cancelled call is closed, not left sent");
+  await stopped();
   assert.equal(opens.length, opensBefore + 1, "the retry opened exactly one new session");
   assert.deepEqual(opens.filter((entry) => entry?.resume !== undefined), [], "the old session was never asked to resume");
   const saved = Object.values((await store.readResumeState()).sessions);

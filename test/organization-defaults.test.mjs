@@ -47,7 +47,7 @@ function portFor(t, { models, values = {}, state = "ready", provider = "codex" }
   host.ai.getOptions = async () => ({ providers: [{ id: provider, state, models }], defaultProviderId: provider, capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10000, inputChars: 20000, transcriptLines: 80 } });
   const open = host.ai.openSession;
   host.ai.openSession = async (input) => { opened.push(input); const session = await open(input); session.effective = { providerId: input.providerId, modelId: input.modelId, effort: null }; return session; };
-  const port = createHostMemoryModelPort(host.ai, () => readOrganizationSettings(values), 5_000, undefined, store);
+  const port = createHostMemoryModelPort(host.ai, () => readOrganizationSettings(values), undefined, store);
   t.after(() => port.cancel());
   return { port, host, opened };
 }

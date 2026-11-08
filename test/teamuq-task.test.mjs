@@ -77,7 +77,7 @@ test("each agent gets its own Task named after it, under one Project", async () 
   const prog = program();
   const { ai, opens } = fakeAi();
   const profile = profileWith({ "sw/developer": { name: "開發工程師", teamKey: "sw" }, "sw/tester": { name: "測試工程師", teamKey: "sw" } });
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, profile, now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, profile, now: () => 0 }));
   await invoke(port, "sw/developer");
   await invoke(port, "sw/tester");
   await invoke(port, "sw/developer");
@@ -93,7 +93,7 @@ test("each agent gets its own Task named after it, under one Project", async () 
 test("concurrent requests for one agent create its Task once, and agents share one Project under parallel first use", async () => {
   const prog = program();
   const { ai } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
   await Promise.all([invoke(port, "x/a"), invoke(port, "x/a"), invoke(port, "x/b"), invoke(port, "x/a"), invoke(port, "x/b")]);
   await port.cancel();
   assert.equal(projectCalls(prog).length, 1);
@@ -105,7 +105,7 @@ test("a restart reuses each agent's own Task without calling Program", async (t)
   const dir = tempDir(t);
   const prog = program();
   const first = fakeAi();
-  const port = createHostMemoryModelPort(first.ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: createTeamuqTaskStore(dir), now: () => 0 }));
+  const port = createHostMemoryModelPort(first.ai, enabled, createTeamuqTaskBinding({ program: prog, store: createTeamuqTaskStore(dir), now: () => 0 }));
   await invoke(port, "x/a");
   await invoke(port, "x/b");
   await port.cancel();
@@ -115,7 +115,7 @@ test("a restart reuses each agent's own Task without calling Program", async (t)
 
   const restartedProgram = program();
   const restarted = fakeAi();
-  const next = createHostMemoryModelPort(restarted.ai, enabled, undefined, createTeamuqTaskBinding({ program: restartedProgram, store: createTeamuqTaskStore(dir), now: () => 0 }));
+  const next = createHostMemoryModelPort(restarted.ai, enabled, createTeamuqTaskBinding({ program: restartedProgram, store: createTeamuqTaskStore(dir), now: () => 0 }));
   await invoke(next, "x/b");
   await invoke(next, "x/a");
   await next.cancel();
@@ -127,7 +127,7 @@ test("task_not_found rebuilds only the failing agent's Task and retries that age
   const prog = program();
   let gone = null;
   const { ai, opens } = fakeAi((input) => (input.taskId === gone ? Object.assign(new Error("gone"), { code: "task_not_found" }) : null));
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
   await invoke(port, "x/a");
   await invoke(port, "x/b");
   gone = "102";
@@ -143,7 +143,7 @@ test("task_not_found rebuilds only the failing agent's Task and retries that age
 test("not_found on Task creation rebuilds the Project together with the Task", async () => {
   const prog = program((operation, _input, call) => (operation === "data.tasks.create" && call === 2 ? fail("not_found") : undefined));
   const { ai, opens } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
   await invoke(port);
   await port.cancel();
   assert.deepEqual(prog.calls.map((call) => call.operation), ["data.projects.create", "data.tasks.create", "data.projects.create", "data.tasks.create"]);
@@ -155,7 +155,7 @@ test("agents that hit not_found on the same deleted Project rebuild it once", as
   let gone = false;
   const prog = program((operation, input) => (gone && operation === "data.tasks.create" && input.projectId === "101" ? fail("not_found") : undefined));
   const { ai } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
   await invoke(port, "x/a");
   gone = true;
   await Promise.all([invoke(port, "x/b"), invoke(port, "x/c")]);
@@ -168,7 +168,7 @@ test("agents that hit not_found on the same deleted Project rebuild it once", as
 test("names fall back to the degraded name when the agent is not in the name table", async () => {
   const prog = program();
   const { ai } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, now: () => 0 }));
   await invoke(port, "sw/developer");
   await port.cancel();
   assert.equal(taskCalls(prog)[0].input.name, "AI 整理記憶：developer（sw）");
@@ -179,7 +179,7 @@ test("a version-1 state file keeps its Project, drops its shared Task, and is re
   writeFileSync(join(dir, TEAMUQ_TASK_FILE), JSON.stringify({ version: 1, projectId: "55", taskId: "77" }));
   const prog = program();
   const { ai, opens } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: createTeamuqTaskStore(dir), now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: createTeamuqTaskStore(dir), now: () => 0 }));
   await invoke(port, "x/a");
   await port.cancel();
   assert.deepEqual(prog.calls.map((call) => call.operation), ["data.tasks.create"]);
@@ -202,7 +202,7 @@ test("denied, unavailable, timed-out Program calls fall back without a taskId an
   let clock = 0;
   const prog = program(() => fail("forbidden"));
   const { ai, opens } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: null, now: () => clock, retryMs: 60_000 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: null, now: () => clock, retryMs: 60_000 }));
   await invoke(port, "x/a");
   clock = 1_000;
   await invoke(port, "x/a");
@@ -217,7 +217,7 @@ test("denied, unavailable, timed-out Program calls fall back without a taskId an
 
   const throwing = program(() => { throw Object.assign(new Error("core offline"), { code: "unavailable" }); });
   const thrownAi = fakeAi();
-  const thrownPort = createHostMemoryModelPort(thrownAi.ai, enabled, undefined, createTeamuqTaskBinding({ program: throwing, store: null, now: () => 0 }));
+  const thrownPort = createHostMemoryModelPort(thrownAi.ai, enabled, createTeamuqTaskBinding({ program: throwing, store: null, now: () => 0 }));
   await invoke(thrownPort, "x/a");
   await invoke(thrownPort, "x/a");
   await thrownPort.cancel();
@@ -226,7 +226,7 @@ test("denied, unavailable, timed-out Program calls fall back without a taskId an
 
   const hanging = { calls: 0, call() { hanging.calls += 1; return new Promise(() => {}); } };
   const hangingAi = fakeAi();
-  const hangingPort = createHostMemoryModelPort(hangingAi.ai, enabled, undefined, createTeamuqTaskBinding({ program: hanging, store: null, now: () => 0, guardMs: 20 }));
+  const hangingPort = createHostMemoryModelPort(hangingAi.ai, enabled, createTeamuqTaskBinding({ program: hanging, store: null, now: () => 0, guardMs: 20 }));
   assert.deepEqual(await invoke(hangingPort, "x/a"), { items: [] });
   assert.deepEqual(await invoke(hangingPort, "x/a"), { items: [] });
   await hangingPort.cancel();
@@ -239,7 +239,7 @@ test("an unreadable state file is treated as absent and rewritten on the next cr
   writeFileSync(join(dir, TEAMUQ_TASK_FILE), "{not json");
   const prog = program();
   const { ai, opens } = fakeAi();
-  const port = createHostMemoryModelPort(ai, enabled, undefined, createTeamuqTaskBinding({ program: prog, store: createTeamuqTaskStore(dir), now: () => 0 }));
+  const port = createHostMemoryModelPort(ai, enabled, createTeamuqTaskBinding({ program: prog, store: createTeamuqTaskStore(dir), now: () => 0 }));
   await invoke(port, "x/a");
   await port.cancel();
   assert.equal(prog.calls.length, 2);
@@ -273,7 +273,7 @@ const devkitHost = (t) => {
   t.after(() => host.close());
   return host;
 };
-const devkitPort = (host, profile) => createHostMemoryModelPort(host.backend.host.ai, () => readOrganizationSettings({ organizationProvider: "scripted" }), undefined, createTeamuqTaskBinding({ program: host.backend.host.program, store: null, profile, now: () => host.clock.now() }));
+const devkitPort = (host, profile) => createHostMemoryModelPort(host.backend.host.ai, () => readOrganizationSettings({ organizationProvider: "scripted" }), createTeamuqTaskBinding({ program: host.backend.host.program, store: null, profile, now: () => host.clock.now() }));
 const scripted = (host, port, agentId) => {
   host.ai.next(JSON_REPLY);
   return invoke(port, agentId);

@@ -404,6 +404,7 @@ export const uiStatusSuccess = z
       partialDelivered: z.boolean().nullable(),
       lastAttemptAt: count.nullable(),
       updatedAt: count.nullable(),
+      waiting: z.object({ sinceMs: count }).strict().nullable().optional(),
       dailyRound: z.object({
         date: z.string().length(10),
         roundId: z.string(),

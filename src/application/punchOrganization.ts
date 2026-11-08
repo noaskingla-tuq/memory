@@ -8,6 +8,7 @@ import { failure } from "../domain/errors.js";
 import { memoryActorSchema } from "../../vendor/teamuq-contract/contract.mjs";
 import { operationKey, pairKey } from "./modelInvocationScope.js";
 import { dailyRoundStatus, failedModelAttemptInRound, isRecord, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
+import { captureOutcome, captureWithContinuation, isPairBlocked, replyProgress } from "./organizationQueue.js";
 import { classifyLegacyJob, isTrialRow, summarizeTrial, trialBreaker, type LegacyTrialRequest, type LegacyTrialResponse, type TrialSummary } from "./organizationTrial.js";
 
 export interface OrganizationStatus {
@@ -36,6 +37,7 @@ export interface OrganizationStatus {
   readonly partialDelivered: boolean | null;
   readonly lastAttemptAt: number | null;
   readonly updatedAt: number | null;
+  readonly waiting?: { readonly sinceMs: number } | null;
   readonly dailyRound: null | {
     readonly date: string;
     readonly roundId: string;
@@ -68,6 +70,8 @@ export interface OrganizationOptions {
   readonly claimDailyRound?: (localDate: string) => Promise<boolean>;
   readonly beginOrResumeDailyRound?: OrganizationResumeStorePort["beginOrResumeDailyRound"];
   readonly capture: (job: { actor: MemoryActor; input: MemoryCaptureInput; memoryId: string; allowModelSend?: boolean }) => Promise<MemoryResult<unknown>>;
+  readonly awaitPending?: (job: { readonly actor: MemoryActor }) => Promise<void>;
+  readonly waiting?: () => { readonly sinceMs: number } | null;
   readonly now?: () => number;
   readonly pollMs?: number;
 }
@@ -264,19 +268,20 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       attempted = true;
       status = { ...status, state: "running" };
       const attemptedAt = now();
-      let result: MemoryResult<unknown>;
-      try { result = await options.capture({ ...job, allowModelSend: trialRow || (!replyOnly && !dailySendBlocked) }); } catch (error) { result = failure("organization", error); }
+      const send = trialRow || (!replyOnly && !dailySendBlocked);
+      const attempt = async (): Promise<MemoryResult<unknown>> => {
+        try { return await options.capture({ ...job, allowModelSend: send }); } catch (error) { return failure("organization", error); }
+      };
+      const { result } = await captureWithContinuation({
+        capture: attempt,
+        readProgress: async () => replyProgress(await resumeState(), job),
+        awaitPending: async () => { await options.awaitPending?.(job); },
+        shouldStop: () => stopped || !options.enabled(),
+      });
       if (stopped) break;
-      const value = result.ok ? result.value : null;
-      const processing = isRecord(value) && value.processing === true;
-      const classification = isRecord(value) && isRecord(value.classification) ? value.classification : undefined;
-      const classificationFailed = classification?.status === "failed";
-      const code = result.ok
-        ? processing ? "RESOURCE_BUSY" : classificationFailed ? (isRecord(classification.error) && "code" in classification.error ? String(classification.error.code).toUpperCase() : "INTERNAL") : null
-        : result.error.code;
-      const terminalOutcome = code === null
-        ? classification?.status === "skipped" || (isRecord(value) && value.emptySuccess === true) ? "empty_success" as const : "committed" as const
-        : null;
+      // why: another operation of this pair holds it, which says nothing about this job, so it keeps its attempt count and its day
+      if (isPairBlocked(result)) continue;
+      const { code, classificationFailed, terminalOutcome } = captureOutcome(result);
       const nextState: Job["state"] = terminalOutcome !== null ? "completed" : code === "MEMORY_SUPPRESSED" ? "skipped" : "pending";
       const latestResume = await resumeState();
       const reportedPhase = !result.ok ? result.error.phase ?? null : classificationFailed ? "cairn_schema" : null;
@@ -439,7 +444,8 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       if (fault !== null) releaseFaults.set(pair, fault);
     },
     status: (): OrganizationStatus => {
-      const current: OrganizationStatus = { ...status, ...(!options.enabled() ? { state: "disabled" as const } : {}) };
+      const waiting = options.waiting?.() ?? null;
+      const current: OrganizationStatus = { ...status, ...(waiting === null ? {} : { waiting }), ...(!options.enabled() ? { state: "disabled" as const } : {}) };
       const releaseFault = [...releaseFaults.values()].pop() ?? null;
       // why: a job's own failure is the more specific cause, so the release fault only fills an otherwise clean status
       if (releaseFault === null || current.state === "disabled" || current.lastError !== null) return current;

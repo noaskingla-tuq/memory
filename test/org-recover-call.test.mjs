@@ -135,14 +135,14 @@ test("a send_unknown call without a turn id is not touched: the unknown send sti
   assert.equal((await callsOf(rig.store, OP, rig.actor))[0].phase, "send_unknown");
 });
 
-async function liveRig(t, send, timeoutMs = 5_000, wrapStore = (store) => store) {
+async function liveRig(t, send, wrapStore = (store) => store) {
   const { store } = tempStore(t);
   const actor = actorOf("sw/a");
   const host = recoverAi();
   const original = host.make;
   const make = (id, turn) => Object.assign(original(id, turn), { send });
   host.ai.openSession = async () => make("live-1", null);
-  const port = portOf(host.ai, wrapStore(store), timeoutMs);
+  const port = portOf(host.ai, wrapStore(store));
   t.after(() => port.cancel());
   return { store, actor, host, port };
 }
@@ -161,24 +161,16 @@ test("an interrupted event closes the call as failed interrupted, never as sent"
   assert.deepEqual([call.phase, call.hostErrorCode, call.retryable, call.partialDelivered, call.turnId], ["failed", "interrupted", true, false, "turn-live"]);
 });
 
-test("an abort after the send closes the call as failed cancelled_local and interrupts the turn", async (t) => {
+test("a hard cancel after the send closes the call as failed cancelled_local and interrupts the turn", async (t) => {
   const rig = await liveRig(t, async () => ({ turnId: "turn-live" }));
-  const controller = new AbortController();
-  const pending = invokeScoped(rig.port, rig.actor, OP, { value: 1 }, controller.signal);
+  const pending = invokeScoped(rig.port, rig.actor, OP, { value: 1 });
   const rejection = assert.rejects(pending, { code: "RESOURCE_BUSY" });
   for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve));
-  controller.abort();
+  rig.port.interrupt();
   await rejection;
   const [call] = await only(rig);
   assert.deepEqual([call.phase, call.hostErrorCode, call.retryable, call.partialDelivered, call.turnId], ["failed", "cancelled_local", true, false, "turn-live"]);
   assert.equal(rig.host.counters.interrupted, 1);
-});
-
-test("the turn time limit closes the call as failed cancelled_local", async (t) => {
-  const rig = await liveRig(t, async () => ({ turnId: "turn-live" }), 30);
-  await assert.rejects(invokeScoped(rig.port, rig.actor, OP), { code: "MODEL_TIMEOUT" });
-  const [call] = await only(rig);
-  assert.deepEqual([call.phase, call.hostErrorCode], ["failed", "cancelled_local"]);
 });
 
 test("a failed session write after the send closes the call as failed cancelled_local and interrupts the turn", async (t) => {
@@ -192,7 +184,7 @@ test("a failed session write after the send closes the call as failed cancelled_
       });
     },
   });
-  const rig = await liveRig(t, async () => ({ turnId: "turn-live" }), 5_000, failAfterSend);
+  const rig = await liveRig(t, async () => ({ turnId: "turn-live" }), failAfterSend);
   await assert.rejects(invokeScoped(rig.port, rig.actor, OP), { code: "STORAGE_BUSY" });
   const [call] = await only(rig);
   assert.deepEqual([call.phase, call.hostErrorCode, call.retryable, call.partialDelivered], ["failed", "cancelled_local", true, false]);

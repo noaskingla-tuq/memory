@@ -134,19 +134,24 @@ test("invalid JSON, oversized UTF-8 and rejected sends clean up listeners and se
 });
 test("a completed event without contentSaved cannot be treated as a durable model reply", async () => {
   const h = mockAi({ send: async ({ emit }) => { emit({ kind: "textDelta", text: '{"items":[]}' }); emit({ kind: "completed" }); return { turnId: "t" }; } });
-  await assert.rejects(invoke(createHostMemoryModelPort(h.ai, enabled, 10)), { code: "MODEL_TIMEOUT" });
+  const controller = new AbortController();
+  const pending = invoke(createHostMemoryModelPort(h.ai, enabled), controller.signal);
+  const rejection = assert.rejects(pending, { code: "RESOURCE_BUSY" });
+  await new Promise((resolve) => setImmediate(resolve));
+  controller.abort();
+  await rejection;
   assert.equal(h.counters.sent, 1);
   assert.equal(h.counters.closed, 1);
 });
-test("abort, timeout and disposal interrupt a stalled turn", async () => {
-  for (const mode of ["abort", "timeout", "dispose"]) {
+test("abort and disposal interrupt a stalled turn that has no journal to keep a late reply", async () => {
+  for (const mode of ["abort", "dispose"]) {
     let sent;
     const started = new Promise((resolve) => { sent = resolve; });
     const h = mockAi({ send: async () => { sent(); return { turnId: "t" }; } });
     const controller = new AbortController();
-    const port = createHostMemoryModelPort(h.ai, enabled, mode === "timeout" ? 20 : 10000);
+    const port = createHostMemoryModelPort(h.ai, enabled);
     const call = invoke(port, controller.signal);
-    const rejection = assert.rejects(call, { code: mode === "timeout" ? "MODEL_TIMEOUT" : "RESOURCE_BUSY" });
+    const rejection = assert.rejects(call, { code: "RESOURCE_BUSY" });
     await started;
     if (mode === "abort") controller.abort();
     if (mode === "dispose") await port.cancel();
@@ -161,7 +166,7 @@ test("a late send result stays unknown after abort, blocks exact retry, and rele
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = durableAi({ holdSends: true });
-  const port = createHostMemoryModelPort(h.ai, enabled, 5_000, undefined, store);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   const callWithSignal = (actor, operationId, signal) => withMemoryCaptureScope(actor, operationId, async () => {
     const input = { value: operationId };
     const invocation = currentMemoryInvocation("extract", "schema", input);
@@ -227,7 +232,7 @@ test("cancellation after prepared persistence exits before send and releases the
     },
   };
   const h = durableAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   const actor = { agentId: "sw/a", projectId: "source", sessionId: "task", providerId: "mock" };
   const controller = new AbortController();
   const operationId = "cancel-before-send";
@@ -266,8 +271,12 @@ test("cancel during discovery and late opening closes any eventual session", asy
   resolveOpen(h.session);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(h.counters.closed, 1);
-  const discovery = createHostMemoryModelPort({ getOptions: () => new Promise(() => {}), openSession: h.ai.openSession }, enabled, 10);
-  await assert.rejects(invoke(discovery), { code: "MODEL_TIMEOUT" });
+  const discovery = createHostMemoryModelPort({ getOptions: () => new Promise(() => {}), openSession: h.ai.openSession }, enabled);
+  const stop = new AbortController();
+  const hung = assert.rejects(invoke(discovery, stop.signal), { code: "RESOURCE_BUSY", phase: "cancelled" });
+  await new Promise((resolve) => setImmediate(resolve));
+  stop.abort();
+  await hung;
 });
 test("disabled, denied, unavailable and quota settings avoid provider sends", async () => {
   for (const [values, mutate, code] of [
@@ -329,7 +338,7 @@ test("same pair reuses one host session, different pairs stay isolated, and each
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = durableAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   const actor = { agentId: "sw/a", projectId: "source-1", sessionId: "management-task", providerId: "mock" };
   const input = { records: [{ id: "synthetic" }] };
   await invokeScoped(port, actor, "organize:punch-1", "extract", "extract system with schema A", input);
@@ -359,7 +368,7 @@ test("same request under different operation systems has distinct durable call i
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = durableAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   const actor = { agentId: "sw/a", projectId: "source-project", sessionId: "task", providerId: "mock" };
   const request = { records: [{ id: "synthetic" }] };
   await invokeScoped(port, actor, "same-operation", "extract", "schema A", request);
@@ -435,7 +444,7 @@ test("legacy call keys recover only when every stored fingerprint matches", asyn
     async getOptions() { discoveryCalls++; throw new Error("host discovery must not be needed"); },
     async openSession() { openCalls++; throw new Error("session attach must not be needed"); },
   };
-  const matchingPort = createHostMemoryModelPort(unavailable, enabled, 1000, undefined, matchingStore);
+  const matchingPort = createHostMemoryModelPort(unavailable, enabled, undefined, matchingStore);
   assert.deepEqual(await invokeScoped(matchingPort, actor, operationId, "extract", system, request), { items: [] });
   assert.equal(discoveryCalls, 0);
   assert.equal(openCalls, 0);
@@ -454,7 +463,7 @@ test("legacy call keys recover only when every stored fingerprint matches", asyn
     const gatedPort = createHostMemoryModelPort({
       async getOptions() { gatedDiscoveryCalls++; return gatedOptions; },
       async openSession() { gatedOpenCalls++; throw new Error("local recovery must not attach a session"); },
-    }, enabled, 1000, undefined, matchingStore);
+    }, enabled, undefined, matchingStore);
     assert.deepEqual(await invokeScoped(gatedPort, actor, operationId, "extract", system, request), { items: [] });
     assert.equal(gatedDiscoveryCalls, 0, `${mode} gates are irrelevant after exact local reply validation`);
     assert.equal(gatedOpenCalls, 0);
@@ -465,7 +474,7 @@ test("legacy call keys recover only when every stored fingerprint matches", asyn
   t.after(() => rmSync(mismatchDir, { recursive: true, force: true }));
   const mismatchStore = createLocalPunchOrganizationStore(mismatchDir);
   await seedLegacyReply(mismatchStore, otherSystem);
-  const mismatchPort = createHostMemoryModelPort(unavailable, enabled, 1000, undefined, mismatchStore);
+  const mismatchPort = createHostMemoryModelPort(unavailable, enabled, undefined, mismatchStore);
   await assert.rejects(
     invokeScoped(mismatchPort, actor, operationId, "extract", system, request),
     (error) => error.code === "RESOURCE_BUSY" && error.phase === "session_resume",
@@ -478,7 +487,7 @@ test("legacy call keys recover only when every stored fingerprint matches", asyn
   t.after(() => rmSync(corruptDir, { recursive: true, force: true }));
   const corruptStore = createLocalPunchOrganizationStore(corruptDir);
   await seedLegacyReply(corruptStore, system, true);
-  const corruptPort = createHostMemoryModelPort(unavailable, enabled, 1000, undefined, corruptStore);
+  const corruptPort = createHostMemoryModelPort(unavailable, enabled, undefined, corruptStore);
   await assert.rejects(
     invokeScoped(corruptPort, actor, operationId, "extract", system, request),
     (error) => error.code === "STORAGE_BUSY" && error.phase === "state",
@@ -492,7 +501,7 @@ test("same-pair sends serialize and different project pairs queue behind the one
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = durableAi({ holdSends: true });
-  const port = createHostMemoryModelPort(h.ai, enabled, 5_000, undefined, store);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   const actor = { agentId: "sw/a", projectId: "project-a", sessionId: "task", providerId: "mock" };
   const first = invokeScoped(port, actor, "op-1", "extract", "extract A", { n: 1 });
   await new Promise((resolve) => setImmediate(resolve));
@@ -535,7 +544,7 @@ test("a different pair cancelled in the host-slot queue sends nothing and releas
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const h = durableAi({ holdSends: true });
-  const port = createHostMemoryModelPort(h.ai, enabled, 5000, undefined, store);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   const actorA = { agentId: "sw/a", projectId: "project-a", sessionId: "task", providerId: "mock" };
   const actorB = { agentId: "sw/a", projectId: "project-b", sessionId: "task", providerId: "mock" };
   const callWithSignal = (actor, operationId, signal) => withMemoryCaptureScope(actor, operationId, async () => {
@@ -589,7 +598,7 @@ test("backend restart resumes a sent turn and recovers its saved result without 
     },
   };
   const actor = { agentId: "sw/a", projectId: "project-a", sessionId: "task", providerId: "mock" };
-  const firstPort = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, injectedStore);
+  const firstPort = createHostMemoryModelPort(h.ai, enabled, undefined, injectedStore);
   await assert.rejects(invokeScoped(firstPort, actor, "op-recover", "extract", "extract schema", { n: 7 }), (error) => error.code === "STORAGE_BUSY" && error.phase === "state");
   const pair = pairKey(actor.agentId, actor.projectId);
   const key = operationKey(pair, "op-recover");
@@ -600,7 +609,7 @@ test("backend restart resumes a sent turn and recovers its saved result without 
   assert.equal(firstCall.replyJson, null);
   await firstPort.cancel();
 
-  const resumedPort = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store);
+  const resumedPort = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   assert.deepEqual(await invokeScoped(resumedPort, actor, "op-recover", "extract", "extract schema", { n: 7 }), { items: [] });
   assert.deepEqual(await invokeScoped(resumedPort, actor, "op-recover", "extract", "extract schema", { n: 7 }), { items: [] });
   assert.equal(h.counters.sent, 1, "reattachment and cached commit recovery add zero sends");
@@ -634,11 +643,11 @@ test("a host without closedSessionResume fails closed for an unresolved turn ins
     },
   };
   const actor = { agentId: "sw/a", projectId: "source", sessionId: "task", providerId: "mock" };
-  const first = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, injectedStore);
+  const first = createHostMemoryModelPort(h.ai, enabled, undefined, injectedStore);
   await assert.rejects(invokeScoped(first, actor, "pending-op", "extract", "schema", { value: 1 }), (error) => error.code === "STORAGE_BUSY" && error.phase === "state");
   await first.cancel();
   h.ai.getOptions = async () => ({ ...h.options, capabilities: { closedSessionResume: false } });
-  const retry = createHostMemoryModelPort(h.ai, enabled, 1000, undefined, store);
+  const retry = createHostMemoryModelPort(h.ai, enabled, undefined, store);
   await assert.rejects(invokeScoped(retry, actor, "pending-op", "extract", "schema", { value: 1 }), { code: "MODEL_POLICY_DENIED" });
   assert.equal(h.counters.sent, 1);
   assert.equal(h.counters.opened, 1, "resume unavailable does not silently create a replacement session");
@@ -666,7 +675,7 @@ test("unknown send delivery is journaled and a retry does not issue a second sen
     async openSession() { return session; },
   };
   const actor = { agentId: "sw/a", projectId: "source", sessionId: "task", providerId: "mock" };
-  const first = createHostMemoryModelPort(ai, enabled, 1000, undefined, store);
+  const first = createHostMemoryModelPort(ai, enabled, undefined, store);
   await assert.rejects(invokeScoped(first, actor, "unknown-op", "extract", "schema", { value: 1 }), { code: "RESOURCE_BUSY" });
   await first.cancel();
   const state = await store.readResumeState();
@@ -674,7 +683,7 @@ test("unknown send delivery is journaled and a retry does not issue a second sen
   const call = Object.values(state.operations[key].calls)[0];
   assert.equal(call.phase, "send_unknown");
   assert.equal(call.hostErrorCode, "plugin_host_unavailable");
-  const retry = createHostMemoryModelPort(ai, enabled, 1000, undefined, store);
+  const retry = createHostMemoryModelPort(ai, enabled, undefined, store);
   await assert.rejects(invokeScoped(retry, actor, "unknown-op", "extract", "schema", { value: 1 }), { code: "RESOURCE_BUSY" });
   assert.equal(counters.sent, 1);
   await retry.cancel();
@@ -703,7 +712,7 @@ test("provider partial delivery stays correlated and cannot be retried automatic
     async openSession() { return session; },
   };
   const actor = { agentId: "sw/a", projectId: "source", sessionId: "task", providerId: "mock" };
-  const port = createHostMemoryModelPort(ai, enabled, 1000, undefined, store);
+  const port = createHostMemoryModelPort(ai, enabled, undefined, store);
   await assert.rejects(invokeScoped(port, actor, "partial-op", "extract", "schema", { value: 1 }), { code: "RESOURCE_BUSY" });
   await assert.rejects(invokeScoped(port, actor, "partial-op", "extract", "schema", { value: 1 }), { code: "RESOURCE_BUSY" });
   const key = operationKey(pairKey(actor.agentId, actor.projectId), "partial-op");

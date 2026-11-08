@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { dispatchUi } from "../out/backend/uiDispatch.js";
 import { NO_PROFILE } from "../out/application/ui/profilePort.js";
 import { openCairnCore } from "../out/adapters/cairn/cairnCoreAdapter.js";
@@ -57,7 +57,7 @@ function modelAi({ replyText = '{"items":[]}', waitForReply = false } = {}) {
   };
 }
 
-async function runOrganizationPhase(t, { name, replyText, waitForReply = false, timeoutMs = 1000, failReplyCheckpoint = false, storageFailure = false }) {
+async function runOrganizationPhase(t, { name, replyText, waitForReply = false, failReplyCheckpoint = false, storageFailure = false }) {
   const dir = mkdtempSync(join(tmpdir(), "memory-phase-path-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const actor = { agentId: "sw/phase-test", projectId: "phase-project", sessionId: "source-session", providerId: "mock" };
@@ -89,7 +89,7 @@ async function runOrganizationPhase(t, { name, replyText, waitForReply = false, 
     },
   } : baseStore;
   const model = storageFailure ? null : modelAi({ replyText, waitForReply });
-  const port = storageFailure ? null : createHostMemoryModelPort(model.api, () => readOrganizationSettings({ organizationEnabled: true }), timeoutMs, undefined, store);
+  const port = storageFailure ? null : createHostMemoryModelPort(model.api, () => readOrganizationSettings({ organizationEnabled: true }), undefined, store);
   const worker = createPunchOrganizationWorker({
     store,
     enabled: () => true,
@@ -98,8 +98,16 @@ async function runOrganizationPhase(t, { name, replyText, waitForReply = false, 
     capture: async (job) => app.execute("memory_capture", job.input, job.actor, undefined, job.allowModelSend ?? true),
   });
   await worker.enqueue(punch(name), "synthetic-raw-memory");
-  worker.start();
-  await worker.idle();
+  // why: the 30 second limit belongs to Cairn and is a real timer there, so the waiting case fires it on a mocked clock instead of waiting
+  if (waitForReply) mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    worker.start();
+    if (waitForReply) {
+      while ((model?.sends ?? 1) < 1) await new Promise((resolve) => setImmediate(resolve));
+      mock.timers.tick(30_000);
+    }
+    await worker.idle();
+  } finally { mock.timers.reset(); }
   const row = (await baseStore.readPage(null, 100)).records.find((entry) => entry.key === name)?.value;
   const organizationStatus = worker.status();
   const uiStatus = await dispatchUi("ui.status", {}, {
@@ -115,6 +123,7 @@ async function runOrganizationPhase(t, { name, replyText, waitForReply = false, 
   await new Promise((resolve) => setImmediate(resolve));
   line.stop();
   await worker.stop();
+  await port?.cancel();
   await app.close();
   return { row, organizationStatus, uiStatus, rendered: target.innerHTML, sends: model?.sends ?? 0 };
 }
@@ -123,7 +132,7 @@ test("organization status preserves distinct redacted model, schema, journal, ti
   const malformed = await runOrganizationPhase(t, { name: "malformed", replyText: "not JSON" });
   const schemaRejected = await runOrganizationPhase(t, { name: "schema", replyText: '{"items":[{}]}' });
   const checkpoint = await runOrganizationPhase(t, { name: "checkpoint", failReplyCheckpoint: true });
-  const timeout = await runOrganizationPhase(t, { name: "timeout", waitForReply: true, timeoutMs: 25 });
+  const timeout = await runOrganizationPhase(t, { name: "timeout", waitForReply: true });
   const storage = await runOrganizationPhase(t, { name: "storage", storageFailure: true });
 
   for (const [entry, phase] of [

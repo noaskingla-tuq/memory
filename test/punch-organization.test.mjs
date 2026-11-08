@@ -329,7 +329,7 @@ test("a durable retryable failed turn blocks same-day daily resend across a job-
     },
   };
   const makePort = () => {
-    const port = createHostMemoryModelPort(ai, () => readOrganizationSettings({ organizationEnabled: true }), 1_000, undefined, baseStore);
+    const port = createHostMemoryModelPort(ai, () => readOrganizationSettings({ organizationEnabled: true }), undefined, baseStore);
     ports.push(port);
     return port;
   };
@@ -773,7 +773,7 @@ test("R-AC06-002 multi-stage crash recovery replays saved prefix without same-da
     },
     async openSession() { counters.opens += 1; return session; },
   };
-  const port = createHostMemoryModelPort(ai, () => readOrganizationSettings({ organizationEnabled: true }), 1_000, undefined, baseStore);
+  const port = createHostMemoryModelPort(ai, () => readOrganizationSettings({ organizationEnabled: true }), undefined, baseStore);
   const modelAdapter = createCairnModelAdapter(who.agentId, port);
   const syntheticCore = {
     async capture() {

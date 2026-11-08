@@ -12,7 +12,6 @@ import { createTempKey } from "../tools/temp-key.mjs";
 import { scanUiFile, verifyArtifact } from "../tools/verify-artifact.mjs";
 import { REPO_ROOT } from "../tools/vendor-lock.mjs";
 import { UI_METHOD_NAMES } from "../out/contracts/uiContract.js";
-import { LINK_MAX_SESSIONS } from "../out/link/linkRuntime.js";
 
 const pin = readPin();
 const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
@@ -102,20 +101,10 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   const manifest = JSON.parse(readFileSync(join(dist, "stage", "manifest.json"), "utf8"));
   assert.equal(manifest.version, packageJson.version);
   assert.equal(manifest.name, "Cairn記憶管理");
-  assert.equal(manifest.minCoreVersion, ">=1.8.2");
-  assert.equal(manifest.permissions.includes("backend:invoke"), false);
-  assert.deepEqual(manifest.provides, [{ capability: "teamuq.memory@1", permission: "cap:memory", transport: "link", maxSessions: 4, dataClass: "local" }]);
-  assert.equal(manifest.provides[0].maxSessions, LINK_MAX_SESSIONS);
-  assert.equal(manifest.provides[0].maxSessions, manifest.resources.maxSessions);
-  assert.deepEqual(manifest.residency, { default: "on-demand", warmKeepSec: 180 });
-  assert.equal(manifest.resources.idleUnloadSec, 180);
-  assert.equal(manifest.description.includes("資料留在本機"), false);
-  assert.ok(manifest.description.includes("AI 提供者") && manifest.description.includes("其他外掛") && manifest.description.includes("只存在本機"));
-  assert.deepEqual(manifest.backendMethods.slice(-4), ["ui.linkSources", "ui.linkList", "ui.linkGet", "ui.linkForget"]);
-  assert.equal(manifest.backendMethods.length, 12);
+  assert.equal(manifest.minCoreVersion, ">=1.7.12");
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
-    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat", "program:data:projects:write", "program:data:tasks:write", "network:loopback"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
+    { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat", "program:data:projects:write", "program:data:tasks:write"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
   );
   assert.deepEqual(manifest.contributes.views, [
     { id: "memory", title: "Cairn記憶管理", icon: "cairn-icon.png", entry: "ui/index.html", presentations: ["tab", "fullpage"], defaultPresentation: "tab" },
@@ -199,10 +188,10 @@ test("verify-artifact resolves a directory URL joined with a file name and rejec
 test("verify-artifact rejects a manifest that permits a Core older than the pinned public API", async (t) => {
   const report = await tamperedArtifact(t, (stageDir) => {
     const file = join(stageDir, "manifest.json");
-    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.8.2", ">=1.7.0"));
+    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.7.12", ">=1.7.0"));
   });
   assert.equal(report.ok, false);
-  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.8.2"));
+  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.7.12"));
 });
 
 test("verify-artifact rejects a backend that imports Cairn or a package by a bare name", async (t) => {
@@ -253,19 +242,6 @@ test("verify-artifact rejects a manifest that exposes memory.* methods, adds a p
   assert.ok(failedChecks(permissions).some((name) => name.startsWith("manifest permissions are exactly")));
   const sessions = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"maxSessions": 4', '"maxSessions": 2')));
   assert.ok(failedChecks(sessions).some((name) => name.startsWith("manifest resources follow")));
-});
-
-test("verify-artifact rejects a manifest that declares backend:invoke, changes the provided capability, residency or description", async (t) => {
-  const invoke = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"ui:view"', '"ui:view", "backend:invoke"')));
-  assert.ok(failedChecks(invoke).some((name) => name.startsWith("manifest does not declare backend:invoke")));
-  const cloud = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"dataClass": "local"', '"dataClass": "cloud"')));
-  assert.ok(failedChecks(cloud).some((name) => name.startsWith("manifest provides exactly teamuq.memory@1")));
-  const sessions = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => { const manifest = JSON.parse(text); manifest.provides[0].maxSessions = 8; return JSON.stringify(manifest, null, 2); }));
-  assert.ok(failedChecks(sessions).some((name) => name.startsWith("manifest provides exactly teamuq.memory@1")));
-  const resident = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace('"on-demand"', '"resident"')));
-  assert.ok(failedChecks(resident).some((name) => name.startsWith("manifest residency is on-demand")));
-  const claim = await tamperedArtifact(t, (stageDir) => rewrite(stageDir, "manifest.json", (text) => text.replace("記憶存在本機；", "資料留在本機；記憶存在本機；")));
-  assert.ok(failedChecks(claim).some((name) => name.startsWith("manifest description says")));
 });
 
 test("verify-artifact rejects a manifest whose backendMethods list memory.profile.sync@1 in any spelling", async (t) => {

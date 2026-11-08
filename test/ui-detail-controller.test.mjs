@@ -60,11 +60,11 @@ test("the drawer is a modal dialog labelled by its title, takes focus at once, a
   assert.equal(drawer.getAttribute("role"), "dialog");
   assert.equal(drawer.getAttribute("aria-modal"), "true");
   const title = s.doc.root.querySelectorAll("h2").find((heading) => heading.id === drawer.getAttribute("aria-labelledby"));
-  assert.equal(title.textContent, "記憶詳情");
+  assert.equal(title.textContent, "詳情");
   assert.equal(active(s), title, "focus is on the title while the memory loads");
   assert.equal(s.header.hasAttribute("inert"), true);
   assert.equal(s.main.hasAttribute("inert"), true);
-  assert.ok(bodyOf(s).includes("正在讀取這筆記憶…"), "loading is announced");
+  assert.ok(bodyOf(s).includes("讀取中…"), "loading is announced");
   assert.equal(footOf(s), "", "no forget button until there is something to forget");
   void pending;
 });
@@ -193,7 +193,7 @@ test("the forget button asks first: a modal alert dialog, labelled, with focus o
   assert.equal(active(s), s.dialogButton("cancel"));
   assert.deepEqual(s.buttons(dialog).map((button) => button.textContent), ["先不要", "永久遺忘這一筆"]);
   const text = dialog.children[1].innerHTML;
-  for (const phrase of ["永久清除", "無法復原", "收據", "一併刪除", "相同內容也不會再被寫入"]) assert.ok(text.includes(phrase), phrase);
+  for (const phrase of ["永久清除", "無法復原", "收據", "一併刪除", "相同內容之後不會再寫入"]) assert.ok(text.includes(phrase), phrase);
   assert.equal(s.client.of("ui.forget").length, 0);
   assert.equal(s.drawer().hasAttribute("inert"), true, "the drawer is inert behind the dialog");
 });
@@ -250,7 +250,7 @@ test("confirming sends the memory's own revision once, then closes the drawer, r
   assert.equal(s.main.hasAttribute("inert"), false);
   assert.equal(s.card("m2"), undefined);
   assert.equal(active(s), s.card("m3"), "the memory that took its place has the focus");
-  assert.equal(s.status().textContent, "已遺忘這筆記憶。之後相同內容不會再被寫入。");
+  assert.equal(s.status().textContent, "已遺忘，相同內容不會再寫入。");
 });
 
 test("when the forgotten memory was the last one, focus goes to the previous card; when it was the only one, to the list title", async () => {
@@ -533,7 +533,7 @@ test("the announcement is a polite status region that exists before the message,
   assert.equal(region.textContent, "");
   await s.detail.open(REF);
   await confirm(s);
-  assert.equal(region.textContent, "已遺忘這筆記憶。之後相同內容不會再被寫入。");
+  assert.equal(region.textContent, "已遺忘，相同內容不會再寫入。");
   assert.equal(s.timers.length, 1);
   assert.equal(s.timers[0].ms, 6000);
   s.timers[0].callback();

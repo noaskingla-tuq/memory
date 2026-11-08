@@ -57,7 +57,7 @@ test("a representative memory without work details or text still gets a readable
   const reps = sectionOf(targets.body.innerHTML, "space-h-rep");
   assert.equal(count(reps, /<article class="rep"/gu), 3);
   assert.ok(reps.includes(STRINGS["space.rep.noTitle"]) && reps.includes(STRINGS["space.rep.noSnippet"]));
-  assert.ok(reps.includes("寫入於 "), "no usable work time falls back to the write time");
+  assert.ok(reps.includes("寫入 "), "no usable work time falls back to the write time");
   assert.ok(reps.includes("專案 01234567"), "a project the table does not name is shown by the project word and its id prefix");
   assert.ok(!/undefined|NaN|null/u.test(reps));
 });
@@ -180,10 +180,10 @@ test("the title falls back from the stats name to the card wall's name to the id
   const named = createSpace({ client: statsClient(() => makeStats({ agentId: "hw/layout", agent: { displayName: "layout（hw）", teamKey: "hw" } })), agentId: "hw/layout" });
   await named.open();
   assert.equal(named.targets.title.textContent, "layout（hw）", "the backend's own degraded display name is used as sent");
-  assert.ok(named.targets.meta.textContent.includes("部門 hw"), "a team without a name shows its key");
+  assert.ok(!named.targets.meta.textContent.includes("部門"), "the header carries no department");
   const noTeam = createSpace({ client: statsClient(() => makeStats({ agent: { displayName: "獨行俠", teamKey: "" } })) });
   await noTeam.open();
-  assert.ok(noTeam.targets.meta.textContent.includes(`部門 ${STRINGS["home.team.none"]}`));
+  assert.ok(!noTeam.targets.meta.textContent.includes("部門"), "the header carries no department");
 });
 
 test("hostile ids, names and texts are escaped everywhere on the page", async () => {

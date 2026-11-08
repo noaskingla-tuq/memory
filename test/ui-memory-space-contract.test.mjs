@@ -49,7 +49,7 @@ test("the page draws the real ui.agentStats answer: counts, names from the table
   assert.equal(client.calls.length, 1);
   assert.equal(targets.title.textContent, "開發工程師");
   const mine = made.filter((row) => row.agentId === AGENT);
-  assert.ok(targets.meta.textContent.includes(`累積 ${mine.length} 筆`) && targets.meta.textContent.includes("部門 軟體組") && targets.meta.textContent.includes("職稱 寫程式的人"), targets.meta.textContent);
+  assert.ok(targets.meta.textContent.includes(`累積 ${mine.length} 筆`) && targets.meta.textContent.includes("最近寫入 ") && !targets.meta.textContent.includes("部門") && !targets.meta.textContent.includes("職稱"), targets.meta.textContent);
   const body = targets.body.innerHTML;
   const spaces = sectionOf(body, "space-h-spaces");
   const personal = mine.filter((row) => row.projectId === null).length;
@@ -75,7 +75,7 @@ test("without a name table the page still has a title, a project name and a team
   assert.equal(space.view().phase, "ready");
   assert.equal(targets.title.textContent, "dev（sw）");
   assert.equal(targets.id.textContent, AGENT);
-  assert.ok(targets.meta.textContent.includes("部門 sw"));
+  assert.ok(targets.meta.textContent.includes("累積 ") && !targets.meta.textContent.includes("部門"), "the header keeps only the total and the last write");
   assert.ok(sectionOf(targets.body.innerHTML, "space-h-spaces").includes(">專案 p1<"));
 });
 
@@ -122,5 +122,4 @@ test("an incomplete name table reaches the home banner with the counts Core repo
   await home.start();
   assert.equal(home.view().profile.incomplete, true);
   assert.ok(targets.banner.innerHTML.includes("有 3 位 agent、1 個專案 沒收進來"), targets.banner.innerHTML);
-  assert.ok(targets.banner.innerHTML.includes("記憶本身不受影響"));
 });

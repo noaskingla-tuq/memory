@@ -86,7 +86,7 @@ test("profile.corrupt tells the reader the names could not be read, that ids are
   const { banner, home } = await bannerOf(profileOf({ corrupt: true, incomplete: false, omitted: { agents: 0, teams: 0, projects: 0 } }));
   assert.ok(banner.includes('data-notice="profile"') && banner.includes('role="status"'));
   assert.ok(banner.includes(STRINGS["home.profile.corrupt"]));
-  assert.ok(STRINGS["home.profile.corrupt"].includes("代號") && STRINGS["home.profile.corrupt"].includes("記憶本身不受影響"));
+  assert.ok(STRINGS["home.profile.corrupt"].includes("代號") && STRINGS["home.profile.corrupt"].includes("記憶不受影響"));
   assert.equal(home.view().profile.corrupt, true);
   assert.equal(count(banner, /<div class="notice"/gu), 1);
 });
@@ -100,7 +100,7 @@ test("profile.incomplete names how many agents, departments and projects lost th
   for (const [omitted, detail] of cases) {
     const { banner } = await bannerOf(profileOf({ incomplete: true, corrupt: false, omitted }));
     assert.ok(banner.includes(`有 ${detail} 沒收進來`), `${detail} in ${banner}`);
-    assert.ok(banner.includes("先用代號顯示") && banner.includes("記憶本身不受影響"));
+    assert.ok(banner.includes("先用代號顯示"));
     assert.ok(banner.includes('data-notice="profile"'));
   }
 });

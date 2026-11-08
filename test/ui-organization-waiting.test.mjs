@@ -39,7 +39,7 @@ test("the agent page shows how long the AI has been replying, and switches to th
   assert.ok(edge.includes('data-ao-waiting="normal"'), "exactly 270 seconds is not yet over the limit");
   const warn = ui.agentOrgSection(model({ run: run(), waitingMs: 271_000 })).value;
   assert.ok(warn.includes('data-ao-waiting="warn"'));
-  assert.ok(warn.includes("AI 回覆中，已等待 271 秒，超過 270 秒仍沒有結果"));
+  assert.ok(warn.includes("AI 已等 271 秒，超過 270 秒，稍後自動中止"));
   assert.ok(!ui.agentOrgSection(model({ run: run() })).value.includes("data-ao-waiting"), "no wait, no line");
   assert.ok(ui.agentOrgSection(model({ waitingMs: 0 })).value.includes("已等待 0 秒"), "zero is a wait, not an absence");
 });
@@ -51,7 +51,7 @@ test("the status line shows the wait in the folded line and in the panel, and wa
   assert.equal(calm.state, "ok");
   const slow = await statusMarkup(organization({ waiting: { sinceMs: 271_000 } }));
   assert.ok(slow.html.includes('data-waiting="warn"'));
-  assert.ok(slow.html.includes("AI 回覆已等待 271 秒，超過 270 秒，稍後會自動中止"));
+  assert.ok(slow.html.includes("AI 已等 271 秒，超過 270 秒，稍後自動中止"));
   assert.equal(slow.state, "warn");
   const none = await statusMarkup(organization({ waiting: null }));
   assert.ok(!none.html.includes("data-waiting") && !none.html.includes("已等待"));
@@ -129,14 +129,14 @@ test("both screens warn at the same threshold: 270 seconds after the send, which
 test("a stall pause says how many stalls in a row, and both ways to resume, on the status line and on the agent page", async () => {
   const stalled = organization({ state: "paused", pauseReason: "stall", stall: { count: 3, limit: 3 }, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: "stall_paused", retryable: true });
   const open = await statusMarkup(stalled);
-  assert.ok(open.html.includes("連續卡住 3 次，已暫停"), open.html);
+  assert.ok(open.html.includes("連續卡住 3 次"), open.html);
   assert.ok(open.html.includes("按「立即整理」試一筆"));
-  assert.ok(open.html.includes("把整理關掉再打開"));
+  assert.ok(open.html.includes("關掉再打開整理"));
   const folded = await statusMarkup(stalled, false);
   assert.ok(folded.html.includes("AI 整理已暫停（連續卡住 3 次）"));
   const page = ui.agentOrgSection(model({ pauseReason: "stall", stallCount: 3 })).value;
   assert.ok(page.includes('data-ao-note="stalled"'));
-  assert.ok(page.includes("連續卡住 3 次，已暫停") && page.includes("只會試一筆") && page.includes("把整理關掉再打開"));
+  assert.ok(page.includes("連續卡住 3 次，已暫停") && page.includes("試一筆") && page.includes("關掉整理再打開"));
   assert.ok(!ui.agentOrgSection(model()).value.includes("data-ao-note=\"stalled\""), "no stall, no note");
   const older = await statusMarkup(organization({ state: "paused", lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: "stall_paused" }));
   assert.ok(older.html.includes("AI 整理暫停"), "an answer without the new fields reads as before");
@@ -145,28 +145,28 @@ test("a stall pause says how many stalls in a row, and both ways to resume, on t
 test("an old error and the legacy job count read as neutral notes: no pause wording and no warning colour", async () => {
   const real = await statusMarkup(organization({ state: "idle", lastError: "RESOURCE_BUSY", errorPhase: "session_resume", retryable: true, legacyUnlinked: 3398, legacyTrialCandidates: 3207, pending: 7406 }));
   assert.equal(real.state, "ok");
-  assert.ok(real.html.includes("先前有工作遇到 RESOURCE_BUSY，不影響目前整理"), real.html);
-  assert.ok(real.html.includes("舊佇列有 3398 筆工作不會自動整理"));
+  assert.ok(real.html.includes("先前遇到 RESOURCE_BUSY，輪到時會自動重試"), real.html);
+  assert.ok(real.html.includes("舊工作 3398 筆不會自動整理"));
   assert.ok(!real.html.includes("暫停"), "nothing in the status line says paused");
   const folded = await statusMarkup(organization({ state: "idle", lastError: "RESOURCE_BUSY", legacyUnlinked: 3398 }), false);
   assert.ok(!folded.html.includes("暫停"));
   const error = await statusMarkup(organization({ state: "error", lastError: "STORAGE_BUSY", errorPhase: "commit" }));
-  assert.ok(!error.html.includes("先前有工作遇到"), "a real error keeps its own wording");
+  assert.ok(!error.html.includes("先前遇到"), "a real error keeps its own wording");
 });
 
 test("while the work records are syncing, the status line and the agent page say so instead of showing a run at 0 of N", async () => {
   const folded = await statusMarkup(organization({ state: "idle", syncing: true }), false);
-  assert.ok(folded.html.includes("正在同步工作紀錄，同步完成後開始整理"), folded.html);
+  assert.ok(folded.html.includes("同步工作紀錄中"), folded.html);
   assert.ok(!folded.html.includes("AI 整理已啟用"));
   const open = await statusMarkup(organization({ state: "idle", syncing: true, pending: 0 }));
   assert.ok(open.html.includes("data-syncing"));
   assert.ok(!open.html.includes("待整理 0"), "the counts are not known yet, so they are not shown");
   const page = ui.agentOrgSection(model({ run: run({ done: 0, failed: 0, untried: 23, total: 23 }), syncing: true })).value;
-  assert.ok(page.includes("正在同步工作紀錄，同步完成後開始整理"));
-  assert.ok(!page.includes("整理中：已處理") && !page.includes("<progress"), page);
+  assert.ok(page.includes("同步工作紀錄中"));
+  assert.ok(!page.includes("整理中 0／23") && !page.includes("<progress"), page);
   const idle = ui.agentOrgSection(model({ syncing: true })).value;
-  assert.ok(idle.includes("正在同步工作紀錄"));
-  assert.ok(ui.agentOrgSection(model({ run: run() })).value.includes("整理中：已處理"), "without syncing the run reads as before");
+  assert.ok(idle.includes("同步工作紀錄中"));
+  assert.ok(ui.agentOrgSection(model({ run: run() })).value.includes("整理中 7／20"), "without syncing the run reads as before");
 });
 
 test("the controller reads syncing, pauseReason and stall from the agent answer", async () => {
@@ -178,6 +178,6 @@ test("the controller reads syncing, pauseReason and stall from the agent answer"
   const target = { innerHTML: "" };
   await org.attach(target, AGENT);
   assert.equal(org.model().syncing, true);
-  assert.ok(target.innerHTML.includes("正在同步工作紀錄"));
+  assert.ok(target.innerHTML.includes("同步工作紀錄中"));
   assert.equal(parseUiResponse("ui.agentOrganization", answers[0]), true);
 });

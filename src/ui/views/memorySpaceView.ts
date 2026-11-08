@@ -17,7 +17,7 @@ import {
   type SpaceItem,
   type SpaceRows,
 } from "../state/memorySpace.js";
-import { displayName, idTail, teamLabel, type OverviewAgent } from "../state/teamHome.js";
+import { displayName, idTail, type OverviewAgent } from "../state/teamHome.js";
 import { axis, barRow, columnChart, spaceBarRow } from "./memorySpaceCharts.js";
 
 export const SPACE_TITLE_ID = "space-title";
@@ -36,7 +36,7 @@ const number = (value: number): string => value.toLocaleString("zh-TW");
 
 // why: the timeline slot lives in the shell, outside the body that the stats controller re-renders, so the timeline slice can mount into it without being wiped by a stats refresh
 export const spaceShell = (): SafeHtml => html`<p><a class="btn-link" href="#/" data-back>${t("space.back")}</a></p>
-<header class="space-head"><span id="space-avatar"></span><div class="space-who"><h2 id="space-title" tabindex="-1"></h2><p id="space-id" class="acard-id"></p><p id="space-meta" class="muted"></p><p class="space-intro">${t("space.intro")}</p></div></header>
+<header class="space-head"><span id="space-avatar"></span><div class="space-who"><h2 id="space-title" tabindex="-1"></h2><p id="space-id" class="acard-id"></p><p id="space-meta" class="muted"></p></div></header>
 <div id="space-body" class="space-body"></div>
 <div id="space-org" class="ao" data-slot="org"></div>
 <div id="space-timeline" data-slot="timeline"></div>`;
@@ -53,13 +53,8 @@ export function spaceMeta(view: SpaceView, nowMs: number): string {
   const { stats, hint } = view;
   if (stats === null) return view.phase === "loading" && hint !== undefined ? t("space.summary", { count: number(hint.counts.total), ago: relativeTime(hint.lastAt, nowMs) }) : "";
   const totals = spaceTotals(stats.namespaces);
-  const teamKey = stats.agent?.teamKey ?? hint?.team.key;
-  const title = firstText(stats.agent?.title, hint?.title);
   const parts: string[] = [];
-  if (teamKey !== undefined) parts.push(t("space.meta.team", { team: teamLabel(teamKey, firstText(stats.agent?.teamName, hint?.team.name)) }));
-  if (title !== undefined) parts.push(t("space.meta.title", { title }));
   parts.push(t("space.meta.total", { count: number(totals.total) }));
-  if (totals.firstMs !== null) parts.push(t("space.meta.first", { date: localDate(new Date(totals.firstMs)) }));
   if (totals.lastMs !== null) parts.push(t("space.meta.last", { ago: relativeTime(new Date(totals.lastMs).toISOString(), nowMs) }));
   return parts.join(t("space.meta.separator"));
 }
@@ -110,7 +105,7 @@ function repeatSection(stats: AgentStats): SafeHtml {
   const top = stats.repeatedRequests[0]?.count ?? 1;
   const rows = stats.repeatedRequests.map((entry) => barRow(entry.title, entry.title, t("space.repeat.times", { n: number(entry.count) }), (entry.count / top) * 100));
   const body = rows.length === 0 ? html`<p class="muted">${t("space.repeat.empty")}</p>` : html`<ul class="bars">${rows}</ul>`;
-  return section("space-h-repeat", t("space.repeat.title"), html`${body}<p class="muted">${t("space.repeat.note")}</p>`);
+  return section("space-h-repeat", t("space.repeat.title"), body);
 }
 
 function whenOf(item: SpaceItem): string {
@@ -131,7 +126,7 @@ function representativeCard(item: SpaceItem): SafeHtml {
 
 function representativeSection(stats: AgentStats): SafeHtml {
   const body = stats.representative.length === 0 ? html`<p class="muted">${t("space.rep.empty")}</p>` : html`<div class="rep-grid">${stats.representative.map(representativeCard)}</div>`;
-  return section("space-h-rep", t("space.rep.title"), html`${body}<p class="muted">${t("space.rep.note")}</p>`);
+  return section("space-h-rep", t("space.rep.title"), body);
 }
 
 function renderReady(stats: AgentStats): SafeHtml {

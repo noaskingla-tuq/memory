@@ -95,7 +95,6 @@ export function fakeTargets() {
     tiles: { innerHTML: "" },
     tools: { innerHTML: "" },
     count: { textContent: "" },
-    note: { textContent: "" },
     wall: { innerHTML: "" },
   };
 }

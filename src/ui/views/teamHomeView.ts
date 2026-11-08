@@ -47,7 +47,6 @@ export const homeShell = (): SafeHtml => html`<div id="home-help"></div>
 <div id="home-banner"></div>
 <div id="home-tiles"></div>
 <div class="wall-tools"><div id="home-tools" class="wall-controls"></div><p id="home-count" class="muted count" aria-live="polite"></p></div>
-<p id="home-note" class="note"></p>
 <div id="home-wall"></div>`;
 
 function actionFor(error: ErrorDescription, retryAct: "reload" | "loadMore"): SafeHtml {
@@ -127,10 +126,6 @@ export function renderCount(view: HomeView, announceMore: boolean): string {
   return view.hasMore && view.team === null ? t("home.count.partial", { shown, total }) : t("home.count.shown", { shown });
 }
 
-export function renderNote(view: HomeView): string {
-  return view.phase === "ready" && view.agents.length > 0 ? t("home.projectNote") : "";
-}
-
 function projectChip(project: ProjectCount): SafeHtml {
   return html`<span class="chip">${t("card.project", { name: projectLabel(project), n: number(project.count) })}</span>`;
 }
@@ -159,7 +154,7 @@ function skeletonWall(): SafeHtml {
 }
 
 function emptyWall(): SafeHtml {
-  return html`<div class="empty"><h2>${t("home.empty.title")}</h2><p>${t("home.empty.body")}</p><p>${t("home.help.body")}</p><p class="muted">${t("home.projectNote")}</p></div>`;
+  return html`<div class="empty"><h2>${t("home.empty.title")}</h2><p>${t("home.empty.body")}</p><p>${t("home.help.body")}</p></div>`;
 }
 
 function loadMoreArea(view: HomeView): SafeHtml {

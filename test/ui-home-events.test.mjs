@@ -42,7 +42,7 @@ test("changes on the department and sort selects carry their value, and other ch
 
 test("the home shell has every container the controller writes into, and only safe markup", () => {
   const markup = homeShell().value;
-  for (const id of ["home-help", "home-banner", "home-tiles", "home-tools", "home-count", "home-note", "home-wall"]) assert.ok(markup.includes(`id="${id}"`), id);
+  for (const id of ["home-help", "home-banner", "home-tiles", "home-tools", "home-count", "home-wall"]) assert.ok(markup.includes(`id="${id}"`), id);
   assert.ok(markup.includes('id="home-count" class="muted count" aria-live="polite"'), "the count is a live region");
   assert.equal(tokenize(markup).rest.trim(), "");
 });

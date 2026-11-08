@@ -21,12 +21,12 @@ const pickerLabels: Readonly<Record<"organizationProvider" | "organizationModel"
 function checkboxInput(disabled: boolean, checked: boolean): SafeHtml {
   if (checked) {
     return disabled
-      ? html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" checked aria-describedby="settings-enabled-help settings-enabled-effect settings-enabled-status" disabled>`
-      : html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" checked aria-describedby="settings-enabled-help settings-enabled-effect settings-enabled-status">`;
+      ? html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" checked aria-describedby="settings-enabled-help settings-enabled-status" disabled>`
+      : html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" checked aria-describedby="settings-enabled-help settings-enabled-status">`;
   }
   return disabled
-    ? html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" aria-describedby="settings-enabled-help settings-enabled-effect settings-enabled-status" disabled>`
-    : html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" aria-describedby="settings-enabled-help settings-enabled-effect settings-enabled-status">`;
+    ? html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" aria-describedby="settings-enabled-help settings-enabled-status" disabled>`
+    : html`<input id="settings-enabled" data-setting-key="organizationEnabled" type="checkbox" aria-describedby="settings-enabled-help settings-enabled-status">`;
 }
 
 function textInput(id: string, key: SettingKey, value: string, placeholder: string, describedBy: string, disabled: boolean): SafeHtml {
@@ -85,7 +85,7 @@ function organizationField(snapshot: SettingsSnapshot, disabled: boolean): SafeH
   const checked = snapshot.draft?.[key] === true;
   const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
   return html`<div class="setting-row setting-row-switch">
-    <div class="setting-copy"><label for="settings-enabled">${t("settings.enabled.label")}</label><p id="settings-enabled-help">${t("settings.enabled.help")}</p><p id="settings-enabled-effect">${t("settings.enabled.effect")}</p>${conflictCopy(snapshot, key)}</div>
+    <div class="setting-copy"><label for="settings-enabled">${t("settings.enabled.label")}</label><p id="settings-enabled-help">${t("settings.enabled.help")}</p>${conflictCopy(snapshot, key)}</div>
     <div class="setting-control"><label class="settings-switch" for="settings-enabled">${checkboxInput(disabled, checked)}<span class="settings-switch-track" aria-hidden="true"></span><span class="settings-switch-state">${checked ? t("settings.enabled.on") : t("settings.enabled.off")}</span></label><p id="settings-enabled-status" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }
@@ -95,8 +95,8 @@ function frequencyField(snapshot: SettingsSnapshot, disabled: boolean): SafeHtml
   const value = snapshot.draft?.[key] as string ?? "daily";
   const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
   return html`<div class="setting-row">
-    <div class="setting-copy"><label for="settings-frequency">${t(labels[key])}</label><p id="settings-frequency-help">${t("settings.frequency.help")}</p><p id="settings-frequency-effect">${t("settings.frequency.effect")}</p>${conflictCopy(snapshot, key)}</div>
-    <div class="setting-control">${frequencySelect(value, "settings-frequency-help settings-frequency-effect settings-frequency-status", disabled)}<p id="settings-frequency-status" class="setting-key-status" aria-live="polite">${status}</p></div>
+    <div class="setting-copy"><label for="settings-frequency">${t(labels[key])}</label><p id="settings-frequency-help">${t("settings.frequency.help")}</p>${conflictCopy(snapshot, key)}</div>
+    <div class="setting-control">${frequencySelect(value, "settings-frequency-help settings-frequency-status", disabled)}<p id="settings-frequency-status" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }
 
@@ -109,10 +109,10 @@ function dailyTimeField(snapshot: SettingsSnapshot, disabled: boolean): SafeHtml
     ? html`<p id="settings-daily-time-issue" class="setting-note setting-invalid" role="alert">${t("settings.dailyTime.invalid")}</p>`
     : html``;
   const issueId = snapshot.dailyTimeIssue === null ? "" : "settings-daily-time-issue";
-  const describedBy = ["settings-daily-time-help", "settings-daily-time-effect", "settings-daily-time-status", issueId].filter((part) => part !== "").join(" ");
+  const describedBy = ["settings-daily-time-help", "settings-daily-time-status", issueId].filter((part) => part !== "").join(" ");
   const disabledHelp = isDisabled ? html`<p class="setting-note">${t("settings.dailyTime.disabled")}</p>` : html``;
   return html`<div class="setting-row">
-    <div class="setting-copy"><label for="settings-daily-time">${t(labels[key])}</label><p id="settings-daily-time-help">${t("settings.dailyTime.help")}</p><p id="settings-daily-time-effect">${t("settings.dailyTime.effect")}</p>${disabledHelp}${issue}${conflictCopy(snapshot, key)}</div>
+    <div class="setting-copy"><label for="settings-daily-time">${t(labels[key])}</label><p id="settings-daily-time-help">${t("settings.dailyTime.help")}</p>${disabledHelp}${issue}${conflictCopy(snapshot, key)}</div>
     <div class="setting-control">${dailyTimeInput(value, describedBy, isDisabled, snapshot.dailyTimeIssue === "invalid")}<p id="settings-daily-time-status" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }
@@ -121,10 +121,9 @@ function textField(snapshot: SettingsSnapshot, key: "organizationProvider" | "or
   const provider = key === "organizationProvider";
   const id = provider ? "settings-provider" : "settings-model";
   const helpId = `${id}-help`;
-  const effectId = `${id}-effect`;
   const statusId = `${id}-status`;
   const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
-  const describedBy = `${helpId} ${effectId} ${statusId}`;
+  const describedBy = `${helpId} ${statusId}`;
   const value = snapshot.draft?.[key] as string ?? "";
   const picker = choices.status === "ready";
   const control = picker
@@ -133,7 +132,7 @@ function textField(snapshot: SettingsSnapshot, key: "organizationProvider" | "or
       : modelSelect(choices.options, snapshot.draft?.organizationProvider ?? "", value, describedBy, disabled)
     : textInput(id, key, value, t(provider ? "settings.provider.placeholder" : "settings.model.placeholder"), describedBy, disabled || choices.status === "pending");
   return html`<div class="setting-row">
-    <div class="setting-copy"><label for="${id}">${t(picker ? pickerLabels[key] : labels[key])}</label><p id="${helpId}">${t(picker ? (provider ? "settings.provider.helpSelect" : "settings.model.helpSelect") : (provider ? "settings.provider.help" : "settings.model.help"))}</p><p id="${effectId}">${t(picker ? (provider ? "settings.provider.effectSelect" : "settings.model.effectSelect") : (provider ? "settings.provider.effect" : "settings.model.effect"))}</p>${conflictCopy(snapshot, key)}</div>
+    <div class="setting-copy"><label for="${id}">${t(picker ? pickerLabels[key] : labels[key])}</label><p id="${helpId}">${t(picker ? (provider ? "settings.provider.helpSelect" : "settings.model.helpSelect") : (provider ? "settings.provider.help" : "settings.model.help"))}</p>${conflictCopy(snapshot, key)}</div>
     <div class="setting-control">${control}<p id="${statusId}" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }
@@ -148,9 +147,9 @@ function budgetField(snapshot: SettingsSnapshot, disabled: boolean): SafeHtml {
       ? html`<p id="settings-budget-issue" class="setting-note" role="status">${t("settings.budget.offStep", { value })}</p>`
       : html``;
   const issueId = snapshot.budgetIssue === null ? "" : "settings-budget-issue";
-  const describedBy = ["settings-budget-help", "settings-budget-effect", "settings-budget-status", issueId].filter((part) => part !== "").join(" ");
+  const describedBy = ["settings-budget-help", "settings-budget-status", issueId].filter((part) => part !== "").join(" ");
   return html`<div class="setting-row">
-    <div class="setting-copy"><label for="settings-budget">${t("settings.budget.label")}</label><p id="settings-budget-help">${t("settings.budget.help")}</p><p id="settings-budget-effect">${t("settings.budget.effect")}</p>${issue}${conflictCopy(snapshot, key)}</div>
+    <div class="setting-copy"><label for="settings-budget">${t("settings.budget.label")}</label><p id="settings-budget-help">${t("settings.budget.help")}</p>${issue}${conflictCopy(snapshot, key)}</div>
     <div class="setting-control">${rangeInput(value, describedBy, disabled, snapshot.budgetIssue === "invalid")}<output class="settings-budget-value" for="settings-budget" data-budget-value>${value.toLocaleString("en-US")} ${t("settings.bytes")}</output><p id="settings-budget-status" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }

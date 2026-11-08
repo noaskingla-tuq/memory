@@ -27,7 +27,7 @@ test("100 agents: the first page is 60 cards, load more brings the other 40 with
   assert.equal(backend.calls[0].params.cursor, undefined);
   assert.equal(count(targets.wall.innerHTML, /class="acard"/gu), 60);
   assert.ok(targets.wall.innerHTML.includes('data-act="loadMore"'));
-  assert.equal(targets.count.textContent, "已載入 60 位，共 100 位 agent");
+  assert.equal(targets.count.textContent, "60／100 位 agent");
   const firstIds = cardIds(targets.wall.innerHTML);
   assert.equal(new Set(firstIds).size, 60);
 
@@ -39,7 +39,7 @@ test("100 agents: the first page is 60 cards, load more brings the other 40 with
   assert.equal(new Set(ids).size, 100, "no card appears twice");
   assert.deepEqual([...ids].sort(), agents100.map((agent) => agent.id).sort());
   assert.ok(!targets.wall.innerHTML.includes('data-act="loadMore"'), "the button is gone when nothing is left");
-  assert.equal(targets.count.textContent, "已載入更多，現在顯示 100 位 agent");
+  assert.equal(targets.count.textContent, "已載入更多，共 100 位");
   assert.equal(count(targets.wall.innerHTML, /<section class="team"/gu), 10);
   for (const group of targets.wall.innerHTML.split('<section class="team"').slice(1)) {
     const teams = new Set([...group.matchAll(/data-agent-id="(team\d)\//gu)].map((match) => match[1]));
@@ -66,9 +66,9 @@ test("the summary tiles, department headers and card facts read the way the desi
   const tiles = targets.tiles.innerHTML;
   assert.ok(tiles.includes("<span>累積記憶</span>"));
   assert.ok(tiles.includes("今天寫入") && !tiles.includes("今天新增"));
-  assert.ok(tiles.includes("<b>62</b>") && tiles.includes("近 7 天有工作的 agent") && tiles.includes("<b>2 / 2</b>"));
+  assert.ok(tiles.includes("<b>62</b>") && tiles.includes("近 7 天活躍") && tiles.includes("<b>2 / 2</b>"));
   const wall = targets.wall.innerHTML;
-  assert.ok(wall.includes("最近記得：") && wall.includes("最近做的事 3"));
+  assert.ok(wall.includes("最近：") && wall.includes("最近做的事 3"));
   assert.ok(wall.includes("個人 4") && wall.includes("官網改版 8") && wall.includes("專案 p2 3"));
   assert.ok(wall.includes("＋2 以上"), "three shown projects, two hidden, and more beyond the five");
   assert.equal(count(wall, /<rect/gu), 28, "two 14-day sparklines");
@@ -106,7 +106,6 @@ test("an empty memory explains where memories come from and that project memory 
   const wall = targets.wall.innerHTML;
   assert.ok(wall.includes(STRINGS["home.empty.title"]) && wall.includes(STRINGS["home.empty.body"]));
   assert.ok(wall.includes(STRINGS["home.help.body"]), "how a memory comes about");
-  assert.ok(wall.includes(STRINGS["home.projectNote"]), "the project memory note (D9) shows even with nothing to list");
   assert.equal(count(wall, /class="acard"/gu), 0);
   assert.equal(targets.tools.innerHTML, "");
   assert.equal(targets.help.innerHTML, "", "the first-use panel is not stacked on the empty state");
@@ -131,10 +130,10 @@ test("the first-use explanation shows once, is remembered when dismissed and can
   assert.ok(second.targets.help.innerHTML.includes("記憶是怎麼來的"));
 });
 
-test("the project note is on the page whenever there are cards", async () => {
+test("the project note is gone: the cards are the only thing under the tools", async () => {
   const { home, targets } = createHome({ client: pagedBackend(agents100.slice(0, 3)) });
   await home.start();
-  assert.equal(targets.note.textContent, "專案記憶只在任務有掛上專案時才會出現；沒掛專案的工作都記在「個人」。");
+  assert.ok(!("note" in targets) && !targets.wall.innerHTML.includes("專案記憶只在任務有掛上專案"));
 });
 
 test("while the first page is on its way the page shows skeleton tiles and cards, announced as reading", async () => {
@@ -145,7 +144,7 @@ test("while the first page is on its way the page shows skeleton tiles and cards
   assert.equal(home.view().phase, "loading");
   assert.equal(count(targets.wall.innerHTML, /class="acard skeleton"/gu), 6);
   assert.equal(count(targets.tiles.innerHTML, /card tile skeleton/gu), 3);
-  assert.ok(targets.wall.innerHTML.includes('role="status"') && targets.wall.innerHTML.includes("正在讀取記憶…"));
+  assert.ok(targets.wall.innerHTML.includes('role="status"') && targets.wall.innerHTML.includes("讀取中…"));
   assert.equal(count(targets.wall.innerHTML, /class="acard"/gu), 0);
   release();
   await started;
@@ -219,7 +218,7 @@ test("an incomplete overview warns that the numbers may be short, and unreadable
   await home.start();
   assert.ok(targets.banner.innerHTML.includes(STRINGS["overview.incomplete"]));
   assert.ok(targets.banner.innerHTML.includes('data-act="reload"') && targets.banner.innerHTML.includes("重新整理"));
-  assert.ok(targets.banner.innerHTML.includes("有 2 位 agent 的記憶庫目前讀不到"));
+  assert.ok(targets.banner.innerHTML.includes("有 2 位 agent 讀不到"));
   const complete = createHome({ client: pagedBackend(agents100.slice(0, 3)) });
   await complete.home.start();
   assert.equal(complete.targets.banner.innerHTML, "");
@@ -245,7 +244,7 @@ test("the department filter and the three sort orders act on what is loaded", as
   assert.equal(count(targets.wall.innerHTML, /class="acard"/gu), 10);
   assert.ok(cardIds(targets.wall.innerHTML).every((id) => id.startsWith("team4/")));
   assert.equal(count(targets.wall.innerHTML, /<section class="team"/gu), 1);
-  assert.equal(targets.count.textContent, "顯示 10 位 agent");
+  assert.equal(targets.count.textContent, "10 位 agent");
   home.setTeam("t:no-such-team");
   assert.equal(count(targets.wall.innerHTML, /class="acard"/gu), 100, "an unknown department falls back to all");
   home.setTeam("");

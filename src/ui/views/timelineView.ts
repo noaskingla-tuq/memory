@@ -56,8 +56,7 @@ const number = (value: number): string => value.toLocaleString("zh-TW");
 
 export const timelineShell = (): SafeHtml => html`<section class="tl" aria-labelledby="tl-title">
 <h2 id="tl-title" class="tl-h" tabindex="-1">${t("tl.title")}</h2>
-<form id="tl-form" class="tl-search" role="search" data-tl-form><label class="sr" for="tl-query">${t("tl.search.label")}</label><input id="tl-query" name="q" type="search" maxlength="100" autocomplete="off" placeholder="${t("tl.search.placeholder")}" aria-describedby="tl-hint"><button type="submit" class="btn btn-primary">${t("tl.search.submit")}</button></form>
-<p id="tl-hint" class="muted tl-hint">${t("tl.search.hint")}</p>
+<form id="tl-form" class="tl-search" role="search" data-tl-form><label class="sr" for="tl-query">${t("tl.search.label")}</label><input id="tl-query" name="q" type="search" maxlength="100" autocomplete="off" placeholder="${t("tl.search.placeholder")}"><button type="submit" class="btn btn-primary">${t("tl.search.submit")}</button></form>
 <div class="tl-tools"><div id="tl-filters" class="tl-filters"></div><div id="tl-clear"></div></div>
 <div id="tl-banner"></div>
 <p id="tl-count" class="muted count" aria-live="polite"></p>
@@ -180,5 +179,5 @@ export function renderList(view: TimelineView, nowMs: number): SafeHtml {
   }
   const terms = view.searching ? termsOf(view.normalizedQuery ?? view.query) : [];
   const groups = groupByDay(view.items, nowMs).map((group) => html`<section class="tl-day" aria-label="${group.label}"><h3 class="day">${group.label}</h3>${group.items.map((item) => renderItem(item, terms))}</section>`);
-  return html`<p class="muted tl-order">${t("tl.order")}</p>${groups}${moreArea(view)}`;
+  return html`${groups}${moreArea(view)}`;
 }

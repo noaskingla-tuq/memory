@@ -199,7 +199,7 @@ test("the organization worker records the close timeout with its phase and plugi
   assert.equal(uiStatus.organization.errorPhase, "session_close");
   assert.equal(uiStatus.organization.localErrorCode, "close_timeout");
   assert.equal(target.innerHTML.includes("AI 整理暫停"), false, "a job's old error that stops nothing is not shown as a pause");
-  assert.ok(target.innerHTML.includes("先前有工作遇到 RESOURCE_BUSY"), "it reads as a neutral note");
+  assert.ok(target.innerHTML.includes("先前遇到 RESOURCE_BUSY"), "it reads as a neutral note");
   assert.ok(target.innerHTML.includes("close_timeout"), "the plugin-decided code stays in the diagnostics");
 });
 

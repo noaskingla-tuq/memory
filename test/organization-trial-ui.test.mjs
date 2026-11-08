@@ -87,7 +87,7 @@ test("U1: the trial controls sit in the status panel outside <details> and are s
   assert.ok(detailsAt > 0);
   assert.ok(idle.indexOf('data-trial="open"') > 0 && idle.indexOf('data-trial="open"') < detailsAt, "the open button is above the details, not inside them");
   assert.ok(!idle.slice(detailsAt).includes("data-trial="), "nothing that drives the trial is inside the details");
-  assert.ok(idle.includes("舊佇列有 90 筆工作不會自動整理（可小量試跑）"));
+  assert.ok(idle.includes("舊工作 90 筆不會自動整理"));
   assert.ok(idle.includes('data-trial-n="80"'), "the dialog count is the candidate count");
 
   const running = await render(organization({ trial: trial() }));
@@ -150,7 +150,7 @@ test("U2b: cancelling sends nothing, stop sends a stop, and a blocked or failed 
   s.click("stop");
   await flush();
   assert.equal(s.calls[0].params.action, "stop");
-  assert.ok(dialogText(s).includes("目前沒有進行中的試跑。"));
+  assert.ok(dialogText(s).includes("沒有進行中的試跑。"));
   s.doc.dispatch(s.labelled("知道了"), "click", {});
   await flush();
   s.click("stop");
@@ -183,12 +183,12 @@ test("U3: every trial string exists, reads as Taiwan Traditional Chinese, and th
 
 test("R2: the count in the confirm dialog is the number that can be tried, not every paused legacy job", async () => {
   const idle = await render(organization({ legacyUnlinked: 90, legacyTrialCandidates: 80 }));
-  assert.ok(idle.includes("舊佇列有 90 筆工作不會自動整理"), "the status line still counts every paused job");
+  assert.ok(idle.includes("舊工作 90 筆不會自動整理"), "the status line still counts every paused job");
   assert.ok(idle.includes('data-trial-n="80"') && !idle.includes('data-trial-n="90"'), "the button carries the candidate count");
   const s = scene([], "80");
   s.click("open");
   const shown = dialogText(s);
-  assert.ok(shown.includes("80 筆舊工作可以試跑"), "the dialog states the number the button carried");
+  assert.ok(shown.includes("有 80 筆舊工作可試跑"), "the dialog states the number the button carried");
   assert.ok(!shown.includes("暫停中"), "the dialog no longer calls the number the paused total");
   s.doc.dispatch(s.labelled("取消"), "click", {});
   await flush();

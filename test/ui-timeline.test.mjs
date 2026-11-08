@@ -29,7 +29,7 @@ test("paging 100 memories 12 at a time shows every memory once, newest first, wi
   assert.deepEqual(shown, expectedIds(memories100), "same set, same order as the backend's keyset order");
   assert.ok(!targets.list.innerHTML.includes('data-tl="loadMore"'), "the button is gone when nothing is left");
   assert.equal(timeline.view().hasMore, false);
-  assert.equal(targets.count.textContent, "已載入更多，現在共 100 筆");
+  assert.equal(targets.count.textContent, "已載入更多，共 100 筆");
 });
 
 test("every continuation asks for exactly the cursor the previous page returned", async () => {
@@ -77,7 +77,7 @@ test("an empty page that still carries a cursor keeps the load-more button and d
   const client = { async call(method, params) { if (method === "ui.agentStats") return failure("NOT_FOUND"); calls.push(params); return { ok: true, value: pages[calls.length - 1] }; } };
   const { timeline, targets, open } = createTimelineFor({ client });
   await open();
-  assert.ok(targets.list.innerHTML.includes("後面還有資料沒掃完"));
+  assert.ok(targets.list.innerHTML.includes("可繼續載入更多"));
   assert.ok(targets.list.innerHTML.includes('data-tl="loadMore"'));
   assert.ok(!targets.list.innerHTML.includes("還沒有記憶"));
   await timeline.loadMore();
@@ -88,7 +88,7 @@ test("an empty page that still carries a cursor keeps the load-more button and d
 test("no memories at all says so in plain words and offers no load-more", async () => {
   const { targets, open } = createTimelineFor({ client: fakeBackend([]) });
   await open();
-  assert.ok(targets.list.innerHTML.includes("還沒有記憶") && targets.list.innerHTML.includes("AI 夥伴完成工作後，記憶會自動出現在這裡。"));
+  assert.ok(targets.list.innerHTML.includes("還沒有記憶") && targets.list.innerHTML.includes("agent 完成工作後，記憶會自動出現。"));
   assert.ok(!targets.list.innerHTML.includes('data-tl="loadMore"'));
   assert.equal(targets.count.textContent, "");
 });
@@ -195,7 +195,7 @@ test("searching sends the query to ui.search, highlights the matched words, and 
   assert.ok(targets.banner.innerHTML.includes("搜尋「成果 12」的結果"));
   assert.ok(targets.banner.innerHTML.includes('data-tl="clearSearch"'));
   assert.ok(!targets.banner.innerHTML.includes("實際比對的是"), "nothing to say when the backend matched exactly what was typed");
-  assert.equal(targets.count.textContent, "找到 1 筆符合的記憶");
+  assert.equal(targets.count.textContent, "找到 1 筆");
 });
 
 test("when the backend normalises the query it says what it actually matched", async () => {
@@ -222,7 +222,7 @@ test("search pages continue with the same query and the same filters, and never 
   const expected = memories100.filter((item) => item.work.cli === "claude");
   assert.deepEqual(idsIn(targets.list.innerHTML), expectedIds(expected));
   assert.equal(new Set(idsIn(targets.list.innerHTML)).size, expected.length);
-  assert.equal(targets.count.textContent, `已載入更多，現在共 ${expected.length} 筆`);
+  assert.equal(targets.count.textContent, `已載入更多，共 ${expected.length} 筆`);
 });
 
 test("a search with no matches says so, names the text-not-meaning limit, and offers a way back", async () => {
@@ -233,7 +233,7 @@ test("a search with no matches says so, names the text-not-meaning limit, and of
   assert.equal(timeline.view().phase, "ready");
   assert.equal(timeline.view().items.length, 0);
   assert.ok(targets.list.innerHTML.includes("找不到符合的記憶"));
-  assert.ok(targets.list.innerHTML.includes("比對文字（關鍵字），不是語意"));
+  assert.ok(targets.list.innerHTML.includes("試試更短的詞"));
   assert.ok(targets.list.innerHTML.includes('data-tl="clearSearch"'));
   assert.ok(!targets.list.innerHTML.includes('data-tl="loadMore"'));
   assert.equal(targets.count.textContent, "");
@@ -286,7 +286,7 @@ test("a search that did not scan everything warns that it may be incomplete, kee
   assert.ok(!targets.banner.innerHTML.includes("可能不完整"));
   await timeline.loadMore();
   assert.equal(timeline.view().complete, false);
-  assert.ok(targets.banner.innerHTML.includes("搜尋結果可能不完整"));
+  assert.ok(targets.banner.innerHTML.includes("結果可能不完整"));
   assert.ok(targets.banner.innerHTML.includes('data-tl-notice="incomplete"') && targets.banner.innerHTML.includes('role="status"'));
   assert.ok(targets.banner.innerHTML.includes(">重新搜尋<") && targets.banner.innerHTML.includes('data-tl="reload"'));
   await timeline.loadMore();
@@ -303,7 +303,7 @@ test("an incomplete search with no matches shows both the empty answer and the w
   await open();
   await timeline.search("完全不存在的詞");
   assert.ok(targets.list.innerHTML.includes("找不到符合的記憶"));
-  assert.ok(targets.banner.innerHTML.includes("搜尋結果可能不完整"));
+  assert.ok(targets.banner.innerHTML.includes("結果可能不完整"));
 });
 
 test("the plain list never claims to be incomplete", async () => {

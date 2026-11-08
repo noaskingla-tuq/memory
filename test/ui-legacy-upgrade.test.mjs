@@ -16,17 +16,17 @@ const view = (overrides = {}) => ({
 
 test("the banner offers the upgrade only for the legacy databases and keeps the old wording for the rest", () => {
   const legacyOnly = renderBanner(view({ unavailableAgents: 3, upgradableAgents: 3 })).value;
-  assert.ok(legacyOnly.includes("有 3 位 agent 的記憶是舊格式，升級後才看得到。"));
+  assert.ok(legacyOnly.includes("3 位 agent 是舊格式，升級後才看得到。"));
   assert.ok(legacyOnly.includes('data-act="upgradeLegacy"'));
   assert.ok(legacyOnly.includes('data-legacy-n="3"'));
-  assert.equal(legacyOnly.includes("目前讀不到"), false);
+  assert.equal(legacyOnly.includes("讀不到"), false);
 
   const mixed = renderBanner(view({ unavailableAgents: 5, upgradableAgents: 3 })).value;
-  assert.ok(mixed.includes("有 3 位 agent 的記憶是舊格式"));
-  assert.ok(mixed.includes("有 2 位 agent 的記憶庫目前讀不到，畫面上不含他們。"));
+  assert.ok(mixed.includes("3 位 agent 是舊格式"));
+  assert.ok(mixed.includes("有 2 位 agent 讀不到，未列出。"));
 
   const damaged = renderBanner(view({ unavailableAgents: 2, upgradableAgents: 0 })).value;
-  assert.ok(damaged.includes("有 2 位 agent 的記憶庫目前讀不到，畫面上不含他們。"));
+  assert.ok(damaged.includes("有 2 位 agent 讀不到，未列出。"));
   assert.equal(damaged.includes("upgradeLegacy"), false);
   assert.equal(renderBanner(view({ unavailableAgents: 2 })).value.includes("upgradeLegacy"), false, "an older backend never sends the field");
   assert.equal(renderBanner(view({ unavailableAgents: 1, upgradableAgents: 4 })).value.includes("有 4 位"), false, "the legacy count can never exceed the unreadable count");
@@ -86,7 +86,7 @@ test("the confirm dialog explains the backup, focuses cancel, and cancelling sen
   assert.deepEqual(s.buttons().map((button) => button.textContent), ["取消", "升級 17 位"]);
   assert.equal(s.doc.activeElement.textContent, "取消");
   assert.ok(s.dialogBody().includes("17 位"));
-  assert.ok(s.dialogBody().includes("先自動備份"));
+  assert.ok(s.dialogBody().includes("先備份"));
   s.doc.dispatch(s.labelled("取消"), "click", {});
   await running;
   assert.equal(s.calls.length, 0);
@@ -104,7 +104,7 @@ test("confirming shows progress while the backend works, then the counts, and re
   await flush();
   assert.equal(s.calls.length, 2);
   assert.equal(s.buttons().length, 0, "the progress dialog has no button and cannot be dismissed");
-  assert.ok(s.dialogBody().includes("已處理 3 / 4 位（成功 2、失敗 1）"));
+  assert.ok(s.dialogBody().includes("已處理 3／4 位（成功 2、失敗 1）"));
   s.doc.key("Escape");
   assert.equal(s.doc.body.children.length, 1, "Escape does not close the progress dialog");
   release();
@@ -139,7 +139,7 @@ test("an unreadable answer is not counted as success and a second click while ru
   s.doc.dispatch(s.labelled("升級 2 位"), "click", {});
   await flush();
   assert.ok(s.dialogBody().includes("成功 0 位，失敗 0 位。"));
-  assert.ok(s.dialogBody().includes("讀不懂"));
+  assert.ok(s.dialogBody().includes("看不懂"));
   s.doc.dispatch(s.labelled("知道了"), "click", {});
   await running;
 });

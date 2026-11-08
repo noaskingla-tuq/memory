@@ -187,7 +187,7 @@ test("invalid daily time is announced and cannot be written until corrected", as
   const markup = ui.settingsPage(invalid).value;
   assert.equal(invalid.dailyTimeIssue, "invalid");
   assert.ok(markup.includes("aria-invalid=\"true\""));
-  assert.ok(markup.includes("HH:mm"));
+  assert.ok(markup.includes("00:00 到 23:59"));
   assert.ok(markup.includes('data-settings-action="save" disabled'));
   await state.save();
   assert.deepEqual(host.calls.filter(([method]) => method === "set"), []);
@@ -329,16 +329,16 @@ test("rendered controls are labelled, escaped and show invalid-budget guidance",
   await state.load();
   const markup = ui.settingsPage(state.view()).value;
   assert.ok(markup.includes("settings-budget-issue"));
-  assert.ok(markup.includes("目前儲存值無效"));
+  assert.ok(markup.includes("儲存值無效"));
   assert.ok(markup.includes("&lt;img src=x onerror=&quot;x&quot;&gt;"));
   assert.ok(!markup.includes("<img") && !markup.includes("onerror=\"x\""));
-  assert.ok(markup.includes('aria-describedby="settings-provider-help settings-provider-effect settings-provider-status"'));
+  assert.ok(markup.includes('aria-describedby="settings-provider-help settings-provider-status"'));
   assert.ok(markup.includes('type="range" min="8192" max="262144" step="8192"'));
   assert.ok(markup.includes('id="settings-frequency" data-setting-key="organizationFrequency"'));
   assert.ok(markup.includes("每天一輪") && markup.includes("即時整理"));
   assert.ok(markup.includes('id="settings-daily-time" data-setting-key="organizationDailyTime" type="time"'));
-  assert.ok(markup.includes("本機時區"));
-  assert.ok(markup.includes("不要輸入 API 金鑰"));
+  assert.ok(markup.includes("本機時間"));
+  assert.ok(markup.includes("不要填 API 金鑰"));
 });
 
 test("daily time is disabled in immediate mode while the saved value remains visible", async () => {
@@ -349,5 +349,5 @@ test("daily time is disabled in immediate mode while the saved value remains vis
   assert.equal(state.view().draft.organizationDailyTime, "07:45");
   assert.ok(markup.includes('value="07:45"') && markup.includes('id="settings-daily-time"'));
   assert.match(markup, /id="settings-daily-time"[^>]*disabled/u);
-  assert.ok(markup.includes("保留每日時間供切回"));
+  assert.ok(markup.includes("即時整理不使用此時間"));
 });

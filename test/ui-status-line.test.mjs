@@ -138,10 +138,10 @@ test("organization status keeps reply, commit, legacy and unknown source counts 
   await r.flush();
   assert.equal(r.target.dataset.state, "warn");
   assert.ok(r.target.innerHTML.includes("已收錄 12 · 待整理 5 · 回覆待提交 1 · 整理完成 6"));
-  assert.ok(r.target.innerHTML.includes("舊佇列有 2 筆工作不會自動整理（可小量試跑）"));
+  assert.ok(r.target.innerHTML.includes("舊工作 2 筆不會自動整理"));
   assert.ok(r.target.innerHTML.includes("來源略過未知"));
   assert.ok(r.target.innerHTML.includes("<details"));
-  assert.ok(r.target.innerHTML.includes("<summary>整理與來源詳情</summary>"));
+  assert.ok(r.target.innerHTML.includes("<summary>詳情</summary>"));
   assert.ok(r.target.innerHTML.includes("provider_error"));
   assert.equal(r.target.innerHTML.includes("private-round-id"), false);
   assert.equal(r.target.innerHTML.includes("secret transcript"), false);
@@ -152,7 +152,7 @@ test("no write yet, an unhealthy store and a failed call each get their own plai
   const none = rig({ results: [{ ok: true, value: statusValue({ lastWriteAt: null }) }] });
   none.line.start();
   await none.flush();
-  assert.ok(none.target.innerHTML.includes("還沒有記憶寫入"));
+  assert.ok(none.target.innerHTML.includes("還沒有記憶"));
   none.line.stop();
 
   const trouble = rig({ results: [{ ok: true, value: statusValue({ storage: { status: "storage_busy" } }) }] });

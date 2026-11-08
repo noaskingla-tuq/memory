@@ -22,7 +22,7 @@ test("memories are grouped by the day they were written, and the group headings 
   assert.equal(headings.length, 3, "two memories of today share one heading");
   assert.deepEqual(headings.slice(0, 2), ["今天寫入", "昨天寫入"]);
   assert.match(headings[2], /^\d{4}-\d{2}-\d{2} 寫入$/u);
-  assert.ok(markup.includes("依寫入時間排列，最新的在最上面。"));
+  assert.ok(!markup.includes("tl-order"), "the ordering sentence is gone");
   assert.ok(!Object.values(STRINGS).some((text) => text.includes("今天新增")), "the wording is 今天寫入 everywhere");
   assert.ok(Object.values(STRINGS).some((text) => text === "今天寫入"));
   assert.equal(count(markup, /class="mcard"/gu), 4);
@@ -142,11 +142,11 @@ test("the tokenizer used by the injection test does catch an injected tag or han
 
 test("the shell has the search box with its text-not-meaning note, every container the controller writes into, and only safe markup", () => {
   const markup = tl.timelineShell().value;
-  for (const id of ["tl-form", "tl-query", "tl-filters", "tl-clear", "tl-banner", "tl-count", "tl-list", "tl-hint", "tl-title"]) assert.ok(markup.includes(`id="${id}"`), id);
+  for (const id of ["tl-form", "tl-query", "tl-filters", "tl-clear", "tl-banner", "tl-count", "tl-list", "tl-title"]) assert.ok(markup.includes(`id="${id}"`), id);
   for (const [name, id] of Object.entries(tl.TIMELINE_IDS)) if (name !== "scope") assert.ok(markup.includes(`id="${id}"`), `TIMELINE_IDS ${id}`);
   assert.match(markup, /<form id="tl-form" class="tl-search" role="search" data-tl-form>/u);
-  assert.match(markup, /<input id="tl-query" name="q" type="search" maxlength="100" autocomplete="off" placeholder="搜尋記憶內容（比對文字，不是語意）" aria-describedby="tl-hint">/u);
-  assert.ok(markup.includes('<p id="tl-hint" class="muted tl-hint">比對文字，不是語意；多個詞要全部出現。</p>'));
+  assert.match(markup, /<input id="tl-query" name="q" type="search" maxlength="100" autocomplete="off" placeholder="搜尋記憶">/u);
+  assert.ok(!markup.includes("tl-hint"), "the search hint line is gone");
   assert.ok(markup.includes('<button type="submit" class="btn btn-primary">搜尋</button>'), "Enter in the box and the button both submit the form");
   assert.ok(markup.includes('<label class="sr" for="tl-query">搜尋記憶</label>'));
   assert.ok(markup.includes('id="tl-count" class="muted count" aria-live="polite"'), "the count is a live region");
@@ -185,9 +185,8 @@ test("the timeline strings are plain Traditional Chinese: no 程序, and the sea
   const strings = Object.entries(STRINGS).filter(([key]) => key.startsWith("tl."));
   assert.ok(strings.length >= 50);
   for (const [key, value] of strings) assert.ok(!value.includes("程序"), key);
-  assert.equal(t("tl.search.hint"), "比對文字，不是語意；多個詞要全部出現。");
   assert.equal(t("tl.day.today"), "今天寫入");
-  assert.equal(t("tl.search.placeholder"), "搜尋記憶內容（比對文字，不是語意）");
+  assert.equal(t("tl.search.placeholder"), "搜尋記憶");
 });
 
 function recorder() {

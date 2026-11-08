@@ -35,19 +35,18 @@ test("a ready drawer tells who wrote what, when it was written, when the work ra
   assert.ok(markup.includes("<span>claude/opus-4</span>"));
   assert.ok(markup.includes('<h3 class="dr-h">請求</h3><div class="dr-txt">整理週報</div>'));
   assert.ok(markup.includes('<h3 class="dr-h">成果</h3><div class="dr-txt">已整理完成</div>'));
-  assert.ok(markup.includes("<p><span class=\"badge\">個人</span> 不屬於任何專案</p>"));
+  assert.ok(markup.includes("<p><span class=\"badge\">個人</span> 不屬於專案</p>"));
   assertSafe(markup, "ready");
 });
 
 test("the detail drawer explains automatic organization without attributing the current memory", () => {
   const markup = body(ready(getResponse()));
-  assert.ok(markup.includes("外掛自動整理功能"));
-  assert.ok(markup.includes("啟用時，整理流程會使用已結案工作紀錄的工作名稱與成果摘要作為輸入"));
-  assert.ok(markup.includes("這是功能的一般說明，不判定目前記憶的來源"));
-  assert.ok(markup.includes("其他明確寫入方式也可能建立記憶"));
+  assert.ok(markup.includes("自動整理"));
+  assert.ok(markup.includes("啟用 AI 整理時，會用已結案工作的名稱與成果摘要當輸入"));
+  assert.ok(markup.includes("不代表這筆記憶的來源"));
   assertSafe(markup, "automatic organization explanation");
   const manual = body(ready(getResponse({ content: "一筆手動寫入的筆記", work: null })));
-  assert.ok(manual.includes("這是功能的一般說明，不判定目前記憶的來源"));
+  assert.ok(manual.includes("不代表這筆記憶的來源"));
 });
 
 test("the receipts list each tool, conversation, role and time; none says so, and a full page says it is capped", () => {
@@ -63,9 +62,9 @@ test("the receipts list each tool, conversation, role and time; none says so, an
   assert.ok(markup.includes("codex・對話 S-200・助理的訊息・"));
   assert.ok(markup.includes('title="ev-1"'));
   assert.ok(!markup.includes("最多列出"));
-  assert.ok(body(ready(getResponse({ receipts: [] }))).includes("沒有收據紀錄。"));
+  assert.ok(body(ready(getResponse({ receipts: [] }))).includes("沒有收據"));
   const capped = Array.from({ length: 12 }, (_, index) => ({ client: "claude", sessionId: `S-${index}`, eventId: `e${index}`, role: "user", createdAt: iso(NOW) }));
-  assert.ok(body(ready(getResponse({ receipts: capped }))).includes("最多列出 12 筆收據。"));
+  assert.ok(body(ready(getResponse({ receipts: capped }))).includes("僅列前 12 筆"));
 });
 
 test("a memory with no text says so, whether it is a work record with an empty result or plain text that is empty", () => {
@@ -89,7 +88,7 @@ test("the original text of the memory is one click away inside a details element
   const response = getResponse();
   const markup = body(ready(response));
   assert.ok(markup.includes("<details"));
-  assert.ok(markup.includes("<summary>看原始文字（記憶庫裡實際存的內容）</summary>"));
+  assert.ok(markup.includes("<summary>原始文字</summary>"));
   assert.ok(markup.includes(`<pre>${response.memory.content}</pre>`));
 });
 
@@ -107,7 +106,7 @@ test("a project memory shows the project's name and id; without a name it degrad
 test("the other memories of the same session are buttons that carry a key and an accessible name, and none means no section", () => {
   const response = getResponse({ sameSession: [siblingItem("m2"), siblingItem("m3", { snippet: "  ", work: { startIso: iso(NOW), endIso: iso(NOW), cli: null, model: null, title: "另一個請求" } })] });
   const markup = body(ready(response));
-  assert.ok(markup.includes("同一次工作的其他記憶（2）"));
+  assert.ok(markup.includes("同次工作的其他記憶（2）"));
   const keys = [...markup.matchAll(/data-dt="sibling" data-dt-key="([^"]*)"/gu)].map((match) => JSON.parse(match[1].replaceAll("&quot;", '"'))[3]);
   assert.deepEqual(keys, ["m2", "m3"]);
   assert.match(markup, /<button type="button" class="sib" data-dt="sibling"[^>]*aria-label="[^"]*在這個抽屜開啟這筆記憶">/u);
@@ -137,7 +136,7 @@ test("the drawer never offers to edit a memory or to open its conversation", () 
 
 test("loading is a polite status with a screen-reader sentence, not an empty drawer", () => {
   const markup = body({ phase: "loading", ref: refOf("m1"), data: null, error: null, notice: null, forgetting: false });
-  assert.ok(markup.includes('role="status"') && markup.includes("正在讀取這筆記憶…"));
+  assert.ok(markup.includes('role="status"') && markup.includes("讀取中…"));
   assert.ok(markup.includes('aria-hidden="true"'));
   assertSafe(markup, "loading");
 });
@@ -166,9 +165,9 @@ test("a conflict notice and a failed-forget notice sit above the content, each a
 
 test("the confirmation says it is permanent, that receipts go with it, that the same content will not be written again, and what is untouched", () => {
   const markup = det.renderConfirmBody(det.parseDetail(getResponse())).value;
-  assert.ok(markup.includes("會從「開發小幫手」的記憶庫永久清除這一筆，無法復原。"));
-  assert.ok(markup.includes("這一筆的收據（寫入來源紀錄）會一併刪除。"));
-  assert.ok(markup.includes("之後相同內容也不會再被寫入。"));
+  assert.ok(markup.includes("會從「開發小幫手」永久清除這一筆，無法復原。"));
+  assert.ok(markup.includes("收據也會一併刪除。"));
+  assert.ok(markup.includes("相同內容之後不會再寫入。"));
   assert.ok(markup.includes("不受影響：對話紀錄、打卡紀錄與其他記憶。"));
   assert.ok(markup.includes("整理週報"), "the quote names the memory being forgotten");
   assertSafe(markup, "confirm");
@@ -201,6 +200,6 @@ test("hostile text in any field is escaped: content, request, names, tool, conve
 
 test("the drawer's strings are Traditional Chinese and never use the word 程序", () => {
   for (const [key, text] of Object.entries(STRINGS)) if (key.startsWith("dt.")) assert.ok(!text.includes("程序"), key);
-  assert.equal(t("dt.title"), "記憶詳情");
+  assert.equal(t("dt.title"), "詳情");
   assert.equal(t("dt.confirm.title"), "要永久遺忘這筆記憶嗎？");
 });

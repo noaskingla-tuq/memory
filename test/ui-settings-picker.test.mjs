@@ -135,7 +135,7 @@ test("the menu mode copy never tells the user to leave a field empty or to type 
 test("the text box fallback names the plugin default in its placeholders", async () => {
   const { state } = await loaded({});
   const markup = ui.settingsPage(state.view(), { status: "unavailable" }).value;
-  assert.equal(markup.split('placeholder="留空使用外掛預設（codex／gpt-6-luna）"').length, 3);
+  assert.equal(markup.split('placeholder="留空用預設（codex／gpt-6-luna）"').length, 3);
 });
 
 test("an empty provider resolves to the same provider and model the backend uses", async () => {
@@ -243,8 +243,8 @@ test("menus keep the label, help and status wiring of the text boxes", async () 
   const { state } = await loaded({});
   const markup = ui.settingsPage(state.view(), await choicesOf()).value;
   assert.ok(markup.includes('<label for="settings-provider">'));
-  assert.ok(markup.includes('<select id="settings-provider" data-setting-key="organizationProvider" aria-describedby="settings-provider-help settings-provider-effect settings-provider-status">'));
-  assert.ok(markup.includes('<select id="settings-model" data-setting-key="organizationModel" aria-describedby="settings-model-help settings-model-effect settings-model-status">'));
+  assert.ok(markup.includes('<select id="settings-provider" data-setting-key="organizationProvider" aria-describedby="settings-provider-help settings-provider-status">'));
+  assert.ok(markup.includes('<select id="settings-model" data-setting-key="organizationModel" aria-describedby="settings-model-help settings-model-status">'));
 });
 
 test("the parser drops malformed providers and models instead of failing", async () => {

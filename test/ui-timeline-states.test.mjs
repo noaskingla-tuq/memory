@@ -172,7 +172,7 @@ test("while the first page loads the list says it is reading, and a search says 
   const { timeline, targets, open } = createTimelineFor({ client: backend });
   const opening = open();
   assert.equal(timeline.view().phase, "loading");
-  assert.ok(targets.list.innerHTML.includes("正在讀取記憶…") && targets.list.innerHTML.includes('role="status"'));
+  assert.ok(targets.list.innerHTML.includes("讀取中…") && targets.list.innerHTML.includes('role="status"'));
   assert.ok(!targets.list.innerHTML.includes('class="mcard"'), "skeleton cards are not memories");
   gate.resolve();
   await opening;
@@ -181,10 +181,10 @@ test("while the first page loads the list says it is reading, and a search says 
   const second = createTimelineFor({ client: searchBackend });
   await second.open();
   const searching = second.timeline.search("請求");
-  assert.ok(second.targets.list.innerHTML.includes("正在搜尋…"));
+  assert.ok(second.targets.list.innerHTML.includes("搜尋中…"));
   gateTwo.resolve();
   await searching;
-  assert.ok(!second.targets.list.innerHTML.includes("正在搜尋…"));
+  assert.ok(!second.targets.list.innerHTML.includes("搜尋中…"));
 });
 
 test("a failed first load says what happened in plain words with one thing to do, and the retry recovers", async () => {
@@ -219,7 +219,7 @@ test("a failed load-more keeps the list, shows a retry, and the retry appends", 
   await open();
   await timeline.loadMore();
   assert.equal(count(targets.list.innerHTML, /class="mcard"/gu), 12);
-  assert.ok(targets.list.innerHTML.includes("後面的記憶沒有載入成功。") && targets.list.innerHTML.includes("記憶服務目前很忙。"));
+  assert.ok(targets.list.innerHTML.includes("後面的記憶載入失敗。") && targets.list.innerHTML.includes("記憶服務目前很忙。"));
   assert.ok(targets.list.innerHTML.includes('data-code="RESOURCE_BUSY"'));
   assert.equal((targets.list.innerHTML.match(/data-tl="loadMore"/gu) ?? []).length, 2, "the retry button and the load-more button");
   broken = false;
@@ -247,7 +247,7 @@ test("a failed reload keeps what is on screen and shows the error in the banner 
   await timeline.reload();
   assert.equal(timeline.view().phase, "ready");
   assert.equal(count(targets.list.innerHTML, /class="mcard"/gu), 12);
-  assert.ok(targets.banner.innerHTML.includes("重新整理沒有成功") && targets.banner.innerHTML.includes('data-tl="reload"'));
+  assert.ok(targets.banner.innerHTML.includes("重新整理失敗") && targets.banner.innerHTML.includes('data-tl="reload"'));
   broken = false;
   await timeline.reload();
   assert.equal(timeline.view().notice, null);

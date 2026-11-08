@@ -16,38 +16,38 @@ const render = (overrides) => ui.agentOrgSection(model(overrides)).value;
 
 test("the idle block says how many jobs wait and offers the one button, with the place for the later settings reserved", () => {
   const idle = render();
-  assert.ok(idle.includes("這位 agent 有 14 筆工作等待 AI 整理。"));
+  assert.ok(idle.includes("14 筆待整理"));
   assert.ok(idle.includes('<button type="button" class="btn btn-primary" data-ao="run">立即整理</button>'));
   assert.ok(idle.includes('data-ao-state="idle"'));
   assert.ok(idle.includes('data-ao-slot="settings"'), "the slot for the per-agent model and time settings");
   assert.ok(!/ onclick|<script/iu.test(idle), "no inline handler");
   assert.ok(render({ pending: 0 }).includes('data-ao="run" disabled'), "nothing waits: the button is off");
-  assert.ok(render({ blocked: "other_running" }).includes("另一位 agent 正在立即整理"));
+  assert.ok(render({ blocked: "other_running" }).includes("另一位 agent 正在整理"));
   assert.ok(render({ blocked: "other_running" }).includes('data-ao="run" disabled'));
-  assert.ok(render({ blocked: "disabled" }).includes("AI 整理目前已關閉"));
-  assert.ok(render({ phase: "loading" }).includes("正在讀取整理狀態"));
+  assert.ok(render({ blocked: "disabled" }).includes("AI 整理已關閉"));
+  assert.ok(render({ phase: "loading" }).includes("讀取中"));
   assert.ok(render({ busy: true }).includes('data-ao="run" disabled'));
 });
 
 test("a running block shows the progress and a stop button; a stopping block says it finishes the current job", () => {
   const running = render({ run: run() });
-  assert.ok(running.includes("整理中：已處理 7／20 筆（完成 6・失敗 1）"));
+  assert.ok(running.includes("整理中 7／20（完成 6・失敗 1）"));
   assert.ok(running.includes('<progress class="ao-progress" max="20" value="7"'));
   assert.ok(running.includes('<button type="button" class="btn" data-ao="stop">停止</button>'));
   assert.ok(!running.includes('data-ao="run"'));
   const stopping = render({ run: run({ state: "stopping" }) });
-  assert.ok(stopping.includes("正在停止，目前這一筆做完就會停下。"));
+  assert.ok(stopping.includes("停止中，這一筆做完就停。"));
   assert.ok(stopping.includes('data-ao="stop" disabled'));
 });
 
 test("a finished block gives the counts, hints that failed jobs can be sent again, and lets the user run again", () => {
   const done = render({ run: run({ state: "completed", total: 20, done: 18, failed: 2, untried: 0, endedAt: 9 }), pending: 2 });
-  assert.ok(done.includes("整理完成：共 20 筆（完成 18・失敗 2・未處理 0）"));
-  assert.ok(done.includes("再按一次「立即整理」就會重送"));
+  assert.ok(done.includes("完成：共 20 筆（完成 18・失敗 2・未處理 0）"));
+  assert.ok(done.includes("可再按「立即整理」重送"));
   assert.ok(done.includes('data-ao="run">立即整理'));
   const clean = render({ run: run({ state: "completed", total: 5, done: 5, failed: 0, untried: 0, endedAt: 9 }), pending: 0 });
-  assert.ok(clean.includes("整理完成：共 5 筆（完成 5・失敗 0・未處理 0）"));
-  assert.ok(!clean.includes("再按一次"));
+  assert.ok(clean.includes("完成：共 5 筆（完成 5・失敗 0・未處理 0）"));
+  assert.ok(!clean.includes("可再按"));
   const stopped = render({ run: run({ state: "stopped", total: 20, done: 8, failed: 0, untried: 12, endedAt: 9 }), pending: 12 });
   assert.ok(stopped.includes("已停止：共 20 筆（完成 8・失敗 0・未處理 12）"));
 });
@@ -82,7 +82,7 @@ test("opening the page reads the status once with the agent id", async () => {
   const s = scene([answer({ pending: 3 })]);
   await s.org.attach(s.target, AGENT);
   assert.deepEqual(s.calls.map((call) => [call.method, call.params]), [["ui.agentOrganization", { action: "status", agentId: AGENT }]]);
-  assert.ok(s.target.innerHTML.includes("這位 agent 有 3 筆工作等待 AI 整理。"));
+  assert.ok(s.target.innerHTML.includes("3 筆待整理"));
   assert.equal(s.timers.length, 0, "an idle block does not poll");
 });
 
@@ -94,12 +94,12 @@ test("the confirm dialog puts focus on cancel, names the model, the one-at-a-tim
   assert.deepEqual(s.buttons().map((button) => button.textContent), ["取消", "開始整理"]);
   assert.equal(s.doc.activeElement.textContent, "取消", "initial focus is on the harmless choice");
   const text = s.doc.body.children[0].children[0].children[1].innerHTML;
-  for (const part of ["14 筆工作", "目前設定的模型", "一次處理一筆", "隨時按「停止」", "目前這一筆做完就會停下"]) assert.ok(text.includes(part), part);
+  for (const part of ["14 筆", "目前的模型", "一次一筆", "隨時按「停止」", "這一筆做完就停"]) assert.ok(text.includes(part), part);
   assert.equal(s.calls.length, 1, "only the status read so far");
   s.doc.dispatch(s.labelled("開始整理"), "click", {});
   await asked;
   assert.deepEqual(s.calls[1], { method: "ui.agentOrganization", params: { action: "run", agentId: AGENT }, options: { key: "agentOrg" } });
-  assert.ok(s.target.innerHTML.includes("整理中：已處理 7／20 筆"));
+  assert.ok(s.target.innerHTML.includes("整理中 7／20"));
   assert.equal(s.timers.length, 1, "a live run is polled");
   assert.equal(s.timers[0].ms, ui.AGENT_ORG_POLL_MS);
 });
@@ -125,15 +125,15 @@ test("cancelling the dialog, escape and a second click send nothing", async () =
 test("polling follows the run to its end: progress, then the result, then no more timers", async () => {
   const s = scene([answer({ run: run({ done: 2, failed: 0 }) }), answer({ run: run({ done: 9, failed: 1 }) }), answer({ run: run({ state: "completed", done: 19, failed: 1, untried: 0, endedAt: 8 }), pending: 1 })]);
   await s.org.attach(s.target, AGENT);
-  assert.ok(s.target.innerHTML.includes("已處理 2／20 筆"));
+  assert.ok(s.target.innerHTML.includes("整理中 2／20"));
   assert.equal(s.timers.length, 1);
   s.timers[0].callback();
   await flush();
-  assert.ok(s.target.innerHTML.includes("已處理 10／20 筆（完成 9・失敗 1）"));
+  assert.ok(s.target.innerHTML.includes("整理中 10／20（完成 9・失敗 1）"));
   assert.equal(s.timers.length, 2);
   s.timers[1].callback();
   await flush();
-  assert.ok(s.target.innerHTML.includes("整理完成：共 20 筆（完成 19・失敗 1・未處理 0）"));
+  assert.ok(s.target.innerHTML.includes("完成：共 20 筆（完成 19・失敗 1・未處理 0）"));
   assert.equal(s.timers.length, 2, "a finished run schedules nothing");
 });
 
@@ -142,7 +142,7 @@ test("stop asks the backend to stop and shows that it finishes the current job",
   await s.org.attach(s.target, AGENT);
   await s.org.stop();
   assert.deepEqual(s.calls[1].params, { action: "stop" });
-  assert.ok(s.target.innerHTML.includes("正在停止，目前這一筆做完就會停下。"));
+  assert.ok(s.target.innerHTML.includes("停止中，這一筆做完就停。"));
 });
 
 test("a blocked answer is told in words and a failed call shows the error and keeps the page usable", async () => {
@@ -152,7 +152,7 @@ test("a blocked answer is told in words and a failed call shows the error and ke
   await flush();
   blocked.doc.dispatch(blocked.labelled("開始整理"), "click", {});
   await asked;
-  assert.ok(blocked.target.innerHTML.includes("另一位 agent 正在立即整理"));
+  assert.ok(blocked.target.innerHTML.includes("另一位 agent 正在整理"));
 
   const doc = new FakeDocument();
   const target = { innerHTML: "" };

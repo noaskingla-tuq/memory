@@ -21,8 +21,8 @@ test("opening an agent asks ui.agentStats once with the agent id and the local o
   assert.equal(targets.id.textContent, AGENT_ID);
   assert.ok(targets.avatar.innerHTML.includes(">開<"), "the avatar letter is the first character of the name");
   const meta = targets.meta.textContent;
-  for (const part of ["部門 軟體開發組", "職稱 寫程式的人", "累積 22 筆", "最早 ", "最近寫入 "]) assert.ok(meta.includes(part), `${part} in ${meta}`);
-  assert.ok(/最早 \d{4}-\d{2}-\d{2}/u.test(meta));
+  for (const part of ["累積 22 筆", "最近寫入 "]) assert.ok(meta.includes(part), `${part} in ${meta}`);
+  for (const gone of ["部門", "職稱", "最早"]) assert.ok(!meta.includes(gone), `${gone} is no longer in the header`);
 });
 
 test("a ready page draws every section: spaces, days, hours and weekdays, tools, repeated requests and the four representative memories", async () => {
@@ -37,10 +37,9 @@ test("a ready page draws every section: spaces, days, hours and weekdays, tools,
   const tools = sectionOf(body, "space-h-tools");
   assert.ok(tools.includes("claude / opus-4") && tools.includes("64%") && tools.includes("27%") && tools.includes(STRINGS["space.tools.unknown"]));
   const repeat = sectionOf(body, "space-h-repeat");
-  assert.ok(repeat.includes("整理本週工作") && repeat.includes("5 次") && repeat.includes("檢查結帳流程") && repeat.includes("2 次") && repeat.includes(STRINGS["space.repeat.note"]));
+  assert.ok(repeat.includes("整理本週工作") && repeat.includes("5 次") && repeat.includes("檢查結帳流程") && repeat.includes("2 次"));
   const reps = sectionOf(body, "space-h-rep");
   assert.equal(count(reps, /<article class="rep"/gu), 4);
-  assert.ok(reps.includes(STRINGS["space.rep.note"]));
   assert.equal(count(body, /<h3 /gu), 6);
 });
 
@@ -66,7 +65,7 @@ test("the 30-day chart has 30 columns, marks empty days, and says the total and 
   const month = Number(peakDay.slice(5, 7));
   const dom = Number(peakDay.slice(8, 10));
   assert.ok(days.includes(`aria-label="近 30 天共寫入 ${sum} 筆，最多的一天是 ${month}/${dom}（${peak} 筆）"`), days.slice(0, 400));
-  assert.ok(days.includes(`近 30 天最多一天寫入 ${peak} 筆`));
+  assert.ok(days.includes(`單日最多 ${peak} 筆`));
   assert.ok(days.includes(`>${STRINGS["space.days.today"]}<`));
   const first = dayKey(29);
   assert.ok(days.includes(`<span>${Number(first.slice(5, 7))}/${Number(first.slice(8, 10))}</span>`), "the left end of the axis is the first day of the window");

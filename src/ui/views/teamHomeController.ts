@@ -13,7 +13,7 @@ import {
   type OverviewPage,
   type SortKey,
 } from "../state/teamHome.js";
-import { renderBanner, renderCount, renderHelp, renderNote, renderTiles, renderTools, renderWall, type HomeView } from "./teamHomeView.js";
+import { renderBanner, renderCount, renderHelp, renderTiles, renderTools, renderWall, type HomeView } from "./teamHomeView.js";
 
 export const OVERVIEW_PAGE_SIZE = 60;
 export const HELP_DISMISSED_KEY = "memory.home.helpDismissed";
@@ -24,7 +24,6 @@ export interface HomeTargets {
   readonly tiles: MountTarget;
   readonly tools: MountTarget;
   readonly count: { textContent: string | null };
-  readonly note: { textContent: string | null };
   readonly wall: MountTarget;
 }
 
@@ -167,7 +166,6 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
     mount(targets.banner, renderBanner(state));
     mount(targets.tiles, renderTiles(state));
     mount(targets.tools, renderTools(state));
-    targets.note.textContent = renderNote(state);
     renderResults();
   }
 

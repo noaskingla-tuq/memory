@@ -8,6 +8,7 @@
 </head>
 <body>
 <header class="hdr">
+<div class="hdr-in">
 <a id="brand-home" class="hdr-brand" href="#/" aria-label="Cairn記憶管理，回到總覽">
 <img class="hdr-logo" src="../cairn-icon.png" width="24" height="24" alt="">
 <h1 id="title">Cairn記憶管理</h1>
@@ -17,6 +18,13 @@
 <a id="nav-settings" href="#/settings">設定</a>
 </nav>
 <section id="status" class="hdr-status" aria-live="polite"></section>
+<div class="hdr-zoom" role="group" aria-label="文字大小" data-zoom-group>
+<button type="button" class="btn zoom-btn" data-zoom="out" aria-label="縮小文字">A−</button>
+<button type="button" class="btn zoom-btn" data-zoom="in" aria-label="放大文字">A＋</button>
+<button type="button" class="btn zoom-btn" data-zoom="reset" aria-label="重設文字大小">重設</button>
+<span class="sr" role="status" data-zoom-status></span>
+</div>
+</div>
 </header>
 <main>
 <div id="view"></div>

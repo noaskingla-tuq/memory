@@ -20,6 +20,8 @@ import { bindLegacyTrial } from "./views/legacyTrial.js";
 import { createLegacyUpgrade } from "./views/legacyUpgrade.js";
 import { createTeamHome, type HomeTargets, type Preferences } from "./views/teamHomeController.js";
 import { homeShell } from "./views/teamHomeView.js";
+import { createZoom } from "./state/zoom.js";
+import { bindZoomControl } from "./views/zoomControl.js";
 import { createTimeline, type TimelineTargets } from "./views/timelineController.js";
 import { bindTimelineEvents } from "./views/timelineEvents.js";
 import { bindSettingsEvents } from "./views/settingsEvents.js";
@@ -51,6 +53,8 @@ const preferences: Preferences = {
     }
   },
 };
+
+const zoom = createZoom(preferences, (percent) => document.documentElement.style.setProperty("--zoom", String(percent / 100)));
 
 const client = backendClient();
 const now = (): number => Date.now();
@@ -109,7 +113,6 @@ function homeTargets(): HomeTargets {
     tiles: element("home-tiles"),
     tools: element("home-tools"),
     count: element("home-count"),
-    note: element("home-note"),
     wall: element("home-wall"),
   };
 }
@@ -348,7 +351,7 @@ function syncSettingsDraft(snapshot: SettingsSnapshot): void {
     const issue = document.getElementById("settings-budget-issue");
     if (snapshot.budgetIssue === null) {
       issue?.remove();
-      budget.setAttribute("aria-describedby", "settings-budget-help settings-budget-effect settings-budget-status");
+      budget.setAttribute("aria-describedby", "settings-budget-help settings-budget-status");
     }
   }
   const dailyTime = document.getElementById("settings-daily-time");
@@ -357,8 +360,8 @@ function syncSettingsDraft(snapshot: SettingsSnapshot): void {
     const invalid = snapshot.dailyTimeIssue === "invalid";
     dailyTime.setAttribute("aria-invalid", String(invalid));
     dailyTime.setAttribute("aria-describedby", invalid
-      ? "settings-daily-time-help settings-daily-time-effect settings-daily-time-status settings-daily-time-issue"
-      : "settings-daily-time-help settings-daily-time-effect settings-daily-time-status");
+      ? "settings-daily-time-help settings-daily-time-status settings-daily-time-issue"
+      : "settings-daily-time-help settings-daily-time-status");
     if (invalid && dailyTimeIssue === null) {
       const issue = document.createElement("p");
       issue.id = "settings-daily-time-issue";
@@ -544,6 +547,7 @@ element("status").addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest("[data-retry]") !== null) void status.refresh();
 });
 bindStatusToggle(element("status"), status);
+bindZoomControl(document.querySelector("header.hdr") as HTMLElement, zoom);
 bindLegacyTrial(element("status"), { client, refresh: status.refresh, background: () => view });
 document.addEventListener("click", onInternalClick, true);
 window.addEventListener("hashchange", onHashChange);

@@ -192,3 +192,35 @@ test("a migration that cannot write its backup leaves the state alone and does n
   const saved = (text) => { const { operations, sessions } = JSON.parse(text).organizationResume; return { operations, sessions }; };
   assert.deepEqual(saved(readFileSync(join(base, STATE_FILE), "utf8")), saved(bytes.toString("utf8")), "without a backup the journal and sessions are not rewritten");
 });
+
+test("F6: a failed migration shows in the organization status and is retried until it works, which clears the status", async (t) => {
+  const base = mkdtempSync(join(tmpdir(), "memory-unstick-retry-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const { createLocalPunchOrganizationStore } = await import("../out/adapters/storage/punchStateStore.js");
+  const store = createLocalPunchOrganizationStore(base);
+  await stuckFixture(store);
+  mkdirSync(join(base, BACKUP_FILE));
+  const snapshot = { snapshotId: "s", generation: "g", highWatermark: "p" };
+  const host = {
+    workRecords: { async readPage() { return { snapshot, nextCursor: null, records: [] }; }, subscribeSettledChanges() { return () => {}; } },
+    pluginState: { async readPage() { throw Object.assign(new Error("retired"), { code: "plugin_state_retired" }); } },
+    agentDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+    projectDirectory: { async readPage() { return { snapshot, entries: [], nextCursor: null }; } },
+    ai: { async getOptions() { throw new Error("no model in this test"); } },
+  };
+  const backend = createBackend({ dataRoot: join(base, "memory-cairn-v1"), pinPath: PIN_PATH, host, unstickRetryMs: 25, settings: { all: () => ({ organizationEnabled: true }), onChange() { return () => {}; } } });
+  t.after(() => backend.dispose());
+  backend.startWorkers();
+  await backend.idleWorkers();
+  const failed = (await backend.call("ui.status", {})).organization;
+  assert.equal(failed.localErrorCode, "unstick_failed");
+  assert.equal(failed.state, "paused");
+  assert.equal(callsOfState(await store.readResumeState()).filter(isStuck).length, EXPIRED + ACTIVE, "nothing was migrated while the backup could not be written");
+
+  rmSync(join(base, BACKUP_FILE), { recursive: true });
+  for (let i = 0; i < 200 && callsOfState(await store.readResumeState()).some(isStuck); i += 1) await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(callsOfState(await store.readResumeState()).filter(isStuck).length, 0, "the retry migrated the stuck calls");
+  const healed = (await backend.call("ui.status", {})).organization;
+  assert.notEqual(healed.localErrorCode, "unstick_failed", "the status no longer reports the failed migration");
+  assert.ok(readFileSync(join(base, BACKUP_FILE)).length > 0);
+});

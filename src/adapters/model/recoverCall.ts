@@ -8,6 +8,7 @@ export interface CallRecoveryDeps {
 }
 
 const UNRECOVERABLE = "reconciled_unrecoverable";
+export const ROTATION_BLOCKED_LOCAL_CODE = "rotation_blocked";
 const DEAD_SESSION = new Set<OrganizationSessionRecord["state"]>(["expired", "invalidated", "resume_unavailable"]);
 
 // why: a sent call with a turn but no saved reply has no live owner once the pair lock is held, so it is the only shape that can strand a pair
@@ -34,9 +35,11 @@ export async function reconcileBeforeSession(deps: CallRecoveryDeps, pair: strin
 }
 
 // why: getSession records session_not_found as expired before it throws, so the saved state is the only trace of that error left here
-export async function reconcileAfterResumeError(deps: CallRecoveryDeps, pair: string, call: OrganizationCallRecord): Promise<boolean> {
+export async function reconcileAfterResumeError(deps: CallRecoveryDeps, pair: string, call: OrganizationCallRecord, error?: unknown): Promise<boolean> {
   const { saved } = await savedSession(deps, pair);
-  return saved !== undefined && saved.state === "expired" ? giveUp(deps, call, saved) : false;
+  if (saved !== undefined && saved.state === "expired") return giveUp(deps, call, saved);
+  // why: a stranded call is the only thing holding back the rotation, and a rotation means its session is never resumed, so the call cannot be recovered
+  return (error as { localCode?: unknown } | null)?.localCode === ROTATION_BLOCKED_LOCAL_CODE ? giveUp(deps, call, saved) : false;
 }
 
 export async function reconcileWithSession(deps: CallRecoveryDeps, pair: string, call: OrganizationCallRecord, session: PluginBackendAiSessionV1): Promise<boolean> {

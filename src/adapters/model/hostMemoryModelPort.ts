@@ -5,7 +5,7 @@ import { legacyModelCallKey, modelCallKey, modelRequestSha256, operationKey, pai
 import type { OrganizationCallRecord, OrganizationOperationRecord, OrganizationSessionRecord, OrganizationResumeStorePort } from "../../application/punchDataPorts.js";
 import type { OrganizationSettings } from "../../backend/organizationSettings.js";
 import type { TeamuqTaskBinding } from "../../application/teamuqTaskBinding.js";
-import { isStrandedSent, reconcileAfterResumeError, reconcileBeforeSession, reconcileWithSession, type CallRecoveryDeps } from "./recoverCall.js";
+import { ROTATION_BLOCKED_LOCAL_CODE, isStrandedSent, reconcileAfterResumeError, reconcileBeforeSession, reconcileWithSession, type CallRecoveryDeps } from "./recoverCall.js";
 import { DETACHED_LOCAL_CODE, REPLY_LIMIT, runTurn, type PairSession, type TurnJournal } from "./turnTracker.js";
 import { PAIR_BLOCKED_LOCAL_CODE } from "../../application/organizationQueue.js";
 
@@ -347,7 +347,7 @@ export function createHostMemoryModelPort(
       || Date.now() - saved.lastUsedAt >= IDLE_ROTATION_MS
       || saved.turnCount >= Math.max(1, Math.floor(options.limits.transcriptLines / 4))
     );
-    if (rotate && operationUnresolved) throw serviceError("RESOURCE_BUSY", "A pending memory operation blocks session rotation", undefined, "session_resume");
+    if (rotate && operationUnresolved) throw serviceError("RESOURCE_BUSY", "A pending memory operation blocks session rotation", undefined, "session_resume", ROTATION_BLOCKED_LOCAL_CODE);
     const cached = sessions.get(pair);
     if (saved !== undefined && !rotate && cached !== undefined && cached.session.sessionId === saved.hostSessionId) {
       return { session: cached.session, record: { ...saved, lastUsedAt: Date.now() } };
@@ -513,7 +513,7 @@ export function createHostMemoryModelPort(
         let currentSession: PairSession;
         try { currentSession = await bounded(() => getSession(activeInvocation, pair, opKey, provider.id, model.id, input.policy.revision, options, before.signal)); }
         catch (error) {
-          if (stranded !== undefined && await reconcileAfterResumeError(recovery!, pair, stranded)) return keyedWork();
+          if (stranded !== undefined && await reconcileAfterResumeError(recovery!, pair, stranded, error)) return keyedWork();
           throw error;
         }
         session = currentSession.session;

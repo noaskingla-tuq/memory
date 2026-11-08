@@ -82,3 +82,13 @@ test("choosing another provider with an empty model uses that provider's own def
   assert.deepEqual(await invokeScoped(rig.port, actorOf("sw/a"), "organize:chosen"), REPLY);
   assert.deepEqual(rig.opened.map((entry) => [entry.providerId, entry.modelId]), [["scripted", "scripted-text"]]);
 });
+
+test("F3: the manifest help for provider and model describes the plugin default, and the stored default stays empty", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../plugin/manifest.template.json", import.meta.url), "utf8"));
+  const field = (key) => manifest.settingsSchema.fields.find((entry) => entry.key === key);
+  assert.equal(field("organizationProvider").default, "");
+  assert.equal(field("organizationModel").default, "");
+  assert.ok(field("organizationProvider").help.includes("外掛預設") && field("organizationProvider").help.includes("codex"));
+  assert.ok(field("organizationModel").help.includes("外掛預設") && field("organizationModel").help.includes("gpt-6-luna"));
+  for (const key of ["organizationProvider", "organizationModel"]) assert.ok(!field(key).help.includes("目前可用的預設提供者") && !field(key).help.includes("留空使用提供者的預設模型"), key + " no longer carries the old meaning");
+});

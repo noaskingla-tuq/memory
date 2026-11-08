@@ -320,7 +320,7 @@ test("each pair keeps its own close timeout record: another pair's successful re
   assert.equal(afterA.state, "idle");
 });
 
-// why: this pins an accepted trade-off, not an ideal: an unfinished operation whose session could not be confirmed closed is never resumed, so it waits for the 7-day operator reconcile
+// why: a hard cancel closes the call as failed cancelled_local, so a session whose close could not be confirmed is never resumed and the retry simply sends on a fresh session
 test("after a hard cancel and then a close timeout, the retry sends on a fresh session and never resumes the old one", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "memory-close-unresolved-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

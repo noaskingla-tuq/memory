@@ -50,6 +50,7 @@ export interface BackendOptions {
   readonly backupHooks?: Partial<BackupHooks>;
   readonly organizationNow?: () => number;
   readonly hostSessionCloseTimeoutMs?: number;
+  readonly unstickRetryMs?: number;
   readonly profilePath?: string;
   readonly profileIo?: ProfileIo;
   readonly host?: PluginHostApiV1;
@@ -174,14 +175,20 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     }).then(() => undefined).catch(() => undefined).finally(() => { profileRefreshing = null; });
   };
 
-  // why: a migration failure must not block start-up, so it only shows in the organization status and the next start tries again
+  // why: a migration failure must not block start-up, so it shows in the organization status and is tried again until it succeeds, which is also what clears that status
+  let unstickTimer: ReturnType<typeof setTimeout> | undefined;
   const unstickStrandedCalls = async (): Promise<void> => {
     if (organizationStore === undefined) return;
     const now = options.organizationNow ?? Date.now;
     try {
       await unstickLocalDeadline(organizationStore, now(), () => { backupStateOnce(dirname(options.dataRoot), "punch-organization.json", "punch-organization.pre-unstick.json"); });
+      organization?.noteReleaseFault("unstick", null);
+      organization?.wake();
     } catch {
       organization?.noteReleaseFault("unstick", { code: "STORAGE_BUSY", phase: "state", localCode: "unstick_failed", retryable: true, at: now() });
+      if (disposed) return;
+      unstickTimer = setTimeout(() => { void unstickStrandedCalls(); }, options.unstickRetryMs ?? 300_000);
+      unstickTimer.unref();
     }
   };
 
@@ -296,6 +303,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     },
     dispose() {
       disposed = true;
+      clearTimeout(unstickTimer);
       if (profileTimer !== null) clearInterval(profileTimer);
       unsubscribeSettings?.();
       unsubscribeSettings = undefined;

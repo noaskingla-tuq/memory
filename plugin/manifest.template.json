@@ -24,8 +24,8 @@
     "summary": "原始工作紀錄儲存在本機；預設把請求與成果送到所選 AI 提供者，整理成可追溯的記憶。",
     "fields": [
       { "key": "organizationEnabled", "type": "toggle", "label": "啟用 AI 整理", "default": true, "help": "預設啟用。關閉時仍儲存原始工作紀錄；重新開啟會接續處理等待中的紀錄。" },
-      { "key": "organizationProvider", "type": "text", "label": "AI 提供者 ID", "default": "", "maxLength": 128, "help": "留空使用目前可用的預設提供者；指定 ID 不可用時會暫停整理。" },
-      { "key": "organizationModel", "type": "text", "label": "模型 ID", "default": "", "maxLength": 128, "help": "留空使用提供者的預設模型；不使用 astra。" },
+      { "key": "organizationProvider", "type": "text", "label": "AI 提供者 ID", "default": "", "maxLength": 128, "help": "留空使用外掛預設的提供者（codex）；指定 ID 不可用時會暫停整理。" },
+      { "key": "organizationModel", "type": "text", "label": "模型 ID", "default": "", "maxLength": 128, "help": "提供者是 codex 時，留空使用外掛預設的 gpt-6-luna；其他提供者留空則使用它的預設模型。不使用 astra。" },
       { "key": "organizationContextBudget", "type": "range", "label": "AI 輸入預算", "default": 32768, "min": 8192, "max": 262144, "step": 8192, "unit": "bytes", "help": "以 UTF-8 bytes 保守估算，並非精確 token 數；Cairn 另有每次模型輸入上限。" },
       { "key": "organizationFrequency", "type": "choice", "label": "整理頻率", "options": [{ "value": "daily", "label": "每天一輪" }, { "value": "immediate", "label": "即時整理" }], "default": "daily", "help": "每天一輪預設使用本機時間 02:00；即時整理會處理同步後的等待項目。" },
       { "key": "organizationDailyTime", "type": "text", "label": "每日開始時間（本機時區）", "default": "02:00", "maxLength": 5, "help": "24 小時制 HH:mm；只在每天一輪時使用。" }

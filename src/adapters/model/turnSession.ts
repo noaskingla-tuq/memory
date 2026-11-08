@@ -131,13 +131,14 @@ export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
     return { session: created, record };
   };
 
-  // why: the host allows one session per plugin, so a later open waits for an earlier one that the caller already walked away from
-  const inflight = new Set<Promise<unknown>>();
+  // why: the host allows one session per plugin, so a later open waits for an earlier one that its caller already walked away from; live opens are ordered by the host slot
+  const inflight = new Map<Promise<unknown>, AbortSignal>();
   const held = new Set<Promise<void>>();
   const acquire = async (request: TurnSessionRequest): Promise<PairSession> => {
-    while (inflight.size > 0) {
+    const abandoned = (): Promise<unknown>[] => [...inflight].filter(([, signal]) => signal.aborted).map(([run]) => run);
+    while (abandoned().length > 0) {
       const aborted = new Promise<void>((resolve) => { request.signal.addEventListener("abort", () => resolve(), { once: true }); });
-      if (!request.signal.aborted) await Promise.race([Promise.allSettled([...inflight]), aborted]);
+      if (!request.signal.aborted) await Promise.race([Promise.allSettled(abandoned()), aborted]);
       if (request.signal.aborted || deps.isDisposed()) throw cancelledError();
     }
     let release = (): void => {};
@@ -147,7 +148,7 @@ export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
       void pending.then(() => held.delete(pending));
     });
     const forget = (): void => { inflight.delete(run); release(); };
-    inflight.add(run);
+    inflight.set(run, request.signal);
     run.then(forget, forget);
     return run;
   };

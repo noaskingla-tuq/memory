@@ -1,6 +1,6 @@
 # teamuq-plugin-memory：TeamUQ 記憶外掛
 
-TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.9，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.8.2，釘選 Cairn e3e3761（套件版本 0.3.3，預設 schema 18）。
+TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.10，full-trust）。後端、Cairn adapter、UI 與作者端打包工具都在此 repo；使用公開 Devkit 1.8.2，釘選 Cairn e3e3761（套件版本 0.3.3，預設 schema 18）。
 
 > 驗證範圍是本機外掛、公開 devkit、Cairn 與 mock host/model。候選包只用暫時測試金鑰；正式簽章由使用者自行執行。此工作不讀取或啟動 TeamUQ 主程式，也不代表已通過實機 host 或真實模型驗證。
 
@@ -24,7 +24,7 @@ TeamUQ 記憶系統的獨立外掛 repo（id `teamuq.memory`，版本 1.4.9，fu
 
 舊佇列小量試跑：`ui.legacyTrial`（`{action:"start", requestId, count 1–50}` 或 `{action:"stop", requestId}`）只由狀態列的「小量試跑…」確認框（5、20、50 筆）呼叫，是寫入方法，不自動重試。只接管 `legacy_unlinked`、pending、`attempts===0`、`lastError===null`、輸入格式正確、沒有 journal 的 job（有 journal 的計入 `skippedAmbiguous`）；以 agent 輪流、同一 agent 依 key 排序挑選，在同一次檔案寫入補上 `queueSequence`、`resumeDisposition:"eligible"`、`adoptedBatchId`、`adoptedAt`，並寫入頂層選填欄位 `organizationTrial`（降回舊版不會壞）。相同 `requestId` 回上次結果、不寫檔；進行中再開始回 `trial_running`。試跑列不等每日輪次、當天輪次已完成也照送，每筆只送一次；連續失敗 3 次、`MODEL_NOT_CONFIGURED`／`MODEL_POLICY_DENIED` 或 quota／policy／task_binding 階段會自動停止，沒試的退回 `legacy_unlinked`。停止是協作式：做完目前這筆才退回。`ui.status.organization` 另有選填的 `legacyTrialCandidates` 與 `trial`（計數全由 job 列推導）。回應欄位 `candidates` 是這次呼叫處理完之後仍可被試跑選取的 job 數（剛接管的不再計入），與 `legacyTrialCandidates` 同義，確認框顯示的筆數也是這個數。這一版不含背景常駐，也不處理 `attempts>0` 的舊 job。
 
-每次 capture 以原始 `(canonical agentId, projectId|null)` 綁定 Cairn host session；TeamUQ 管理 Task ID 只作 host 關聯，不當來源專案識別。session 的固定 system 是 pair-neutral protocol；每個 turn 都攜帶當次 Cairn operation、system/output schema、callKey 與 input。v2 callKey 同時綁定 operation system/schema、request 與 occurrence；舊版 key 僅在保存的 model operation/system/request/occurrence 完全相符時相容，模糊或不符的舊 call 會停止等待核對，不重送。若 host 回報 `closedSessionResume`，重啟後才以原 sessionId attach 並核對有效 provider/model；舊 host、過期 session、權限失效或未知 send 都顯示降級階段，不自動開新 session 重送。Host `completed` 加 output 就是可靠回覆（真實 Core 不送 `contentSaved`）：收到 completed 後最多等 5 秒讓 `contentSaved` 到，期滿用 output 保存 bounded reply checkpoint（`sequenceNo` 可為 null，以 sha256 與位元組長度驗完整性），再交 Cairn 驗證 schema 並以穩定 operationId commit。`items:[]` 經 Cairn 驗證後是 `empty_success`，整理 job 完成且新記憶數為零；JSON 解析成功本身不算 Cairn schema 成功。
+Cairn 每呼叫一次模型（extract、classify 等每一次 `invoke`）就開一個全新的 host session，只帶固定 system、不帶 transcript，只送 1 個 turn，結算後立刻關閉，同一時間最多開 1 個；TeamUQ 管理 Task ID 只作 host 關聯，不當來源專案識別。固定 system 是 pair-neutral protocol；每個 turn 都攜帶當次 Cairn operation、system/output schema、callKey 與 input。v2 callKey 同時綁定 operation system/schema、request 與 occurrence；舊版 key 僅在保存的 model operation/system/request/occurrence 完全相符時相容，模糊或不符的舊 call 會停止等待核對，不重送。若 host 回報 `closedSessionResume`，重啟後遇到已送出而沒有回覆的呼叫，才以日誌記的 sessionId attach 並核對有效 provider/model；舊 host、過期 session、權限失效或未知 send 都顯示降級階段，不自動開新 session 重送。Host `completed` 加 output 就是可靠回覆（真實 Core 不送 `contentSaved`）：收到 completed 後最多等 5 秒讓 `contentSaved` 到，期滿用 output 保存 bounded reply checkpoint（`sequenceNo` 可為 null，以 sha256 與位元組長度驗完整性），再交 Cairn 驗證 schema 並以穩定 operationId commit。`items:[]` 經 Cairn 驗證後是 `empty_success`，整理 job 完成且新記憶數為零；JSON 解析成功本身不算 Cairn schema 成功。
 
 模型回合與 Cairn 的 30 秒脫鉤（S2）：Cairn 對單次模型呼叫寫死 30 秒（外掛不能改）。`input.signal` 在 `send()` 之後觸發時（軟中止）外掛只對 Cairn 回 `MODEL_TIMEOUT`（本機碼 `detached_running`），不呼叫 `session.interrupt()`、不寫日誌，回合繼續跑，結果存成 `reply_ready`；下一次呼叫的 callKey 相同（請求只由訊息 index、role、content 組成，eventId 固定），命中快取，不重送、不重複 admission。只有 `interrupt()`（關閉整理）與 `cancel()`（關機，最多等 15 秒）是硬取消，會中斷回合並寫成 `failed{cancelled_local}`。外掛自己的 90 秒上限已移除，只剩 Core 的 300 秒。detached 回合持續持有該配對的鎖與唯一的 host 位置，`releasePair` 等回合結束才關 session。整理佇列在同一筆工作內遇到逾時時，等回合結束、journal 有新的 `reply_ready` 才續跑，最多 6 次，整段算同一次嘗試。限制（已用真實 Cairn 核心驗證）：Cairn 在分類階段逾時時 admission 已完成，之後同一事件的 capture 只回 `duplicate`、不會重跑分類，所以逾時後才完成的分類回覆會被快取但用不到。
 
@@ -79,7 +79,7 @@ cairn-pin.json          Cairn 釘選：commit、coreTree、redactSha256、accept
 - remember：每個 op 依序執行，成功值只投影 `{memory:{id}, deduplicated}`。
 - inspect：以整個回應 `Buffer.byteLength(JSON.stringify(response), "utf8")`、60,000 bytes 為預算；超過就把 limit 對半、重查，直到符合。回 `nextCursor`（list 取 `nextCursor`，get 取 `nextReceiptCursor`）與 `appliedLimit`，呼叫端續頁必須用 `appliedLimit`。`limit` 沒給時明確用 6。降到 1 仍超過拋 `result_too_large`。Cairn cursor 綁定簽發時的 limit，帶 cursor 的續頁超過預算無法對半，同樣拋 `result_too_large`。
 - 每個回應在回傳前都用 vendored 回應 schema 解析（失敗拋 `internal`）；`diagnose` 不含任何路徑，`storage.status` 為 `ready` 或小寫的錯誤碼（如 `storage_unsafe`）。
-- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.4.9`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
+- `plugin.version` 是 `src/backend/diagnose.ts` 的常數（現為 `1.4.10`），測試會比對 `package.json` 的 version，改版時兩處一起改；manifest 的 version 由 `package.json` 帶入。
 - 資料層的祖先目錄檢查只從 `dataDir` 往下走（`CairnDataLayout` 的 `trustedBase`）：`--permission` 下外掛讀不到 `dataDir` 以上的任何路徑，往上 lstat 會被拒（實測回 `STORAGE_BUSY`）。`dataDir` 以下仍拒絕 symlink／junction；`dataDir` 以上的重導向（例如 macOS `/var`）視為 host 的事。不傳 `trustedBase` 時維持從根目錄往下檢查。
 
 ## 唯讀讀取器與 agent 目錄（S1）
@@ -231,10 +231,10 @@ Core 把整份名稱表（agent、部門、專案）以 `memory.profile.sync@1` 
 ## 打包與簽章（P3）
 
 ```powershell
-node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.4.9.tuqplugin
+node tools/build.mjs                        # 暫時金鑰簽章（--anchors self），產出 dist/teamuq.memory-1.4.10.tuqplugin
 node tools/build.mjs --stage-only           # 只做 stage 與 devkit validate
 node tools/build.mjs --key <file.key.pem>   # 真金鑰：互動輸入 passphrase，預設 --anchors core
-node tools/verify-artifact.mjs dist/teamuq.memory-1.4.9.tuqplugin --pub-file dist/signer.pub.json
+node tools/verify-artifact.mjs dist/teamuq.memory-1.4.10.tuqplugin --pub-file dist/signer.pub.json
 ```
 
 build 依序：`verify-source-untouched`、`contract:verify`（含 devkit lock）→ esbuild 打 `stage/backend.mjs`（zod 內聯；`cairn-memory/core/index.mjs` 改成外部相對路徑 `./cairn/core/index.mjs`，其他 `cairn-memory` import 一律報錯）→ `stage-cairn` → 由 `plugin/manifest.template.json` 產 manifest → devkit `validate` → `release`（devkit `pack`＋`verify`）→ `verify-artifact`。

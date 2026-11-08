@@ -11,7 +11,7 @@ import { callError } from "./contractErrors.js";
 import { CONTRACT_LOCK_SHA256 } from "./vendoredContractLock.js";
 
 // why: test/backend-diagnose asserts this equals package.json version; the packaged plugin has no package.json to read
-export const PLUGIN_VERSION = "1.4.9";
+export const PLUGIN_VERSION = "1.4.10";
 
 let sqliteVersion: string | undefined;
 

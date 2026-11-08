@@ -9,7 +9,7 @@ import { ok, punch, workerRig } from "./organizationHarness.mjs";
 const NO_PROFILE = { current: () => ({ generation: null, receivedAt: null, agents: 0, projects: 0, teams: 0, incomplete: false, corrupt: false, omitted: { agents: 0, projects: 0, teams: 0 } }) };
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const until = async (condition, ms = 5_000) => { const end = Date.now() + ms; while (Date.now() < end && !condition()) await pause(10); assert.ok(condition(), "condition not reached"); };
-const wrap = (organization) => ({ ok: true, version: "1.4.8", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
+const wrap = (organization) => ({ ok: true, version: "1.4.10", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
 
 function dailyRig(t, patch = {}) {
   const events = [];

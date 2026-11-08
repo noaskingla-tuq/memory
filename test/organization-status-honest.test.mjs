@@ -4,7 +4,7 @@ import { parseUiResponse } from "../out/contracts/uiContract.js";
 import { fail, legacyJob, seed } from "./trialHarness.mjs";
 import { ok, punch, workerRig } from "./organizationHarness.mjs";
 
-const wrap = (organization) => ({ ok: true, version: "1.4.8", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
+const wrap = (organization) => ({ ok: true, version: "1.4.10", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
 const eligible = (index, patch = {}) => ({ ...legacyJob("e" + index, { agentId: "sw/manager", projectId: "1", attempts: 0 }), resumeDisposition: "eligible", queueSequence: index + 1, ...patch });
 const oldBusy = (index) => eligible(index, { attempts: 2, lastError: "RESOURCE_BUSY", errorPhase: "session_resume", retryable: true, nextAttemptAt: Date.now() + 3_600_000, lastAttemptDate: "2026-01-01", lastAttemptAt: 1 });
 

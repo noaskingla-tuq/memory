@@ -78,7 +78,7 @@ export function createHostMemoryModelPort(
   const tails = new Set<Promise<unknown>>();
   const detachedSince = new Map<AbortController, number>();
   const live = new Set<PluginBackendAiSessionV1>();
-  let stuckClose: { readonly pair: string; readonly error: MemoryServiceError } | null = null;
+  const stuckClose: { readonly pair: string; readonly error: MemoryServiceError }[] = [];
   const locks = new Map<string, Promise<void>>();
   // why: a host session whose close timed out may still be open, so it must never be resumed
   const abandoned = new Set<string>();
@@ -134,7 +134,7 @@ export function createHostMemoryModelPort(
 
   const closeQuietly = (session: PluginBackendAiSessionV1): Promise<void> => closeWithin(session).then((outcome) => {
     if (outcome === "timeout") abandoned.add(session.sessionId);
-  }, () => undefined);
+  }, () => { abandoned.add(session.sessionId); });
 
   // why: the saved record outlives this process state, so it must stop reading as an active session that can be resumed
   const invalidateSaved = async (pair: string, hostSessionId: string): Promise<void> => {
@@ -278,7 +278,7 @@ export function createHostMemoryModelPort(
     closeQuietly, persistSession, stateError, publicError, ...(limits.openWaitMs === undefined ? {} : { abandonedWaitMs: limits.openWaitMs }),
   });
 
-  // why: a close that does not settle must not fail a turn whose reply is already saved, so it is remembered and reported once to the next call or release
+  // why: a close that does not settle must not fail a turn whose reply is already saved, so each one is remembered and reported once to the next call or release
   const closeTurnSession = async (pair: string, session: PluginBackendAiSessionV1): Promise<void> => {
     live.delete(session);
     let outcome: "closed" | "timeout" = "closed";
@@ -287,7 +287,7 @@ export function createHostMemoryModelPort(
     if (outcome !== "timeout") return;
     abandoned.add(session.sessionId);
     await invalidateSaved(pair, session.sessionId);
-    stuckClose = { pair, error: serviceError("RESOURCE_BUSY", "Memory host session close timed out", undefined, "session_close", CLOSE_TIMEOUT_LOCAL_CODE) };
+    stuckClose.push({ pair, error: serviceError("RESOURCE_BUSY", "Memory host session close timed out", undefined, "session_close", CLOSE_TIMEOUT_LOCAL_CODE) });
   };
 
   const journal: TurnJournal | undefined = resumeStore === undefined ? undefined : {
@@ -449,7 +449,7 @@ export function createHostMemoryModelPort(
         ? keyedWork()
         : withPairLock(pair, () => withHostSlot(async () => {
           if (before.signal.aborted || disposed) throw cancelledError();
-          if (stuckClose !== null) { const fault = stuckClose.error; stuckClose = null; throw fault; }
+          const fault = stuckClose.shift(); if (fault !== undefined) throw fault.error;
           return keyedWork();
         }, before.signal));
       // why: the pair lock and the host slot belong to this tail until the host turn ends, even after the caller was told the call timed out
@@ -489,10 +489,8 @@ export function createHostMemoryModelPort(
       const pair = pairKey(agentId, projectId);
       // why: the turn already closed its own session, so this only waits behind a running turn and reports a close that timed out
       await withPairLock(pair, () => withHostSlot(async () => {
-        if (stuckClose?.pair !== pair) return;
-        const fault = stuckClose.error;
-        stuckClose = null;
-        throw fault;
+        const at = stuckClose.findIndex((entry) => entry.pair === pair);
+        if (at >= 0) throw stuckClose.splice(at, 1)[0]!.error;
       }));
     },
     async cancel() {

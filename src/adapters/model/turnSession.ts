@@ -45,10 +45,12 @@ export interface TurnSessionRequest {
 
 const cancelledError = (): MemoryServiceError => new MemoryServiceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled");
 
-export function createTurnSessions(deps: TurnSessionDeps): (request: TurnSessionRequest) => Promise<PairSession> {
+export type TurnSessionAcquire = ((request: TurnSessionRequest) => Promise<PairSession>) & { idle(): Promise<void> };
+
+export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
   const { ai, task, resumeStore } = deps;
 
-  return async (request) => {
+  const acquireOne = async (request: TurnSessionRequest): Promise<PairSession> => {
     const { invocation, pair, providerId, modelId, signal } = request;
     let taskId = task === undefined ? null : await task.resolve(invocation.canonicalAgentId);
     const openFresh = async (): Promise<PluginBackendAiSessionV1> => {
@@ -102,7 +104,10 @@ export function createTurnSessions(deps: TurnSessionDeps): (request: TurnSession
         throw new MemoryServiceError("MODEL_POLICY_DENIED", "The resumed memory session identity changed", false, "session_resume");
       }
       const record: OrganizationSessionRecord = { ...saved, state: "active", lastUsedAt: Date.now() };
-      await deps.persistSession(record);
+      try { await deps.persistSession(record); }
+      catch (error) { await deps.closeQuietly(resumed); throw error; }
+      // why: the caller may have stopped waiting during the write, and then nobody else would ever close this session
+      if (gone()) { await deps.closeQuietly(resumed); throw cancelledError(); }
       return { session: resumed, record };
     }
 
@@ -120,6 +125,23 @@ export function createTurnSessions(deps: TurnSessionDeps): (request: TurnSession
     // why: the saved record is what lets a restart find the one session a sent turn lives on
     try { await deps.persistSession(record); }
     catch (error) { await deps.closeQuietly(created); throw error; }
+    if (gone()) { await deps.closeQuietly(created); throw cancelledError(); }
     return { session: created, record };
   };
+
+  // why: the host allows one session per plugin, so a later open waits for an earlier one that the caller already walked away from
+  const inflight = new Set<Promise<unknown>>();
+  const acquire = async (request: TurnSessionRequest): Promise<PairSession> => {
+    while (inflight.size > 0) {
+      const aborted = new Promise<void>((resolve) => { request.signal.addEventListener("abort", () => resolve(), { once: true }); });
+      if (!request.signal.aborted) await Promise.race([Promise.allSettled([...inflight]), aborted]);
+      if (request.signal.aborted || deps.isDisposed()) throw cancelledError();
+    }
+    const run = acquireOne(request);
+    const forget = (): void => { inflight.delete(run); };
+    inflight.add(run);
+    run.then(forget, forget);
+    return run;
+  };
+  return Object.assign(acquire, { idle: async (): Promise<void> => { await Promise.allSettled([...inflight]); } });
 }

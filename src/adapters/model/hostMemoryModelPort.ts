@@ -283,7 +283,7 @@ export function createHostMemoryModelPort(
     live.delete(session);
     let outcome: "closed" | "timeout" = "closed";
     try { outcome = await closeWithin(session); }
-    catch { return; }
+    catch { outcome = "timeout"; }
     if (outcome !== "timeout") return;
     abandoned.add(session.sessionId);
     await invalidateSaved(pair, session.sessionId);
@@ -502,7 +502,7 @@ export function createHostMemoryModelPort(
       let timer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([Promise.all([...tails]), new Promise<void>((resolve) => { timer = setTimeout(resolve, closeTimeoutMs); })]);
       clearTimeout(timer);
-      await Promise.all([...live].map(closeQuietly));
+      await Promise.all([...live].map(closeQuietly).concat(acquireSession.idle()));
       live.clear();
     },
   };

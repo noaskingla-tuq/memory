@@ -29,6 +29,16 @@
   color: var(--text-secondary-strong);
 }
 
+.ao .ao-wait {
+  margin: var(--sp-2) 0 0;
+  font-size: 12px;
+}
+
+.ao .ao-wait[data-ao-waiting="warn"] {
+  color: var(--warning-strong);
+  font-weight: 600;
+}
+
 .ao .ao-actions {
   margin: var(--sp-3) 0 0;
 }

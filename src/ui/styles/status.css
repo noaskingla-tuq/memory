@@ -35,6 +35,11 @@
   background: var(--error-strong);
 }
 
+.status-items li[data-waiting="warn"] {
+  color: var(--warning-strong);
+  font-weight: 600;
+}
+
 .status-toggle {
   flex: none;
   min-width: 28px;

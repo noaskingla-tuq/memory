@@ -56,7 +56,7 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   // why: the per-agent run needs only the organization worker, like the trial, so it answers even while the Cairn layout is unavailable
   if (method === "ui.agentOrganization") {
     if (deps.agentOrganization === undefined) return uiFailure("STORAGE_UNSUPPORTED");
-    try { return { ok: true, ...(await deps.agentOrganization(params as UiAgentOrganizationRequest)) }; } catch { return uiFailure("STORAGE_BUSY"); }
+    try { return { ok: true, ...(await deps.agentOrganization(params as UiAgentOrganizationRequest)), waiting: deps.organizationStatus?.().waiting ?? null }; } catch { return uiFailure("STORAGE_BUSY"); }
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;

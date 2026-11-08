@@ -372,6 +372,7 @@ export const uiAgentOrganizationSuccess = z.object({
   pending: count,
   blocked: z.enum(["disabled", "running", "other_running", "no_candidates", "not_running"]).nullable(),
   run: uiAgentRunSchema.nullable(),
+  waiting: z.object({ sinceMs: count }).strict().nullable().optional(),
 }).strict();
 
 export const uiUpgradeLegacySuccess = z

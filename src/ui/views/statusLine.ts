@@ -45,6 +45,14 @@ const TOGGLE_SELECTOR = "[data-status-toggle]";
 
 type Organization = NonNullable<UiStatus["organization"]>;
 
+export const STATUS_WAITING_WARN_MS = 300_000;
+
+function waitingText(organization: Organization): string {
+  const ms = organization.waiting?.sinceMs;
+  if (ms === undefined) return "";
+  return t(ms > STATUS_WAITING_WARN_MS ? "status.organization.waitingLong" : "status.organization.waiting", { n: Math.floor(ms / 1000) });
+}
+
 interface StatusView {
   readonly state: "ok" | "warn" | "error";
   readonly content: SafeHtml;
@@ -90,6 +98,7 @@ function compactText(status: UiStatus, ready: boolean): string {
   const parts = [ready ? (organization === undefined ? t("status.ok") : t(`status.organization.phase.${organization.state}`)) : t("status.storageTrouble").replace(/。$/u, "")];
   // why: a running trial is the one thing that must stay visible while the panel is folded
   if (organization?.trial?.state === "running") parts.push(t("trial.compact", { done: organization.trial.attempted, adopted: organization.trial.adopted }));
+  if (organization?.waiting != null) parts.push(waitingText(organization));
   if (organization !== undefined && organization.legacyUnlinked > 0) parts.push(t("status.compact.legacy", { n: organization.legacyUnlinked }));
   return parts.join(" · ");
 }
@@ -110,7 +119,8 @@ function organizationItems(organization: Organization): SafeHtml {
   const jobs = legacy.value === "" && controls === EMPTY_HTML ? EMPTY_HTML : html`<li class="muted">${legacy}${controls}</li>`;
   const skipped = organization.diagnosticsAvailable === true ? t("status.organization.skipped", { n: organization.schemaSkipped ?? 0 }) : t("status.organization.skippedUnknown");
   const summary = t("status.organization.summary", { admitted: organization.admitted ?? t("status.organization.unknown"), pending: organization.pending, replies: organization.replyReady, completed: organization.completed });
-  return html`<li>${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}</li><li class="muted">${summary}</li>${jobs}<li class="muted">${skipped}</li>`;
+  const wait = organization.waiting == null ? EMPTY_HTML : html`<li data-waiting="${organization.waiting.sinceMs > STATUS_WAITING_WARN_MS ? "warn" : "normal"}">${waitingText(organization)}</li>`;
+  return html`<li>${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}</li>${wait}<li class="muted">${summary}</li>${jobs}<li class="muted">${skipped}</li>`;
 }
 
 function organizationDetails(organization: Organization): SafeHtml {
@@ -146,7 +156,7 @@ function viewOf(result: BackendResult, nowMs: number, expanded: boolean): Status
     const status = result.value;
     const ready = status.storage.status === "ready";
     const organization = status.organization;
-    const warn = !ready || organization?.state === "paused" || organization?.state === "error";
+    const warn = !ready || organization?.state === "paused" || organization?.state === "error" || (organization?.waiting?.sinceMs ?? 0) > STATUS_WAITING_WARN_MS;
     const detail = t("status.detail", { version: status.version, storage: status.storage.status });
     const written = ready ? html`<li class="muted">${writeText(status, nowMs)}</li>` : EMPTY_HTML;
     const panel = html`<ul class="status-items"><li title="${detail}">${ready ? t("status.ok") : t("status.storageTrouble")}</li>${written}${organization === undefined ? EMPTY_HTML : organizationItems(organization)}</ul>${organization === undefined ? EMPTY_HTML : organizationDetails(organization)}`;

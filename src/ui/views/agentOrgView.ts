@@ -14,9 +14,11 @@ export interface AgentOrgModel {
   readonly busy: boolean;
   readonly notice: StringKey | null;
   readonly error: ErrorDescription | null;
+  readonly waitingMs?: number | null;
 }
 
 export const AGENT_ORG_ID = "space-org";
+export const WAITING_WARN_MS = 300_000;
 
 export type AgentOrgState = "loading" | "idle" | "running" | "stopping" | "completed" | "stopped";
 
@@ -42,6 +44,15 @@ function line(model: AgentOrgModel, state: AgentOrgState): string {
   if (run !== null && state === "completed") return t("ao.done", counts(run));
   if (run !== null && state === "stopped") return t("ao.stopped", counts(run));
   return model.pending === 0 ? t("ao.idle.none") : t("ao.idle", { n: model.pending });
+}
+
+function waitingLine(model: AgentOrgModel): SafeHtml {
+  const ms = model.waitingMs ?? null;
+  if (ms === null) return EMPTY_HTML;
+  const n = Math.floor(ms / 1000);
+  return ms > WAITING_WARN_MS
+    ? html`<p class="ao-wait" data-ao-waiting="warn" role="status">${t("ao.waiting.long", { n })}</p>`
+    : html`<p class="ao-wait" data-ao-waiting="normal" role="status">${t("ao.waiting", { n })}</p>`;
 }
 
 function note(model: AgentOrgModel, state: AgentOrgState): SafeHtml {
@@ -71,5 +82,5 @@ function meter(model: AgentOrgModel, state: AgentOrgState): SafeHtml {
 // why: the empty ao-slot keeps the place where the per-agent model and time settings go, so adding them later does not move the buttons
 export function agentOrgSection(model: AgentOrgModel): SafeHtml {
   const state = agentOrgState(model);
-  return html`<section class="card ao-card" aria-labelledby="ao-title" data-ao-state="${state}"><h3 id="ao-title">${t("ao.title")}</h3><p class="ao-line" role="status" aria-live="polite">${line(model, state)}</p>${meter(model, state)}${note(model, state)}<p class="ao-actions">${actions(model, state)}</p><div class="ao-slot" data-ao-slot="settings"></div></section>`;
+  return html`<section class="card ao-card" aria-labelledby="ao-title" data-ao-state="${state}"><h3 id="ao-title">${t("ao.title")}</h3><p class="ao-line" role="status" aria-live="polite">${line(model, state)}</p>${meter(model, state)}${waitingLine(model)}${note(model, state)}<p class="ao-actions">${actions(model, state)}</p><div class="ao-slot" data-ao-slot="settings"></div></section>`;
 }

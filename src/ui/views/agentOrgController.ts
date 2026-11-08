@@ -26,15 +26,15 @@ export interface AgentOrg {
   model(): AgentOrgModel;
 }
 
-const BLANK: AgentOrgModel = { phase: "loading", agentId: "", pending: 0, run: null, blocked: null, busy: false, notice: null, error: null };
+const BLANK: AgentOrgModel = { phase: "loading", agentId: "", pending: 0, run: null, blocked: null, busy: false, notice: null, error: null, waitingMs: null };
 
-function parse(value: unknown): { pending: number; blocked: string | null; run: UiAgentRun | null } | null {
-  const answer = value as { ok?: unknown; pending?: unknown; blocked?: unknown; run?: unknown } | null;
+function parse(value: unknown): { pending: number; blocked: string | null; run: UiAgentRun | null; waitingMs: number | null } | null {
+  const answer = value as { ok?: unknown; pending?: unknown; blocked?: unknown; run?: unknown; waiting?: { sinceMs?: unknown } | null } | null;
   if (typeof answer !== "object" || answer === null || answer.ok !== true || typeof answer.pending !== "number") return null;
   const run = answer.run;
   const valid = run === null || (typeof run === "object" && run !== undefined && typeof (run as { state?: unknown }).state === "string");
   if (!valid) return null;
-  return { pending: answer.pending, blocked: typeof answer.blocked === "string" ? answer.blocked : null, run: run as UiAgentRun | null };
+  return { pending: answer.pending, blocked: typeof answer.blocked === "string" ? answer.blocked : null, run: run as UiAgentRun | null, waitingMs: typeof answer.waiting?.sinceMs === "number" ? answer.waiting.sinceMs : null };
 }
 
 export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
@@ -46,7 +46,7 @@ export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
 
   const render = (): void => { if (target !== null) mount(target, agentOrgSection(state)); };
   const stopTimer = (): void => { if (timer !== null) { deps.scheduler.clear(timer); timer = null; } };
-  const active = (): boolean => state.run?.state === "running" || state.run?.state === "stopping";
+  const active = (): boolean => state.run?.state === "running" || state.run?.state === "stopping" || (state.waitingMs ?? null) !== null;
   // why: the poll only runs while a run is live and the page is visible, so an idle or hidden page asks the backend for nothing
   const schedule = (): void => {
     stopTimer();
@@ -70,7 +70,7 @@ export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
     const answer = parse(result.value);
     state = answer === null
       ? { ...state, phase: "ready", busy: false, error: describeError("malformed_response", "client") }
-      : { phase: "ready", agentId, pending: answer.pending, blocked: answer.blocked, run: answer.run, busy: false, notice: answer.blocked === null ? notice : null, error: null };
+      : { phase: "ready", agentId, pending: answer.pending, blocked: answer.blocked, run: answer.run, waitingMs: answer.waitingMs, busy: false, notice: answer.blocked === null ? notice : null, error: null };
     render();
     schedule();
   }

@@ -135,8 +135,14 @@ test("organization status preserves distinct redacted model, schema, journal, ti
   const timeout = await runOrganizationPhase(t, { name: "timeout", waitForReply: true });
   const storage = await runOrganizationPhase(t, { name: "storage", storageFailure: true });
 
+  // why: a reply that stays invalid after its retries ends the job for good, so the row keeps the phase while the status no longer holds an error for a closed job
+  assert.equal(malformed.row.state, "skipped");
+  assert.equal(malformed.row.errorPhase, "reply_contract");
+  assert.equal(malformed.row.lastError, "MODEL_OUTPUT_INVALID");
+  assert.equal(malformed.row.hostErrorCode, "json_parse");
+  assert.equal(malformed.organizationStatus.lastError, null);
   for (const [entry, phase] of [
-    [malformed, "reply_contract"], [schemaRejected, "cairn_schema"], [checkpoint, "state"], [timeout, "turn_timeout"], [storage, "commit"],
+    [schemaRejected, "cairn_schema"], [checkpoint, "state"], [timeout, "turn_timeout"], [storage, "commit"],
   ]) {
     assert.equal(entry.row.errorPhase, phase, JSON.stringify(entry.row));
     assert.equal(entry.organizationStatus.errorPhase, phase, "worker.status keeps the semantic failure phase");

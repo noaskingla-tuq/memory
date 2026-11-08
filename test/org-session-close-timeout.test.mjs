@@ -66,14 +66,19 @@ test("a close() that never settles is abandoned after the limit, recorded as ses
   const dir = mkdtempSync(join(tmpdir(), "memory-close-timeout-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const h = hangingCloseAi();
-  const port = createHostMemoryModelPort(h.ai, enabled, undefined, createLocalPunchOrganizationStore(dir), CLOSE_LIMIT_MS);
+  const store = createLocalPunchOrganizationStore(dir);
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, store, CLOSE_LIMIT_MS);
   // why: the session is closed right after its own turn, so the bounded wait is spent inside the call that opened it and the saved reply is still returned
   const startedAt = Date.now();
   assert.deepEqual(await invokeScoped(port, actorOf("sw/a"), "organize:one"), { items: [] });
   const elapsed = Date.now() - startedAt;
   assert.ok(elapsed >= CLOSE_LIMIT_MS - 20 && elapsed < CLOSE_LIMIT_MS + 1500, "released near the limit, not after the hang: " + elapsed + "ms");
+  // why: the worker prunes a finished operation, and an unpruned one would block the pair for a reason unrelated to the close fault
+  await store.pruneOperation(operationKey(pairKey("sw/a", "close-project"), "organize:one"));
 
-  await assert.rejects(invokeScoped(port, actorOf("sw/b"), "organize:two"), (error) => {
+  // why: the fault belongs to the pair whose session did not close, so another pair's call is not failed by it
+  assert.deepEqual(await invokeScoped(port, actorOf("sw/b"), "organize:other"), { items: [] });
+  await assert.rejects(invokeScoped(port, actorOf("sw/a"), "organize:two"), (error) => {
     assert.equal(error.name, "MemoryServiceError");
     assert.equal(error.code, "RESOURCE_BUSY");
     assert.equal(error.phase, "session_close");
@@ -81,8 +86,8 @@ test("a close() that never settles is abandoned after the limit, recorded as ses
     return true;
   });
 
-  assert.deepEqual(await invokeScoped(port, actorOf("sw/b"), "organize:three"), { items: [] });
-  assert.equal(h.counters.closeCalls, 2, "the stuck session was asked to close once and is not retried; the third call closed only its own session");
+  assert.deepEqual(await invokeScoped(port, actorOf("sw/a"), "organize:three"), { items: [] });
+  assert.equal(h.counters.closeCalls, 3, "the stuck session was asked to close once and is not retried; the other two calls closed only their own sessions");
   await port.cancel();
 });
 
@@ -99,7 +104,7 @@ test("after a close timed out, the same pair opens a new session instead of resu
   assert.equal(h.counters.openOptions.length, 1);
   assert.equal(h.counters.openOptions[0].resume, undefined);
 
-  await assert.rejects(invokeScoped(port, actorOf("sw/b"), "organize:two"), (error) => error.phase === "session_close");
+  await assert.rejects(invokeScoped(port, actorOf("sw/a"), "organize:two"), (error) => error.phase === "session_close");
   const afterTimeout = (await store.readResumeState()).sessions;
   const savedA = Object.values(afterTimeout).find((record) => record.hostSessionId === stuckId);
   assert.notEqual(savedA?.state, "active", "the saved record of the unclosed session is no longer resumable");
@@ -165,7 +170,8 @@ test("the organization worker records the close timeout with its phase and plugi
     },
   });
   await worker.enqueue(punch("close-a", "sw/a"), "memory-a");
-  await worker.enqueue(punch("close-b", "sw/b"), "memory-b");
+  // why: the close fault of sw/a is reported to the next call of sw/a, so the second job belongs to the same pair
+  await worker.enqueue(punch("close-b", "sw/a"), "memory-b");
   await worker.enqueue(punch("close-c", "sw/c"), "memory-c");
   const startedAt = Date.now();
   worker.start();

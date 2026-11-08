@@ -37,6 +37,15 @@ function isPlainObject(value: unknown): boolean {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// why: the agent page shows the same optional facts as the status line, and a field the worker leaves out stays out of the answer
+function organizationHints(status: OrganizationStatus | undefined): Record<string, unknown> {
+  return {
+    waiting: status?.waiting ?? null,
+    ...(status?.pauseReason === undefined ? {} : { pauseReason: status.pauseReason }),
+    ...(status?.stall === undefined ? {} : { stall: status.stall }),
+  };
+}
+
 function storageFailure(status: string): UiFailure {
   return uiFailure(status === "storage_unsupported" || status === "storage_unsafe" ? "STORAGE_UNSUPPORTED" : "STORAGE_BUSY");
 }
@@ -56,7 +65,7 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   // why: the per-agent run needs only the organization worker, like the trial, so it answers even while the Cairn layout is unavailable
   if (method === "ui.agentOrganization") {
     if (deps.agentOrganization === undefined) return uiFailure("STORAGE_UNSUPPORTED");
-    try { return { ok: true, ...(await deps.agentOrganization(params as UiAgentOrganizationRequest)), waiting: deps.organizationStatus?.().waiting ?? null }; } catch { return uiFailure("STORAGE_BUSY"); }
+    try { return { ok: true, ...(await deps.agentOrganization(params as UiAgentOrganizationRequest)), ...organizationHints(deps.organizationStatus?.()) }; } catch { return uiFailure("STORAGE_BUSY"); }
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;

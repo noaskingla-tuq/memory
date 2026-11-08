@@ -96,6 +96,7 @@ export interface AgentOrganizationDeps {
   readonly enabled: () => boolean;
   readonly now: () => number;
   readonly wake: () => void;
+  readonly onRun?: () => void;
 }
 
 // why: requests are answered one after another, so two quick presses can never both find no run and both start one
@@ -126,6 +127,7 @@ export function createAgentOrganization(deps: AgentOrganizationDeps): (request: 
       if (running !== null) return reply(request.agentId, running === request.agentId ? "running" : "other_running");
       const members = candidates(request.agentId);
       if (members.length === 0) return reply(request.agentId, "no_candidates");
+      deps.onRun?.();
       deps.run.begin(request.agentId, members, deps.now());
       deps.wake();
       return reply(request.agentId, null);

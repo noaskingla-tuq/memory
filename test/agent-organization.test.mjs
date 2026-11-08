@@ -227,3 +227,14 @@ test("a member that is forgotten before it is reached does not hold the run open
   assert.deepEqual([run.state, run.total, run.done, run.failed, run.untried], ["completed", 1, 0, 0, 1]);
   assert.equal((await worker.agentOrganization(RUN("sw/b"))).blocked, "no_candidates", "another agent is no longer held back (b1 already ran)");
 });
+
+test("dispatch: the agent page answer carries the stall facts from the organization status, and omits them when there are none", async () => {
+  const answer = async () => ({ action: "status", agentId: "sw/a", pending: 2, blocked: null, run: null });
+  const deps = (status) => ({ storageStatus: () => "ready", services: () => undefined, profile: NO_PROFILE, agentOrganization: answer, organizationStatus: () => status });
+  const stalled = await dispatchUi("ui.agentOrganization", STATUS("sw/a"), deps({ waiting: null, pauseReason: "stall", stall: { count: 3, limit: 3 } }));
+  assert.equal(parseUiResponse("ui.agentOrganization", stalled), true);
+  assert.deepEqual([stalled.pauseReason, stalled.stall], ["stall", { count: 3, limit: 3 }]);
+  const calm = await dispatchUi("ui.agentOrganization", STATUS("sw/a"), deps({ waiting: null }));
+  assert.equal("pauseReason" in calm, false);
+  assert.equal(calm.waiting, null);
+});

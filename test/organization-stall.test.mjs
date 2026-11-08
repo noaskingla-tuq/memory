@@ -97,11 +97,16 @@ test("three stuck jobs in a row pause the organization with an existing code, la
   const wrap = (organization) => ({ ok: true, version: "1.4.7", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
   assert.equal(parseUiResponse("ui.status", wrap(paused)), true);
 
-  const blocked = await worker.agentOrganization({ action: "run", agentId: "sw/a" });
-  assert.equal(blocked.blocked, null);
+  const probe = await worker.agentOrganization({ action: "run", agentId: "sw/a" });
+  assert.equal(probe.blocked, null);
   await worker.idle();
-  assert.deepEqual(h.calls, ["j1", "j2", "j3"], "an immediate run does not get past the pause either");
+  assert.deepEqual(h.calls, ["j1", "j2", "j3", "j1"], "run now sends exactly one job while paused, and that job stalls again");
+  assert.equal(worker.status().state, "paused", "the stall pauses again at once");
+  assert.equal(worker.status().pauseReason, "stall");
   assert.equal((await worker.agentOrganization({ action: "status", agentId: "sw/a" })).run.state, "completed");
+  await worker.agentOrganization({ action: "run", agentId: "sw/a" });
+  await worker.idle();
+  assert.deepEqual(h.calls, ["j1", "j2", "j3", "j1", "j1"], "each press probes one job, never more");
 
   answer = ok();
   h.state.enabled = false;
@@ -132,4 +137,66 @@ test("a settled job clears the count, so stalls that are not consecutive never p
 test("the queue's wait cap is above the model port's backstop", async () => {
   const { TURN_BACKSTOP_MS } = await import("../out/adapters/model/turnLimits.js");
   assert.ok(AWAIT_CAP_MS > TURN_BACKSTOP_MS);
+});
+
+test("the guard lets one job through for a run-now press and pauses again at the next stall", () => {
+  const guard = createStallGuard();
+  assert.equal(guard.allowOne(), false, "nothing to lift while not paused");
+  for (let i = 0; i < STALL_LIMIT; i += 1) guard.observe("stuck");
+  assert.equal(guard.allowOne(), true);
+  assert.equal(guard.paused(), false);
+  assert.equal(guard.count(), STALL_LIMIT - 1);
+  guard.observe("stuck");
+  assert.equal(guard.paused(), true, "one more stall and it is paused again");
+  guard.allowOne();
+  guard.observe("settled");
+  assert.equal(guard.count(), 0, "a settled probe clears the count");
+});
+
+test("run now while paused: a probe that settles clears the pause and the queue carries on; the scheduled queue stayed paused until then", async (t) => {
+  let answer = timeout();
+  const h = workerRig(t, { capture: async (job) => { h.calls.push(job.punchId); return answer; } });
+  const worker = h.create();
+  await enqueueAll(worker, ["m1", "m2", "m3", "m4", "m5"]);
+  worker.start();
+  await worker.idle();
+  assert.deepEqual(h.calls, ["m1", "m2", "m3"]);
+  worker.wake();
+  await worker.idle();
+  assert.equal(h.calls.length, 3, "the schedule sends nothing while paused");
+  answer = ok();
+  await worker.agentOrganization({ action: "run", agentId: "sw/a" });
+  await worker.idle();
+  assert.equal(worker.status().state === "paused", false);
+  assert.equal(new Set(h.calls.slice(3)).size, 5, "the probe settled, so every job was sent after it");
+});
+
+test("settingsChanged clears the stall count on the spot, without waiting for a pass or for the organization to be switched off", async (t) => {
+  const h = workerRig(t, { capture: async (job) => { h.calls.push(job.punchId); return timeout(); } });
+  const worker = h.create();
+  await enqueueAll(worker, ["s1", "s2", "s3", "s4"]);
+  worker.start();
+  await worker.idle();
+  assert.equal(worker.status().pauseReason, "stall");
+  h.state.enabled = false;
+  worker.settingsChanged();
+  h.state.enabled = true;
+  worker.settingsChanged();
+  assert.notEqual(worker.status().state, "paused", "no pass has run in between, and the pause is already gone");
+  assert.equal(worker.status().pauseReason, undefined);
+});
+
+test("the stall facts are optional status fields the contract accepts, and a worker that is not stalled leaves them out", async (t) => {
+  const h = workerRig(t, { capture: async (job) => { h.calls.push(job.punchId); return timeout(); } });
+  const worker = h.create();
+  await enqueueAll(worker, ["f1", "f2", "f3"]);
+  assert.equal(worker.status().stall, undefined);
+  worker.start();
+  await worker.idle();
+  const paused = worker.status();
+  assert.deepEqual(paused.stall, { count: 3, limit: 3 });
+  const wrap = (organization) => ({ ok: true, version: "1.4.8", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
+  assert.equal(parseUiResponse("ui.status", wrap(paused)), true);
+  assert.equal(parseUiResponse("ui.status", wrap({ ...paused, pauseReason: "other" })), false);
+  assert.equal(parseUiResponse("ui.agentOrganization", { ok: true, action: "status", agentId: "sw/a", pending: 1, blocked: null, run: null, pauseReason: "stall", stall: { count: 3, limit: 3 } }), true);
 });

@@ -20,6 +20,9 @@ export function createStallGuard(limit = STALL_LIMIT) {
   return {
     paused: (): boolean => count >= limit,
     count: (): number => count,
+    limit,
+    // why: a press on "run now" is the user asking for one probe, so it lets exactly one job through and the next stall pauses again at once
+    allowOne(): boolean { if (count < limit) return false; count = limit - 1; return true; },
     reset(): void { count = 0; },
     observe(outcome: StallOutcome): void { count = outcome === "stuck" ? count + 1 : 0; },
   };

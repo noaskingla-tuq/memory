@@ -40,6 +40,8 @@ export interface OrganizationStatus {
   readonly lastAttemptAt: number | null;
   readonly updatedAt: number | null;
   readonly waiting?: { readonly sinceMs: number } | null;
+  readonly pauseReason?: "stall" | "model_not_configured" | "model_policy_denied" | "operator_reconcile" | null;
+  readonly stall?: { readonly count: number; readonly limit: number } | null;
   readonly dailyRound: null | {
     readonly date: string;
     readonly roundId: string;
@@ -394,7 +396,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     }
     if (!attempted && status.state === "running") status = { ...status, state: "idle" };
   };
-  const agentOrganization = createAgentOrganization({ run: agentRun, rows: jobs, state: resumeState, enabled: () => options.enabled(), now, wake: () => wake() });
+  const agentOrganization = createAgentOrganization({ run: agentRun, rows: jobs, state: resumeState, enabled: () => options.enabled(), now, wake: () => wake(), onRun: () => { stall.allowOne(); } });
   const wake = (): void => {
     if (stopped || !started) return;
     if (active !== null) { requested = true; return; }
@@ -442,7 +444,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     },
     resumeStartup() { if (!started || stopped || startupReady) return; startupReady = true; requested = false; wake(); },
     wake,
-    settingsChanged() { retryNow = true; wake(); },
+    settingsChanged() { retryNow = true; stall.reset(); wake(); },
     legacyTrial(request: LegacyTrialRequest): Promise<LegacyTrialResponse> {
       const answer = trialQueue.then(async (): Promise<LegacyTrialResponse> => {
         if (request.action === "stop") {
@@ -475,7 +477,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       // why: the pause reuses an existing failure code, and the host and local codes tell the stall apart from a plain busy host
       const current: OrganizationStatus = {
         ...status, ...(waiting === null ? {} : { waiting }),
-        ...(stalled ? { state: "paused" as const, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: STALL_LOCAL_CODE, retryable: true } : {}),
+        ...(stalled ? { pauseReason: "stall" as const, stall: { count: stall.count(), limit: stall.limit }, state: "paused" as const, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: STALL_LOCAL_CODE, retryable: true } : {}),
         ...(!options.enabled() ? { state: "disabled" as const } : {}),
       };
       const releaseFault = [...releaseFaults.values()].pop() ?? null;

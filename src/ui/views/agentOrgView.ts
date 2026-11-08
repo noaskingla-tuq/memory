@@ -15,6 +15,8 @@ export interface AgentOrgModel {
   readonly notice: StringKey | null;
   readonly error: ErrorDescription | null;
   readonly waitingMs?: number | null;
+  readonly pauseReason?: string | null;
+  readonly stallCount?: number | null;
 }
 
 export const AGENT_ORG_ID = "space-org";
@@ -60,6 +62,7 @@ function note(model: AgentOrgModel, state: AgentOrgState): SafeHtml {
   if (model.error !== null) parts.push(html`<p class="ao-note" data-ao-note="error">${model.error.message}${model.error.action}</p>`);
   else if (model.notice !== null) parts.push(html`<p class="ao-note" data-ao-note="notice">${t(model.notice)}</p>`);
   else if (model.blocked !== null && BLOCKED[model.blocked] !== undefined && state !== "running" && state !== "stopping") parts.push(html`<p class="ao-note" data-ao-note="blocked">${t(BLOCKED[model.blocked]!)}</p>`);
+  if (model.pauseReason === "stall" && model.stallCount != null && state !== "running" && state !== "stopping") parts.push(html`<p class="ao-note" data-ao-note="stalled">${t("ao.stalled", { n: model.stallCount })}</p>`);
   if ((state === "completed" || state === "stopped") && model.run !== null && (model.run.failed > 0 || model.run.untried > 0)) parts.push(html`<p class="ao-note" data-ao-note="hint">${t("ao.failedHint")}</p>`);
   return parts.length === 0 ? EMPTY_HTML : html`${parts}`;
 }

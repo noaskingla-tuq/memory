@@ -353,6 +353,9 @@ export const uiLegacyTrialSuccess = z.object({
   trial: uiTrialSchema.nullable(),
 }).strict();
 
+export const pauseReasonSchema = z.enum(["stall", "model_not_configured", "model_policy_denied", "operator_reconcile"]);
+export const stallSchema = z.object({ count, limit: count }).strict();
+
 export const uiAgentRunSchema = z.object({
   agentId: z.string().max(200),
   state: z.enum(["running", "stopping", "completed", "stopped"]),
@@ -373,6 +376,8 @@ export const uiAgentOrganizationSuccess = z.object({
   blocked: z.enum(["disabled", "running", "other_running", "no_candidates", "not_running"]).nullable(),
   run: uiAgentRunSchema.nullable(),
   waiting: z.object({ sinceMs: count }).strict().nullable().optional(),
+  pauseReason: pauseReasonSchema.nullable().optional(),
+  stall: stallSchema.nullable().optional(),
 }).strict();
 
 export const uiUpgradeLegacySuccess = z
@@ -434,6 +439,8 @@ export const uiStatusSuccess = z
       lastAttemptAt: count.nullable(),
       updatedAt: count.nullable(),
       waiting: z.object({ sinceMs: count }).strict().nullable().optional(),
+      pauseReason: pauseReasonSchema.nullable().optional(),
+      stall: stallSchema.nullable().optional(),
       dailyRound: z.object({
         date: z.string().length(10),
         roundId: z.string(),

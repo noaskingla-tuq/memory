@@ -2,7 +2,7 @@ import type { UiAgentRun } from "../../contracts/uiContract.js";
 import type { BackendClient } from "../api/backendClient.js";
 import { describeError } from "../api/errors.js";
 import { openDialog } from "../components/dialog.js";
-import { html, mount, type MountTarget } from "../dom/html.js";
+import { EMPTY_HTML, html, mount, type MountTarget } from "../dom/html.js";
 import { t, type StringKey } from "../i18n/index.js";
 import { agentOrgSection, type AgentOrgModel } from "./agentOrgView.js";
 import type { Scheduler, Visibility } from "./statusLine.js";
@@ -28,13 +28,16 @@ export interface AgentOrg {
 
 const BLANK: AgentOrgModel = { phase: "loading", agentId: "", pending: 0, run: null, blocked: null, busy: false, notice: null, error: null, waitingMs: null };
 
-function parse(value: unknown): { pending: number; blocked: string | null; run: UiAgentRun | null; waitingMs: number | null } | null {
-  const answer = value as { ok?: unknown; pending?: unknown; blocked?: unknown; run?: unknown; waiting?: { sinceMs?: unknown } | null } | null;
+interface Parsed { pending: number; blocked: string | null; run: UiAgentRun | null; waitingMs: number | null; pauseReason: string | null; stallCount: number | null }
+
+function parse(value: unknown): Parsed | null {
+  const answer = value as { ok?: unknown; pending?: unknown; blocked?: unknown; run?: unknown; waiting?: { sinceMs?: unknown } | null; pauseReason?: unknown; stall?: { count?: unknown } | null } | null;
   if (typeof answer !== "object" || answer === null || answer.ok !== true || typeof answer.pending !== "number") return null;
   const run = answer.run;
   const valid = run === null || (typeof run === "object" && run !== undefined && typeof (run as { state?: unknown }).state === "string");
   if (!valid) return null;
-  return { pending: answer.pending, blocked: typeof answer.blocked === "string" ? answer.blocked : null, run: run as UiAgentRun | null, waitingMs: typeof answer.waiting?.sinceMs === "number" ? answer.waiting.sinceMs : null };
+  return { pending: answer.pending, blocked: typeof answer.blocked === "string" ? answer.blocked : null, run: run as UiAgentRun | null, waitingMs: typeof answer.waiting?.sinceMs === "number" ? answer.waiting.sinceMs : null,
+    pauseReason: typeof answer.pauseReason === "string" ? answer.pauseReason : null, stallCount: typeof answer.stall?.count === "number" ? answer.stall.count : null };
 }
 
 export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
@@ -70,7 +73,7 @@ export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
     const answer = parse(result.value);
     state = answer === null
       ? { ...state, phase: "ready", busy: false, error: describeError("malformed_response", "client") }
-      : { phase: "ready", agentId, pending: answer.pending, blocked: answer.blocked, run: answer.run, waitingMs: answer.waitingMs, busy: false, notice: answer.blocked === null ? notice : null, error: null };
+      : { phase: "ready", agentId, pending: answer.pending, blocked: answer.blocked, run: answer.run, waitingMs: answer.waitingMs, pauseReason: answer.pauseReason, stallCount: answer.stallCount, busy: false, notice: answer.blocked === null ? notice : null, error: null };
     render();
     schedule();
   }
@@ -81,7 +84,7 @@ export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
   }
 
   async function confirm(): Promise<boolean> {
-    const body = html`<p>${t("ao.dialog.intro", { n: state.pending })}</p><p>${t("ao.dialog.cost")}</p><p>${t("ao.dialog.safety")}</p>`;
+    const body = html`<p>${t("ao.dialog.intro", { n: state.pending })}</p>${state.pauseReason === "stall" ? html`<p>${t("ao.dialog.stallProbe")}</p>` : EMPTY_HTML}<p>${t("ao.dialog.cost")}</p><p>${t("ao.dialog.safety")}</p>`;
     try {
       const handle = openDialog({
         title: t("ao.dialog.title"), body, initialFocus: "cancel",

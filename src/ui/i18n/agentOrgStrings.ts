@@ -12,6 +12,8 @@ export const AGENT_ORG_STRINGS = {
   "ao.failedHint": "失敗的工作還在佇列裡，再按一次「立即整理」就會重送。",
   "ao.waiting": "AI 回覆中，已等待 {n} 秒",
   "ao.waiting.long": "AI 回覆中，已等待 {n} 秒，超過 270 秒仍沒有結果，系統稍後會自動中止這一筆",
+  "ao.stalled": "連續卡住 {n} 次，已暫停。按「立即整理」只會試一筆：成功就繼續整理，再卡住就立刻重新暫停。也可以把整理關掉再打開來恢復。",
+  "ao.dialog.stallProbe": "目前因連續卡住而暫停，這次只會試一筆；成功就繼續整理，再卡住就立刻重新暫停。",
   "ao.progress": "整理進度",
   "ao.blocked.disabled": "AI 整理目前已關閉，請先在設定開啟。",
   "ao.blocked.running": "這位 agent 已經在整理了。",

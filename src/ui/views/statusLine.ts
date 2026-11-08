@@ -53,6 +53,11 @@ function waitingText(organization: Organization): string {
   return t(ms > STATUS_WAITING_WARN_MS ? "status.organization.waitingLong" : "status.organization.waiting", { n: Math.floor(ms / 1000) });
 }
 
+// why: only a pause the plugin put on itself after repeated stalls says how many in a row and how to resume, so older answers without the fields read as before
+function stalled(organization: Organization): boolean {
+  return organization.state === "paused" && organization.pauseReason === "stall" && organization.stall != null;
+}
+
 interface StatusView {
   readonly state: "ok" | "warn" | "error";
   readonly content: SafeHtml;
@@ -95,7 +100,7 @@ function failureReason(organization: Organization): string {
 // why: the compact line keeps the priority the full line always had: storage trouble, then the organization phase, then plain service health
 function compactText(status: UiStatus, ready: boolean): string {
   const organization = status.organization;
-  const parts = [ready ? (organization === undefined ? t("status.ok") : t(`status.organization.phase.${organization.state}`)) : t("status.storageTrouble").replace(/。$/u, "")];
+  const parts = [ready ? (organization === undefined ? t("status.ok") : stalled(organization) ? t("status.compact.stall", { n: organization.stall!.count }) : t(`status.organization.phase.${organization.state}`)) : t("status.storageTrouble").replace(/。$/u, "")];
   // why: a running trial is the one thing that must stay visible while the panel is folded
   if (organization?.trial?.state === "running") parts.push(t("trial.compact", { done: organization.trial.attempted, adopted: organization.trial.adopted }));
   if (organization?.waiting != null) parts.push(waitingText(organization));
@@ -120,7 +125,8 @@ function organizationItems(organization: Organization): SafeHtml {
   const skipped = organization.diagnosticsAvailable === true ? t("status.organization.skipped", { n: organization.schemaSkipped ?? 0 }) : t("status.organization.skippedUnknown");
   const summary = t("status.organization.summary", { admitted: organization.admitted ?? t("status.organization.unknown"), pending: organization.pending, replies: organization.replyReady, completed: organization.completed });
   const wait = organization.waiting == null ? EMPTY_HTML : html`<li data-waiting="${organization.waiting.sinceMs > STATUS_WAITING_WARN_MS ? "warn" : "normal"}">${waitingText(organization)}</li>`;
-  return html`<li>${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}</li>${wait}<li class="muted">${summary}</li>${jobs}<li class="muted">${skipped}</li>`;
+  const head = stalled(organization) ? html`${t("status.organization.stalled", { n: organization.stall!.count })}` : html`${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}`;
+  return html`<li>${head}</li>${wait}<li class="muted">${summary}</li>${jobs}<li class="muted">${skipped}</li>`;
 }
 
 function organizationDetails(organization: Organization): SafeHtml {

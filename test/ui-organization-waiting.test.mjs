@@ -125,3 +125,19 @@ test("both screens warn at the same threshold: 270 seconds after the send, which
   const over = await statusMarkup(organization({ waiting: { sinceMs: 270_001 } }));
   assert.ok(over.html.includes('data-waiting="warn"'));
 });
+
+test("a stall pause says how many stalls in a row, and both ways to resume, on the status line and on the agent page", async () => {
+  const stalled = organization({ state: "paused", pauseReason: "stall", stall: { count: 3, limit: 3 }, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: "stall_paused", retryable: true });
+  const open = await statusMarkup(stalled);
+  assert.ok(open.html.includes("連續卡住 3 次，已暫停"), open.html);
+  assert.ok(open.html.includes("按「立即整理」試一筆"));
+  assert.ok(open.html.includes("把整理關掉再打開"));
+  const folded = await statusMarkup(stalled, false);
+  assert.ok(folded.html.includes("AI 整理已暫停（連續卡住 3 次）"));
+  const page = ui.agentOrgSection(model({ pauseReason: "stall", stallCount: 3 })).value;
+  assert.ok(page.includes('data-ao-note="stalled"'));
+  assert.ok(page.includes("連續卡住 3 次，已暫停") && page.includes("只會試一筆") && page.includes("把整理關掉再打開"));
+  assert.ok(!ui.agentOrgSection(model()).value.includes("data-ao-note=\"stalled\""), "no stall, no note");
+  const older = await statusMarkup(organization({ state: "paused", lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: "stall_paused" }));
+  assert.ok(older.html.includes("AI 整理暫停"), "an answer without the new fields reads as before");
+});

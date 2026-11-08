@@ -85,9 +85,9 @@ test("S2: the other states keep the priority the full line had, and a failed cal
   const disabled = await shown(statusOf(organization({ state: "disabled", legacyUnlinked: 0, legacyTrialCandidates: 0 })));
   assert.equal(compactOf(disabled.target.innerHTML), "AI 整理關閉");
   const plain = await shown(statusOf(undefined));
-  assert.equal(compactOf(plain.target.innerHTML), "記憶服務運作中");
+  assert.equal(compactOf(plain.target.innerHTML), "運作中");
   const trouble = await shown(statusOf(organization({ state: "idle" }), { storage: { status: "storage_busy" } }));
-  assert.equal(compactOf(trouble.target.innerHTML), "記憶庫目前無法正常讀寫，請稍後再試 · 舊工作 3401 筆", "storage trouble outranks the organization phase");
+  assert.equal(compactOf(trouble.target.innerHTML), "記憶庫暫時無法使用，請稍後再試 · 舊工作 3401 筆", "storage trouble outranks the organization phase");
   assert.equal(trouble.target.dataset.state, "warn");
 
   const broken = rig({ ok: false, superseded: false, attempts: 1, code: "plugin_backend_crashed", message: "記憶服務停了。", action: "請稍後再試。", retryable: true });
@@ -122,13 +122,13 @@ test("S4: the toggle is a button whose aria-expanded follows the panel, and the 
   assert.ok(button.includes('aria-controls="status-panel"'));
   assert.equal(expandedOf(markup()), "false");
   assert.equal(panelOf(markup()).hidden, true);
-  assert.ok(button.includes('aria-label="展開狀態與詳情"'));
+  assert.ok(button.includes('aria-label="展開狀態"'));
 
   r.line.toggle();
   assert.equal(r.line.expanded(), true);
   assert.equal(expandedOf(markup()), "true");
   assert.equal(panelOf(markup()).hidden, false);
-  assert.ok(toggleOf(markup()).includes('aria-label="收合狀態與詳情"'));
+  assert.ok(toggleOf(markup()).includes('aria-label="收合狀態"'));
   assert.equal(r.target.ownerDocument.activeElement, r.target.button, "focus stays on the toggle after it is pressed");
 
   r.next({ ok: true, value: statusOf(organization({ pending: 9 })) });
@@ -154,8 +154,8 @@ test("S5: the trial button and the details are in the panel, and only an open pa
   assert.equal(open.hidden, false);
   assert.ok(open.inner.includes('data-trial="open" data-trial-n="3400"'));
   assert.ok(open.inner.includes("小量試跑…"));
-  assert.ok(open.inner.includes("<summary>整理與來源詳情</summary>"));
-  for (const text of ["記憶服務運作中", "還沒有記憶寫入", "AI 整理暫停", "已收錄 3 · 待整理 0 · 回覆待提交 0 · 整理完成 1", "舊佇列有 3401 筆工作不會自動整理（可小量試跑）", "來源略過 0"]) assert.ok(open.inner.includes(text), text);
+  assert.ok(open.inner.includes("<summary>詳情</summary>"));
+  for (const text of ["運作中", "還沒有記憶", "AI 整理暫停", "已收錄 3 · 待整理 0 · 回覆待提交 0 · 整理完成 1", "舊工作 3401 筆不會自動整理", "來源略過 0"]) assert.ok(open.inner.includes(text), text);
 
   const running = await shown(statusOf(organization({ state: "running", trial: trial() })));
   running.line.toggle();
@@ -202,9 +202,10 @@ test("S8: the compact line is ellipsised in one row, the settings cards use the 
   for (const declaration of ["overflow: hidden", "text-overflow: ellipsis", "white-space: nowrap", "min-width: 0"]) assert.ok(text.includes(declaration), declaration);
   assert.ok(/\.hdr-status \{[^}]*flex: 1 1 0;[^}]*min-width: 0;/u.test(status), "the status area shrinks instead of wrapping the header");
   const settings = read("styles/settings.css");
-  assert.ok(/\.settings-page \{[^}]*width: 100%;[^}]*max-width: 1200px;/u.test(settings));
+  assert.ok(/\.settings-page \{[^}]*width: 100%;/u.test(settings));
+  assert.ok(!/\.settings-page \{[^}]*max-width/u.test(settings), "the page width comes from main, so the header and the content share one edge");
   assert.ok(!settings.includes("48rem;\n  margin: 0 auto"), "the narrow 48rem cap is gone");
-  assert.ok(/main:has\(\.settings-page\) \{[^}]*max-width: calc\(1200px/u.test(settings), "main no longer clips the settings page below 1200px");
+  assert.ok(/:root:has\(\.settings-page\) \{[^}]*--page-max: 1200px;/u.test(read("styles/app.css")), "the settings page lifts the shared width to 1200px for the header and the content alike");
   assert.ok(/\.setting-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(18rem, 1fr\);/u.test(settings), "copy and control columns are balanced");
   for (const file of ["views/statusLine.ts", "styles/status.css"]) {
     const source = read(file);

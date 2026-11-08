@@ -2,13 +2,19 @@
   position: sticky;
   top: 0;
   z-index: 5;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.hdr-in {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-2) var(--sp-4);
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--sp-3) var(--page-pad);
 }
 
 .hdr-brand {
@@ -29,8 +35,31 @@
 
 .hdr-status {
   margin-left: auto;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
+}
+
+.hdr-in > .hdr-status {
+  min-width: min(100%, 8rem);
+}
+
+.hdr-zoom {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.zoom-btn {
+  min-width: 2.25rem;
+  padding: 2px var(--sp-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.zoom-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .hdr-status .state[data-state="warn"] {
@@ -48,9 +77,10 @@
 }
 
 main {
-  max-width: 1120px;
+  width: 100%;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: var(--sp-4) var(--sp-4) 48px;
+  padding: var(--sp-4) var(--page-pad) 48px;
 }
 
 .card {
@@ -61,7 +91,7 @@ main {
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(10.625rem, 100%), 1fr));
   gap: var(--sp-3);
   margin-bottom: var(--sp-3);
 }
@@ -72,12 +102,12 @@ main {
 
 .tile b {
   display: block;
-  font-size: 22px;
+  font-size: 1.375rem;
   line-height: 1.2;
 }
 
 .tile span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
@@ -111,16 +141,6 @@ select {
   margin: 0;
 }
 
-.note {
-  margin: 0 0 var(--sp-2);
-  font-size: 12px;
-  color: var(--text-secondary-strong);
-}
-
-.note:empty {
-  display: none;
-}
-
 .notice {
   margin: var(--sp-2) 0;
   padding: 10px var(--sp-4);
@@ -135,7 +155,7 @@ select {
 
 .notice h2 {
   margin: 0 0 var(--sp-1);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .help {
@@ -155,11 +175,11 @@ select {
   align-items: baseline;
   gap: var(--sp-2);
   margin: var(--sp-6) 0 var(--sp-2);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .team-h b {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .wall {
@@ -173,7 +193,7 @@ select {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
@@ -226,7 +246,7 @@ select {
 
 .acard-id {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-secondary-strong);
   overflow-wrap: anywhere;
 }
@@ -237,7 +257,7 @@ select {
   flex-wrap: wrap;
   gap: var(--sp-1);
   align-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
@@ -246,7 +266,7 @@ select {
   min-height: 2.9em;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -262,7 +282,7 @@ select {
   align-items: flex-end;
   gap: var(--sp-2);
   margin-top: auto;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
@@ -287,6 +307,8 @@ select {
 
 .spark {
   display: block;
+  width: 5.25rem;
+  height: 1.5rem;
 }
 
 .spark rect {
@@ -344,7 +366,7 @@ select {
   display: flex;
   gap: var(--sp-4);
   align-items: center;
-  padding: var(--sp-4);
+  padding: var(--sp-4) var(--sp-4);
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
@@ -356,7 +378,7 @@ select {
 
 .space-who h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   overflow-wrap: anywhere;
 }
 

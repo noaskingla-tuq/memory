@@ -4,7 +4,7 @@
 
 .tl-h {
   margin: 0 0 var(--sp-2);
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 
 .tl-search {
@@ -16,8 +16,8 @@
 }
 
 .tl-search input {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 12.5rem;
+  min-width: 0;
   padding: 6px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -25,11 +25,6 @@
   color: var(--text-primary);
 }
 
-.tl-hint {
-  margin: var(--sp-1) 0 var(--sp-2);
-  font-size: 12px;
-  color: var(--text-secondary-strong);
-}
 
 .tl-tools {
   display: flex;
@@ -50,15 +45,10 @@
   margin: var(--sp-2) 0;
 }
 
-.tl-order {
-  margin: var(--sp-2) 0 0;
-  font-size: 12px;
-  color: var(--text-secondary-strong);
-}
 
 .day {
   margin: var(--sp-4) 0 var(--sp-2);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-secondary-strong);
 }
@@ -69,7 +59,7 @@
   gap: 2px;
   width: 100%;
   margin-bottom: var(--sp-2);
-  padding: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
@@ -90,7 +80,7 @@
   flex-wrap: wrap;
   gap: 4px var(--sp-2);
   align-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
@@ -103,7 +93,7 @@
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary-strong);
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -111,6 +101,6 @@
 
 .mc-meta {
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-secondary-strong);
 }

@@ -1,5 +1,5 @@
 .trial-controls .btn {
   margin-left: var(--sp-2);
   padding: 2px var(--sp-2);
-  font-size: 12px;
+  font-size: 0.75rem;
 }

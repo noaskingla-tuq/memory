@@ -100,6 +100,8 @@ function textColorUses(css) {
 
 // why: the avatar swatch hue (--h) and size (--s) are set per element from the id hash, so they are not theme tokens
 const ELEMENT_PROPERTIES = new Set(["h", "s"]);
+// why: the page width and gutter are layout constants shared by the header and main, not theme tokens, so they live in app.css
+const LAYOUT_PROPERTIES = new Set(["page-max", "page-pad"]);
 const AVATAR_BACKGROUND = "hsl(var(--h) 55% 75%)";
 
 const TEXT_TOKENS = new Set(["text-primary", "text-secondary", "text-secondary-strong", "link", "error-strong", "warning-strong", "success-strong", "accent-fg", "danger-fg", "hit-fg"]);
@@ -115,7 +117,7 @@ test("no rule sets a text colour from a token that fails as text, and every text
   }
   for (const banned of ["text-muted", "accent-hover", "accent", "on-accent"]) assert.ok(!uses.includes(`var(--${banned})`), `--${banned} is never a text colour`);
   const tokenSet = new Set([...appCss.matchAll(/var\(--([a-z0-9-]+)\)/gu)].map((match) => match[1]));
-  for (const name of tokenSet) assert.ok(THEMES.light.has(name) || ELEMENT_PROPERTIES.has(name), `app.css uses --${name} which tokens.css defines`);
+  for (const name of tokenSet) assert.ok(THEMES.light.has(name) || ELEMENT_PROPERTIES.has(name) || LAYOUT_PROPERTIES.has(name), `app.css uses --${name} which tokens.css defines`);
 });
 
 test("the style sheets write no colour of their own outside the black overlay and hover shadows and the one hash-coloured avatar", () => {

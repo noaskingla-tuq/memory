@@ -46,7 +46,7 @@
 
 .dr-head h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 
 .dr-x {
@@ -55,7 +55,7 @@
   border: 0;
   border-radius: 6px;
   background: none;
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1;
 }
 
@@ -82,13 +82,13 @@
   flex-wrap: wrap;
   gap: 0 var(--sp-3);
   margin: var(--sp-1) 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
 .dr-h {
   margin: var(--sp-4) 0 var(--sp-1);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-secondary-strong);
 }
@@ -104,19 +104,19 @@
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 
 .dr-receipts {
   margin: 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 
 .dr-note {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .dr-raw {
@@ -134,7 +134,7 @@
   border-radius: 8px;
   background: var(--surface-muted);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -163,7 +163,7 @@
 
 .sib-at {
   flex: none;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
@@ -171,7 +171,7 @@
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 0.8125rem;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
@@ -201,7 +201,7 @@
 }
 
 .dr-hint {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
@@ -226,7 +226,7 @@
   border-left: 3px solid var(--border-strong);
   border-radius: 0 6px 6px 0;
   background: var(--surface-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 

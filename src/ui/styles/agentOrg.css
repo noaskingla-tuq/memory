@@ -9,12 +9,12 @@
 
 .ao .ao-card h3 {
   margin: 0 0 var(--sp-2);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .ao .ao-line {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .ao .ao-progress {
@@ -25,13 +25,13 @@
 
 .ao .ao-note {
   margin: var(--sp-2) 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary-strong);
 }
 
 .ao .ao-wait {
   margin: var(--sp-2) 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .ao .ao-wait[data-ao-waiting="warn"] {

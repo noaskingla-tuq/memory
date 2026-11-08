@@ -155,7 +155,7 @@ test("S5: the trial button and the details are in the panel, and only an open pa
   assert.ok(open.inner.includes('data-trial="open" data-trial-n="3400"'));
   assert.ok(open.inner.includes("小量試跑…"));
   assert.ok(open.inner.includes("<summary>整理與來源詳情</summary>"));
-  for (const text of ["記憶服務運作中", "還沒有記憶寫入", "AI 整理暫停", "已收錄 3 · 待整理 0 · 回覆待提交 0 · 整理完成 1", "舊工作 3401 筆暫停中（可小量試跑）", "來源略過 0"]) assert.ok(open.inner.includes(text), text);
+  for (const text of ["記憶服務運作中", "還沒有記憶寫入", "AI 整理暫停", "已收錄 3 · 待整理 0 · 回覆待提交 0 · 整理完成 1", "舊佇列有 3401 筆工作不會自動整理（可小量試跑）", "來源略過 0"]) assert.ok(open.inner.includes(text), text);
 
   const running = await shown(statusOf(organization({ state: "running", trial: trial() })));
   running.line.toggle();

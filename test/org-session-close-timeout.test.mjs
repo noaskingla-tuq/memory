@@ -192,15 +192,15 @@ test("the organization worker records the close timeout with its phase and plugi
   assert.equal(rows.get("close-b").localErrorCode, "close_timeout");
   assert.equal(rows.get("close-b").hostErrorCode, null, "a code the plugin decided is not stored as a host code");
   assert.equal(rows.get("close-c").state, "completed", "the job after the stuck close was still processed");
-  assert.equal(organizationStatus.state, "paused");
+  assert.equal(organizationStatus.state, "idle", "an old RESOURCE_BUSY does not stop any pass, so it is a note and not a pause");
   assert.equal(organizationStatus.errorPhase, "session_close");
   assert.equal(organizationStatus.localErrorCode, "close_timeout");
   assert.equal(organizationStatus.hostErrorCode, null);
   assert.equal(uiStatus.organization.errorPhase, "session_close");
   assert.equal(uiStatus.organization.localErrorCode, "close_timeout");
-  assert.ok(target.innerHTML.includes("失敗階段 session_close・外掛自行判定 close_timeout"), "the headline says the plugin decided this code");
-  const headline = target.innerHTML.slice(target.innerHTML.indexOf("AI 整理暫停"), target.innerHTML.indexOf("</span>", target.innerHTML.indexOf("AI 整理暫停")));
-  assert.equal(headline.includes("主程式代碼"), false, "the headline does not present it as a host code");
+  assert.equal(target.innerHTML.includes("AI 整理暫停"), false, "a job's old error that stops nothing is not shown as a pause");
+  assert.ok(target.innerHTML.includes("先前有工作遇到 RESOURCE_BUSY"), "it reads as a neutral note");
+  assert.ok(target.innerHTML.includes("close_timeout"), "the plugin-decided code stays in the diagnostics");
 });
 
 test("a session_close phase alone does not become a timeout code, and a retry without it clears the local code", async (t) => {

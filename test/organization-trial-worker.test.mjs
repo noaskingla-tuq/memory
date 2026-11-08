@@ -227,7 +227,7 @@ test("W14: a real error during the trial is shown as an error and is not covered
   const h = workerRig(t, { capture: async () => fail("MODEL_TIMEOUT", { phase: "turn_timeout" }) });
   await seedLegacy(h, 5);
   const worker = h.create(); worker.start(); await worker.idle();
-  assert.equal((await worker.status()).state, "paused", "only legacy jobs: paused, as before");
+  assert.equal((await worker.status()).state, "idle", "only legacy jobs: nothing is stopped, so not paused");
   await begin(worker, START(1));
   const status = await worker.status();
   assert.equal(status.legacyUnlinked, 4);
@@ -273,7 +273,7 @@ for (const mode of ["before-due", "due", "immediate"]) {
     await seedStuckLegacy(h, 3, 4);
     const worker = h.create(); worker.start(); await worker.idle();
     let status = await worker.status();
-    assert.equal(status.state, "paused", "only legacy jobs: paused, never error");
+    assert.equal(status.state, "idle", "only legacy jobs: idle, never paused and never error");
     assert.equal(status.lastError, null);
     assert.equal(status.errorPhase, null);
     assert.equal(status.legacyUnlinked, 7);
@@ -281,7 +281,7 @@ for (const mode of ["before-due", "due", "immediate"]) {
     await begin(worker, START(2));
     status = await worker.status();
     assert.equal(status.trial.committed, 2);
-    assert.equal(status.state, "paused", "a clean trial leaves the legacy jobs paused");
+    assert.equal(status.state, "idle", "a clean trial leaves the legacy jobs waiting, not paused");
     assert.equal(status.lastError, null);
   });
 }
@@ -304,7 +304,7 @@ test("W19: a real trial error is still an error, and it is the trial job's code 
     ...ids(4, "f").map((id) => legacyJob(id)),
   ]);
   const worker = h.create(); worker.start(); await worker.idle();
-  assert.equal((await worker.status()).state, "paused");
+  assert.equal((await worker.status()).state, "idle");
   await begin(worker, START(1));
   const status = await worker.status();
   assert.equal(status.state, "error");

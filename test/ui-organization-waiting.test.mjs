@@ -141,3 +141,15 @@ test("a stall pause says how many stalls in a row, and both ways to resume, on t
   const older = await statusMarkup(organization({ state: "paused", lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: "stall_paused" }));
   assert.ok(older.html.includes("AI 整理暫停"), "an answer without the new fields reads as before");
 });
+
+test("an old error and the legacy job count read as neutral notes: no pause wording and no warning colour", async () => {
+  const real = await statusMarkup(organization({ state: "idle", lastError: "RESOURCE_BUSY", errorPhase: "session_resume", retryable: true, legacyUnlinked: 3398, legacyTrialCandidates: 3207, pending: 7406 }));
+  assert.equal(real.state, "ok");
+  assert.ok(real.html.includes("先前有工作遇到 RESOURCE_BUSY，不影響目前整理"), real.html);
+  assert.ok(real.html.includes("舊佇列有 3398 筆工作不會自動整理"));
+  assert.ok(!real.html.includes("暫停"), "nothing in the status line says paused");
+  const folded = await statusMarkup(organization({ state: "idle", lastError: "RESOURCE_BUSY", legacyUnlinked: 3398 }), false);
+  assert.ok(!folded.html.includes("暫停"));
+  const error = await statusMarkup(organization({ state: "error", lastError: "STORAGE_BUSY", errorPhase: "commit" }));
+  assert.ok(!error.html.includes("先前有工作遇到"), "a real error keeps its own wording");
+});

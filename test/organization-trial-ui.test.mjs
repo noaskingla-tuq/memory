@@ -87,7 +87,7 @@ test("U1: the trial controls sit in the status panel outside <details> and are s
   assert.ok(detailsAt > 0);
   assert.ok(idle.indexOf('data-trial="open"') > 0 && idle.indexOf('data-trial="open"') < detailsAt, "the open button is above the details, not inside them");
   assert.ok(!idle.slice(detailsAt).includes("data-trial="), "nothing that drives the trial is inside the details");
-  assert.ok(idle.includes("舊工作 90 筆暫停中（可小量試跑）"));
+  assert.ok(idle.includes("舊佇列有 90 筆工作不會自動整理（可小量試跑）"));
   assert.ok(idle.includes('data-trial-n="80"'), "the dialog count is the candidate count");
 
   const running = await render(organization({ trial: trial() }));
@@ -183,7 +183,7 @@ test("U3: every trial string exists, reads as Taiwan Traditional Chinese, and th
 
 test("R2: the count in the confirm dialog is the number that can be tried, not every paused legacy job", async () => {
   const idle = await render(organization({ legacyUnlinked: 90, legacyTrialCandidates: 80 }));
-  assert.ok(idle.includes("舊工作 90 筆暫停中"), "the status line still counts every paused job");
+  assert.ok(idle.includes("舊佇列有 90 筆工作不會自動整理"), "the status line still counts every paused job");
   assert.ok(idle.includes('data-trial-n="80"') && !idle.includes('data-trial-n="90"'), "the button carries the candidate count");
   const s = scene([], "80");
   s.click("open");

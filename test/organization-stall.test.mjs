@@ -183,7 +183,7 @@ test("settingsChanged clears the stall count on the spot, without waiting for a 
   h.state.enabled = true;
   worker.settingsChanged();
   assert.notEqual(worker.status().state, "paused", "no pass has run in between, and the pause is already gone");
-  assert.equal(worker.status().pauseReason, undefined);
+  assert.equal(worker.status().pauseReason ?? null, null);
 });
 
 test("the stall facts are optional status fields the contract accepts, and a worker that is not stalled leaves them out", async (t) => {

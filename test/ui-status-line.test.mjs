@@ -138,7 +138,7 @@ test("organization status keeps reply, commit, legacy and unknown source counts 
   await r.flush();
   assert.equal(r.target.dataset.state, "warn");
   assert.ok(r.target.innerHTML.includes("已收錄 12 · 待整理 5 · 回覆待提交 1 · 整理完成 6"));
-  assert.ok(r.target.innerHTML.includes("舊工作 2 筆暫停中（可小量試跑）"));
+  assert.ok(r.target.innerHTML.includes("舊佇列有 2 筆工作不會自動整理（可小量試跑）"));
   assert.ok(r.target.innerHTML.includes("來源略過未知"));
   assert.ok(r.target.innerHTML.includes("<details"));
   assert.ok(r.target.innerHTML.includes("<summary>整理與來源詳情</summary>"));

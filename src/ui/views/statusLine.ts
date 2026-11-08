@@ -122,11 +122,13 @@ function organizationItems(organization: Organization): SafeHtml {
   const controls = trialControls(organization);
   const legacy = organization.legacyUnlinked > 0 ? html`${t("status.organization.legacy", { n: organization.legacyUnlinked })}` : EMPTY_HTML;
   const jobs = legacy.value === "" && controls === EMPTY_HTML ? EMPTY_HTML : html`<li class="muted">${legacy}${controls}</li>`;
+  // why: an old error that no longer stops anything is told apart from a pause or a failure, so it reads as a note and not as a warning
+  const stale = organization.state !== "paused" && organization.state !== "error" && organization.lastError != null ? html`<li class="muted" data-stale-error>${t("status.organization.staleError", { code: clip(organization.lastError) })}</li>` : EMPTY_HTML;
   const skipped = organization.diagnosticsAvailable === true ? t("status.organization.skipped", { n: organization.schemaSkipped ?? 0 }) : t("status.organization.skippedUnknown");
   const summary = t("status.organization.summary", { admitted: organization.admitted ?? t("status.organization.unknown"), pending: organization.pending, replies: organization.replyReady, completed: organization.completed });
   const wait = organization.waiting == null ? EMPTY_HTML : html`<li data-waiting="${organization.waiting.sinceMs > STATUS_WAITING_WARN_MS ? "warn" : "normal"}">${waitingText(organization)}</li>`;
   const head = stalled(organization) ? html`${t("status.organization.stalled", { n: organization.stall!.count })}` : html`${t(`status.organization.phase.${organization.state}`)}${failureReason(organization)}`;
-  return html`<li>${head}</li>${wait}<li class="muted">${summary}</li>${jobs}<li class="muted">${skipped}</li>`;
+  return html`<li>${head}</li>${wait}<li class="muted">${summary}</li>${stale}${jobs}<li class="muted">${skipped}</li>`;
 }
 
 function organizationDetails(organization: Organization): SafeHtml {

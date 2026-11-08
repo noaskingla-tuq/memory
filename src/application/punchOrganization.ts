@@ -10,6 +10,7 @@ import { operationKey, pairKey } from "./modelInvocationScope.js";
 import { dailyRoundStatus, failedModelAttemptInRound, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
 import { captureOutcome, captureWithContinuation, isPairBlocked, replyProgress } from "./organizationQueue.js";
 import { AWAIT_CAP_MS, STALL_LOCAL_CODE, awaitUnlessStopped, createStallGuard, stallOutcome } from "./organizationStall.js";
+import { deriveState, findBlockingCode, type PauseReason } from "./organizationStatusState.js";
 import { createAgentOrganization, createAgentRun } from "./organizationAgentRun.js";
 import { classifyLegacyJob, isTrialRow, summarizeTrial, trialBreaker, type LegacyTrialRequest, type LegacyTrialResponse, type TrialSummary } from "./organizationTrial.js";
 
@@ -40,7 +41,7 @@ export interface OrganizationStatus {
   readonly lastAttemptAt: number | null;
   readonly updatedAt: number | null;
   readonly waiting?: { readonly sinceMs: number } | null;
-  readonly pauseReason?: "stall" | "model_not_configured" | "model_policy_denied" | "operator_reconcile" | null;
+  readonly pauseReason?: PauseReason | null;
   readonly stall?: { readonly count: number; readonly limit: number } | null;
   readonly dailyRound: null | {
     readonly date: string;
@@ -146,9 +147,11 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     const firstError = pendingRows.find(({ job }) => job.resumeDisposition !== "legacy_unlinked" && (job.lastError !== null || phaseOf(resume, job, now()).phase === "operator_reconcile"));
     const phase = firstError === undefined ? { phase: null, hostCode: null, localCode: null, partial: null } : phaseOf(resume, firstError.job, now());
     const lastSource = resume?.lastSourceRun;
+    const derived = deriveState(options.enabled(), findBlockingCode(pendingRows, phase.phase === "operator_reconcile"), firstError?.job.lastError ?? null);
     status = {
       ...status,
-      state: !options.enabled() ? "disabled" : firstError === undefined ? (legacy > 0 ? "paused" : "idle") : phase.phase === "operator_reconcile" || firstError.job.lastError === "MODEL_NOT_CONFIGURED" || firstError.job.lastError === "MODEL_POLICY_DENIED" || firstError.job.lastError === "RESOURCE_BUSY" ? "paused" : "error",
+      state: derived.state,
+      pauseReason: derived.pauseReason,
       admitted: lastSource?.admitted ?? null,
       pending: pendingRows.length - legacy,
       replyReady: replyCount,
@@ -250,8 +253,6 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     }
     await updateStatus(rows, round === null ? null : { date: schedule.date, value: round });
     const state = await resumeState();
-    const previousFailure = rows.find(({ job }) => job.lastError !== null && job.state !== "skipped" && job.resumeDisposition !== "legacy_unlinked")?.job.lastError ?? null;
-    status = { ...status, state: !options.enabled() ? "disabled" : previousFailure === null ? "idle" : previousFailure === "MODEL_NOT_CONFIGURED" || previousFailure === "MODEL_POLICY_DENIED" || previousFailure === "RESOURCE_BUSY" ? "paused" : "error" };
     if (!options.enabled()) return;
     const runFrequency = currentFrequency;
     const immediateRetry = runFrequency === "immediate" && retryNow;
@@ -387,12 +388,9 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       await options.store.updateDailyRound(date, roundState);
       round = roundState;
       await updateStatus(latestRows, { date, value: roundState });
-      status = { ...status, state: remaining.length === 0 ? (status.legacyUnlinked > 0 ? "paused" : "idle") : status.lastError === null ? "paused" : status.lastError === "OPERATOR_RECONCILE" || status.lastError === "MODEL_NOT_CONFIGURED" || status.lastError === "MODEL_POLICY_DENIED" || status.lastError === "RESOURCE_BUSY" ? "paused" : "error" };
     } else {
       const latestRows = await jobs();
       await updateStatus(latestRows, null);
-      const error = latestRows.find(({ job }) => job.state === "pending" && job.lastError !== null && job.resumeDisposition !== "legacy_unlinked")?.job.lastError ?? null;
-      status = { ...status, state: !options.enabled() ? "disabled" : error === null ? (status.legacyUnlinked > 0 ? "paused" : "idle") : error === "OPERATOR_RECONCILE" || error === "MODEL_NOT_CONFIGURED" || error === "MODEL_POLICY_DENIED" || error === "RESOURCE_BUSY" ? "paused" : "error" };
     }
     if (!attempted && status.state === "running") status = { ...status, state: "idle" };
   };
@@ -478,7 +476,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       const current: OrganizationStatus = {
         ...status, ...(waiting === null ? {} : { waiting }),
         ...(stalled ? { pauseReason: "stall" as const, stall: { count: stall.count(), limit: stall.limit }, state: "paused" as const, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: STALL_LOCAL_CODE, retryable: true } : {}),
-        ...(!options.enabled() ? { state: "disabled" as const } : {}),
+        ...(!options.enabled() ? { state: "disabled" as const, pauseReason: null } : {}),
       };
       const releaseFault = [...releaseFaults.values()].pop() ?? null;
       // why: a job's own failure is the more specific cause, so the release fault only fills an otherwise clean status

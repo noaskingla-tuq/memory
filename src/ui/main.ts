@@ -11,7 +11,9 @@ import { parseRoute, type Route } from "./router.js";
 import { createDetail } from "./views/detailController.js";
 import { bindHomeEvents } from "./views/homeEvents.js";
 import { createMemorySpace, type SpaceTargets } from "./views/memorySpaceController.js";
-import { SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
+import { SPACE_ORG_ID, SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpaceView.js";
+import { createAgentOrg } from "./views/agentOrgController.js";
+import { bindAgentOrgEvents } from "./views/agentOrgEvents.js";
 import { bindSpaceEvents } from "./views/spaceEvents.js";
 import { bindStatusToggle, createStatusLine } from "./views/statusLine.js";
 import { bindLegacyTrial } from "./views/legacyTrial.js";
@@ -74,6 +76,19 @@ const settings = createSettingsState(settingsClient());
 const aiOptions = aiOptionsClient();
 let aiChoices: AiChoices = { status: "pending" };
 let aiChoicesLoad = 0;
+
+const agentOrg = createAgentOrg({
+  client,
+  background: () => view,
+  scheduler: { set: (callback, ms) => window.setTimeout(callback, ms), clear: (handle) => window.clearTimeout(handle as number) },
+  visibility: {
+    isVisible: () => document.visibilityState === "visible",
+    subscribe(listener) {
+      document.addEventListener("visibilitychange", listener);
+      return () => document.removeEventListener("visibilitychange", listener);
+    },
+  },
+});
 
 const timeline = createTimeline({ client, now, onOpenDetail: (ref) => void detail.open(ref) });
 
@@ -194,6 +209,7 @@ function showAgent(agentId: string): void {
   mount(view, spaceShell());
   mount(element(SPACE_TIMELINE_ID), timelineShell());
   void space.open(agentId, agent, spaceTargets());
+  void agentOrg.attach(element(SPACE_ORG_ID), agentId);
   timeline.attach(timelineTargets());
   void timeline.open(agentId, { projects: agent?.counts.projects ?? [] });
   window.scrollTo(0, 0);
@@ -225,7 +241,7 @@ function route(): void {
   if (previous !== null && sameRoute(previous, next)) return;
   if (previous?.name === "home") homeScroll = window.scrollY;
   detail.close({ force: true });
-  if (previous?.name === "agent") space.close();
+  if (previous?.name === "agent") { space.close(); void agentOrg.attach(null); }
   current = next;
   currentHash = hashOf(next);
   updateNavigation(next);
@@ -261,6 +277,8 @@ bindSpaceEvents(view, {
     document.getElementById(SPACE_TITLE_ID)?.focus();
   },
 });
+
+bindAgentOrgEvents(view, { run: () => void agentOrg.run(), stop: () => void agentOrg.stop() });
 
 bindTimelineEvents(view, {
   search: (text) => void timeline.search(text),

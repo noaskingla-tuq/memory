@@ -4,10 +4,12 @@ import { SPACE_STRINGS } from "./zhTWSpace.js";
 import { TIMELINE_STRINGS } from "./timelineStrings.js";
 import { LEGACY_UPGRADE_STRINGS } from "./legacyUpgradeStrings.js";
 import { TRIAL_STRINGS } from "./legacyTrialStrings.js";
+import { AGENT_ORG_STRINGS } from "./agentOrgStrings.js";
 
 export const STRINGS = {
   ...SPACE_STRINGS,
   ...TRIAL_STRINGS,
+  ...AGENT_ORG_STRINGS,
   ...LEGACY_UPGRADE_STRINGS,
   "app.title": "Cairn記憶管理",
   "status.loading": "讀取中…",

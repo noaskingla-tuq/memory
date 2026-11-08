@@ -57,10 +57,11 @@ test("C1: a start needs a whole count of 1 to 50 and a requestId, a stop needs a
   assert.deepEqual(await dispatchUi("ui.legacyTrial", good, { storageStatus: () => "ready", services: () => undefined, profile: NO_PROFILE, legacyTrial: async () => { throw new Error("EPERM"); } }), { ok: false, code: "STORAGE_BUSY", retryable: true });
 });
 
-test("C2: the contract lists nine ui methods, in the order the manifest lists them, and the status accepts the new optional fields", () => {
-  assert.equal(UI_METHOD_NAMES.length, 9);
-  assert.equal(UI_METHOD_NAMES.at(-2), "ui.legacyTrial");
-  assert.equal(UI_METHOD_NAMES.at(-1), "ui.upgradeLegacy");
+test("C2: the contract lists ten ui methods, in the order the manifest lists them, and the status accepts the new optional fields", () => {
+  assert.equal(UI_METHOD_NAMES.length, 10);
+  assert.equal(UI_METHOD_NAMES.at(-3), "ui.legacyTrial");
+  assert.equal(UI_METHOD_NAMES.at(-2), "ui.upgradeLegacy");
+  assert.equal(UI_METHOD_NAMES.at(-1), "ui.agentOrganization");
   const manifest = JSON.parse(readFileSync(join(REPO, "plugin", "manifest.template.json"), "utf8"));
   assert.deepEqual(manifest.backendMethods, [...UI_METHOD_NAMES]);
   assert.equal(parseUiResponse("ui.status", statusOf(organization({ trial: trial() }))), true);

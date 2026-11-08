@@ -23,7 +23,7 @@ const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metada
 const UI_ENTRY = 'ui/index.html'
 const UI_FILES = ['ui/index.html', 'ui/app.js', 'ui/app.css', 'cairn-icon.png']
 const EXPECTED_PERMISSIONS = ['agent-directory:read', 'agent:avatar-read', 'ai:chat', 'backend:invoke', 'data:legacy-migrate', 'plugin-state:read', 'program:data:projects:write', 'program:data:tasks:write', 'project-directory:read', 'settings:plugin', 'ui:view', 'work-records:read']
-const EXPECTED_BACKEND_METHODS = ['ui.agentStats', 'ui.forget', 'ui.get', 'ui.legacyTrial', 'ui.list', 'ui.overview', 'ui.search', 'ui.status', 'ui.upgradeLegacy']
+const EXPECTED_BACKEND_METHODS = ['ui.agentOrganization', 'ui.agentStats', 'ui.forget', 'ui.get', 'ui.legacyTrial', 'ui.list', 'ui.overview', 'ui.search', 'ui.status', 'ui.upgradeLegacy']
 const EXPECTED_MAX_SESSIONS = 4
 // why: the view CSP is script-src 'self' with no eval and connect-src 'self'; each pattern below is either blocked at runtime or a way to reach outside the plugin origin
 const SCRIPT_TAG = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/giu
@@ -140,7 +140,7 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   check('manifest requires the supported host data API and declares the opaque Cairn migration source/target bound by release metadata', RELEASE_METADATA.schemaVersion === 1 && RELEASE_METADATA.pluginId === PLUGIN_ID && legacySources.length === 1 && legacySources[0].sourceId === 'memory-cairn-v1' && legacySources[0].relativePath === 'memory-cairn-v1' && JSON.stringify(manifest.hostApis) === JSON.stringify([{ id: 'teamuq.host-data', range: '^1.1.0' }]) && migrations.length === 1 && migrations[0].id === 'cairn-v1' && migrations[0].source === legacySources[0].sourceId && migrations[0].target === legacySources[0].relativePath, JSON.stringify({ hostApis: manifest.hostApis, legacyMigrations: migrations, releaseMetadata: RELEASE_METADATA }))
   check('manifest organization settings exactly match the repository template', JSON.stringify(manifest.settingsSchema) === JSON.stringify(JSON.parse(readFileSync(join(REPO_ROOT, 'plugin', 'manifest.template.json'), 'utf8')).settingsSchema))
   const methods = Array.isArray(manifest.backendMethods) ? manifest.backendMethods : []
-  check('manifest backendMethods are exactly the nine ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
+  check('manifest backendMethods are exactly the ten ui.* methods', JSON.stringify([...methods].sort()) === JSON.stringify(EXPECTED_BACKEND_METHODS), JSON.stringify(methods))
   check('no memory.* method (nor diagnose) is exposed to the view through backendMethods', !methods.some((method) => /^(?:memory\.|diagnose$)/u.test(method)), methods.join(', '))
   check('manifest backendMethods do not list memory.profile.sync@1: Core pushes the name table through its own gate and the view never calls it', !methods.some((method) => String(method).includes('profile.sync')), methods.join(', '))
   const resources = manifest.resources ?? {}

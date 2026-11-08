@@ -7,8 +7,9 @@ import type { MemoryResult } from "../domain/errors.js";
 import { failure } from "../domain/errors.js";
 import { memoryActorSchema } from "../../vendor/teamuq-contract/contract.mjs";
 import { operationKey, pairKey } from "./modelInvocationScope.js";
-import { dailyRoundStatus, failedModelAttemptInRound, isRecord, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
+import { dailyRoundStatus, failedModelAttemptInRound, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
 import { captureOutcome, captureWithContinuation, isPairBlocked, replyProgress } from "./organizationQueue.js";
+import { createAgentOrganization, createAgentRun } from "./organizationAgentRun.js";
 import { classifyLegacyJob, isTrialRow, summarizeTrial, trialBreaker, type LegacyTrialRequest, type LegacyTrialResponse, type TrialSummary } from "./organizationTrial.js";
 
 export interface OrganizationStatus {
@@ -88,6 +89,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
   let timer: ReturnType<typeof setInterval> | undefined;
   let stopRequested = false;
   let trialQueue: Promise<unknown> = Promise.resolve();
+  const agentRun = createAgentRun();
   // why: a failed host-session release happens after the job result is final, so no job row carries it; each pair keeps its own record and the map order is recency
   const releaseFaults = new Map<string, OrganizationReleaseFault>();
   let status: OrganizationStatus = {
@@ -203,6 +205,9 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     const trial = await trialState();
     const trialBatch = trial?.state === "running" ? trial.batchId : null;
     const hasTrialRows = rows.some(({ job }) => isTrialRow(job, trialBatch));
+    const agentRows = new Set(rows.filter(({ job }) => job.state === "pending" && agentRun.has(job.punchId)).map(({ job }) => job.punchId));
+    const runGeneration = agentRun.generation();
+    let cut = false;
     let trialEnded = false;
     let dailyClosed = false;
     let replyOnly = false;
@@ -233,7 +238,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         replyOnly = !roundActive;
       }
       if (!roundActive && !replyOnly) {
-        if (!hasTrialRows) { await updateStatus(rows, round === null ? null : { date: schedule.date, value: round }); return; }
+        if (!hasTrialRows && agentRows.size === 0) { await updateStatus(rows, round === null ? null : { date: schedule.date, value: round }); return; }
         dailyClosed = true;
       }
     }
@@ -246,29 +251,34 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     const immediateRetry = runFrequency === "immediate" && retryNow;
     retryNow = false;
     const date = schedule.date;
+    const priority = (job: Job): number => isTrialRow(job, trialBatch) ? 2 : agentRows.has(job.punchId) ? 1 : 0;
     const eligibleRows = rows.filter(({ job }) => {
-      if (isTrialRow(job, trialBatch)) return true;
+      if (isTrialRow(job, trialBatch) || agentRows.has(job.punchId)) return true;
       if (dailyClosed || job.state !== "pending" || job.resumeDisposition === "legacy_unlinked") return false;
       if (runFrequency === "daily" && replyOnly) return replyReady(state, job);
       if (runFrequency === "daily") return round !== null && job.queueSequence !== undefined && job.queueSequence <= round.snapshot.queueSequenceHighWatermark;
       return true;
-    }).sort((left, right) => Number(isTrialRow(right.job, trialBatch)) - Number(isTrialRow(left.job, trialBatch)));
+    }).sort((left, right) => priority(right.job) - priority(left.job));
     let attempted = false;
     for (const { row, job } of eligibleRows) {
-      if (stopped || !options.enabled() || frequency() !== runFrequency) break;
+      if (stopped || !options.enabled() || frequency() !== runFrequency) { cut = true; break; }
       const trialRow = isTrialRow(job, trialBatch);
+      const agentRow = agentRows.has(job.punchId);
+      // why: an agent run that starts while this pass is under way goes to the front, so this pass ends and the next one begins with its rows
+      if (!trialRow && !agentRow && agentRun.generation() !== runGeneration && agentRun.hasWaiting()) { requested = true; cut = true; break; }
+      if (agentRow && (agentRun.wantsStop() || phaseOf(state, job, now()).phase === "operator_reconcile")) { agentRun.record(job.punchId, "blocked"); continue; }
       if (trialRow && !trialEnded && stopRequested) { trialEnded = true; await endTrial("stopped", null); }
       if (trialRow && trialEnded) continue;
       if (phaseOf(state, job, now()).phase === "operator_reconcile") continue;
       const hasReply = replyReady(state, job);
-      const dailySendBlocked = !trialRow && runFrequency === "daily"
+      const dailySendBlocked = !trialRow && !agentRow && runFrequency === "daily"
         && (job.lastAttemptDate === date || failedModelAttemptInRound(state, job, date, dailyTime));
       if (dailySendBlocked && !hasReply) continue;
-      if (!immediateRetry && !hasReply && job.nextAttemptAt > now()) continue;
+      if (!immediateRetry && !hasReply && !agentRow && job.nextAttemptAt > now()) continue;
       attempted = true;
       status = { ...status, state: "running" };
       const attemptedAt = now();
-      const send = trialRow || (!replyOnly && !dailySendBlocked);
+      const send = trialRow || agentRow || (!replyOnly && !dailySendBlocked);
       const attempt = async (): Promise<MemoryResult<unknown>> => {
         try { return await options.capture({ ...job, allowModelSend: send }); } catch (error) { return failure("organization", error); }
       };
@@ -276,11 +286,11 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         capture: attempt,
         readProgress: async () => replyProgress(await resumeState(), job),
         awaitPending: async () => { await options.awaitPending?.(job); },
-        shouldStop: () => stopped || !options.enabled(),
+        shouldStop: () => stopped || !options.enabled() || (agentRow && agentRun.wantsStop()),
       });
-      if (stopped) break;
+      if (stopped) { cut = true; break; }
       // why: another operation of this pair holds it, which says nothing about this job, so it keeps its attempt count and its day
-      if (isPairBlocked(result)) continue;
+      if (isPairBlocked(result)) { if (agentRow) agentRun.record(job.punchId, "blocked"); continue; }
       const { code, classificationFailed, terminalOutcome } = captureOutcome(result);
       const nextState: Job["state"] = terminalOutcome !== null ? "completed" : code === "MEMORY_SUPPRESSED" ? "skipped" : "pending";
       const latestResume = await resumeState();
@@ -328,6 +338,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       if (nextState !== "pending" && options.store.completeJobAndPruneOperation === undefined) {
         await options.store.pruneOperation?.(key);
       }
+      if (agentRow) agentRun.record(job.punchId, nextState !== "pending" ? "done" : "failed", code);
       status = { ...status, lastError: nextState === "skipped" ? null : code, errorPhase: next.errorPhase ?? null, hostErrorCode: next.hostErrorCode ?? null, localErrorCode: next.localErrorCode ?? null, retryable: next.retryable ?? null, partialDelivered: next.partialDelivered ?? null, lastAttemptAt: attemptedAt, updatedAt: attemptedAt };
       if (trialRow && trial !== null) {
         const latestRows = await jobs();
@@ -337,6 +348,8 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
         if (halt !== null) { trialEnded = true; await endTrial("halted", halt); }
       }
     }
+    // why: a run that began during this pass is left for the next one, and a member that vanished meanwhile must not keep the run open for ever
+    if (agentRun.generation() === runGeneration) agentRun.finish(now(), !cut);
     if (trial?.state === "running" && !trialEnded) {
       if (stopRequested) await endTrial("stopped", null);
       else if (!(await jobs()).some(({ job }) => isTrialRow(job, trialBatch))) await options.store.writeTrial?.({ ...trial, state: "completed", endedAt: now() });
@@ -370,6 +383,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     }
     if (!attempted && status.state === "running") status = { ...status, state: "idle" };
   };
+  const agentOrganization = createAgentOrganization({ run: agentRun, rows: jobs, state: resumeState, enabled: () => options.enabled(), now, wake: () => wake() });
   const wake = (): void => {
     if (stopped || !started) return;
     if (active !== null) { requested = true; return; }
@@ -439,6 +453,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       trialQueue = answer.catch(() => undefined);
       return answer;
     },
+    agentOrganization,
     noteReleaseFault(pair: string, fault: OrganizationReleaseFault | null) {
       releaseFaults.delete(pair);
       if (fault !== null) releaseFaults.set(pair, fault);

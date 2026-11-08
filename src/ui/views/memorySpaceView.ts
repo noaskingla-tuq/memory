@@ -22,6 +22,7 @@ import { axis, barRow, columnChart, spaceBarRow } from "./memorySpaceCharts.js";
 
 export const SPACE_TITLE_ID = "space-title";
 export const SPACE_TIMELINE_ID = "space-timeline";
+export const SPACE_ORG_ID = "space-org";
 
 export interface SpaceView {
   readonly phase: "loading" | "ready" | "empty" | "error";
@@ -37,6 +38,7 @@ const number = (value: number): string => value.toLocaleString("zh-TW");
 export const spaceShell = (): SafeHtml => html`<p><a class="btn-link" href="#/" data-back>${t("space.back")}</a></p>
 <header class="space-head"><span id="space-avatar"></span><div class="space-who"><h2 id="space-title" tabindex="-1"></h2><p id="space-id" class="acard-id"></p><p id="space-meta" class="muted"></p><p class="space-intro">${t("space.intro")}</p></div></header>
 <div id="space-body" class="space-body"></div>
+<div id="space-org" class="ao" data-slot="org"></div>
 <div id="space-timeline" data-slot="timeline"></div>`;
 
 export function spaceName(view: SpaceView): string {

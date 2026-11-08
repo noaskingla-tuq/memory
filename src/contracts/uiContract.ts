@@ -10,6 +10,7 @@ export const UI_METHOD_NAMES = [
   "ui.status",
   "ui.legacyTrial",
   "ui.upgradeLegacy",
+  "ui.agentOrganization",
 ] as const;
 
 export type UiMethodName = (typeof UI_METHOD_NAMES)[number];
@@ -134,6 +135,12 @@ const trialRequestId = z.string().min(8).max(64);
 export const uiLegacyTrialRequest = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start"), requestId: trialRequestId, count: z.number().int().min(1).max(UI_LIMITS.legacyTrialMax) }).strict(),
   z.object({ action: z.literal("stop"), requestId: trialRequestId }).strict(),
+]);
+
+export const uiAgentOrganizationRequest = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("run"), agentId: identifier }).strict(),
+  z.object({ action: z.literal("stop") }).strict(),
+  z.object({ action: z.literal("status"), agentId: identifier }).strict(),
 ]);
 
 const agentHash = z.string().regex(/^[0-9a-f]{64}$/);
@@ -346,6 +353,27 @@ export const uiLegacyTrialSuccess = z.object({
   trial: uiTrialSchema.nullable(),
 }).strict();
 
+export const uiAgentRunSchema = z.object({
+  agentId: z.string().max(200),
+  state: z.enum(["running", "stopping", "completed", "stopped"]),
+  total: count,
+  done: count,
+  failed: count,
+  untried: count,
+  startedAt: count,
+  endedAt: count.nullable(),
+  lastError: z.string().nullable(),
+}).strict();
+
+export const uiAgentOrganizationSuccess = z.object({
+  ok: z.literal(true),
+  action: z.enum(["run", "stop", "status"]),
+  agentId: z.string().max(200),
+  pending: count,
+  blocked: z.enum(["disabled", "running", "other_running", "no_candidates", "not_running"]).nullable(),
+  run: uiAgentRunSchema.nullable(),
+}).strict();
+
 export const uiUpgradeLegacySuccess = z
   .object({
     ok: z.literal(true),
@@ -438,6 +466,7 @@ export const UI_METHOD_SCHEMAS = {
   "ui.status": { request: uiStatusRequest, success: uiStatusSuccess },
   "ui.legacyTrial": { request: uiLegacyTrialRequest, success: uiLegacyTrialSuccess },
   "ui.upgradeLegacy": { request: uiUpgradeLegacyRequest, success: uiUpgradeLegacySuccess },
+  "ui.agentOrganization": { request: uiAgentOrganizationRequest, success: uiAgentOrganizationSuccess },
 } as const satisfies Record<UiMethodName, { request: z.ZodTypeAny; success: z.ZodTypeAny }>;
 
 export type UiFailure = z.infer<typeof uiFailureSchema>;
@@ -457,6 +486,9 @@ export type UiSearchRequest = z.infer<typeof uiSearchRequest>;
 export type UiLegacyTrialRequest = z.infer<typeof uiLegacyTrialRequest>;
 export type UiUpgradeLegacyRequest = z.infer<typeof uiUpgradeLegacyRequest>;
 export type UiTrial = z.infer<typeof uiTrialSchema>;
+export type UiAgentOrganizationRequest = z.infer<typeof uiAgentOrganizationRequest>;
+export type UiAgentRun = z.infer<typeof uiAgentRunSchema>;
+export type UiAgentOrganization = z.infer<typeof uiAgentOrganizationSuccess>;
 
 export type UiParamsResult = { readonly ok: true; readonly value: unknown } | { readonly ok: false };
 

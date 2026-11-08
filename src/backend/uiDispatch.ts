@@ -1,4 +1,4 @@
-import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiLegacyTrialRequest, type UiMethodName } from "../contracts/uiContract.js";
+import { UI_METHOD_NAMES, parseUiParams, type UiFailure, type UiForgetRequest, type UiAgentOrganizationRequest, type UiLegacyTrialRequest, type UiMethodName } from "../contracts/uiContract.js";
 import { runAgentStats } from "../application/ui/agentStats.js";
 import { serializedBytes, UI_RESPONSE_BUDGET_BYTES } from "../application/ui/budget.js";
 import { runGet } from "../application/ui/detail.js";
@@ -17,6 +17,7 @@ import { callError } from "./contractErrors.js";
 import { PLUGIN_VERSION } from "./diagnose.js";
 import type { OrganizationStatus } from "../application/punchOrganization.js";
 import type { LegacyTrialResponse } from "../application/organizationTrial.js";
+import type { AgentOrganizationResponse } from "../application/organizationAgentRun.js";
 
 export interface UiDispatchDeps {
   readonly storageStatus: () => string;
@@ -25,6 +26,7 @@ export interface UiDispatchDeps {
   readonly organizationStatus?: () => OrganizationStatus;
   readonly onForgotten?: (agentId: string, memoryId: string) => Promise<void>;
   readonly legacyTrial?: (request: UiLegacyTrialRequest) => Promise<LegacyTrialResponse>;
+  readonly agentOrganization?: (request: UiAgentOrganizationRequest) => Promise<AgentOrganizationResponse>;
 }
 
 export function isUiMethod(method: unknown): method is UiMethodName {
@@ -50,6 +52,11 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
   if (method === "ui.legacyTrial") {
     if (deps.legacyTrial === undefined) return uiFailure("STORAGE_UNSUPPORTED");
     try { return { ok: true, ...(await deps.legacyTrial(params as UiLegacyTrialRequest)) }; } catch { return uiFailure("STORAGE_BUSY"); }
+  }
+  // why: the per-agent run needs only the organization worker, like the trial, so it answers even while the Cairn layout is unavailable
+  if (method === "ui.agentOrganization") {
+    if (deps.agentOrganization === undefined) return uiFailure("STORAGE_UNSUPPORTED");
+    try { return { ok: true, ...(await deps.agentOrganization(params as UiAgentOrganizationRequest)) }; } catch { return uiFailure("STORAGE_BUSY"); }
   }
   if (services === undefined) return storageFailure(deps.storageStatus());
   const request = params as never;

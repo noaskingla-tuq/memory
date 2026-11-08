@@ -1,0 +1,38 @@
+.ao {
+  margin-top: var(--sp-3);
+}
+
+.ao .ao-card {
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.ao .ao-card h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: 14px;
+}
+
+.ao .ao-line {
+  margin: 0;
+  font-size: 12px;
+}
+
+.ao .ao-progress {
+  display: block;
+  width: 100%;
+  margin-top: var(--sp-2);
+}
+
+.ao .ao-note {
+  margin: var(--sp-2) 0 0;
+  font-size: 12px;
+  color: var(--text-secondary-strong);
+}
+
+.ao .ao-actions {
+  margin: var(--sp-3) 0 0;
+}
+
+.ao .ao-slot:empty {
+  display: none;
+}

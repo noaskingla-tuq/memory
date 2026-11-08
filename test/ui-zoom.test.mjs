@@ -74,8 +74,8 @@ test("the three buttons carry spoken labels, act on the zoom, and tell the curre
   const out = harness.nodes.get('[data-zoom="out"]');
   const larger = harness.nodes.get('[data-zoom="in"]');
   const reset = harness.nodes.get('[data-zoom="reset"]');
-  assert.equal(out.attributes.get("aria-label"), "縮小文字");
-  assert.equal(larger.attributes.get("aria-label"), "放大文字");
+  assert.equal(out.attributes.get("aria-label"), "A− 縮小文字");
+  assert.equal(larger.attributes.get("aria-label"), "A＋ 放大文字");
   assert.equal(reset.attributes.get("aria-label"), "重設文字大小（目前 100%）");
   assert.deepEqual([out.textContent, larger.textContent, reset.textContent], ["A−", "A＋", "重設"]);
   assert.equal(harness.nodes.get("[data-zoom-group]").attributes.get("aria-label"), "文字大小");
@@ -111,10 +111,10 @@ test("the page frame: header and content share one width and one gutter, and the
   assert.deepEqual(sizes.map((match) => match[0]), [], "every font size is in rem so the zoom reaches it");
 });
 
-test("the header holds the three zoom buttons inside the inner box, as real buttons with aria-labels", () => {
+test("the header holds the three zoom buttons inside the inner box, as real buttons whose aria-labels come from i18n", () => {
   const inner = /<div class="hdr-in">([\s\S]*)<\/div>\s*<\/header>/u.exec(indexHtml);
   assert.ok(inner !== null, "header content sits in .hdr-in");
-  for (const action of ["out", "in", "reset"]) assert.match(inner[1], new RegExp(`<button type="button" class="btn zoom-btn" data-zoom="${action}" aria-label="[^"]+">`, "u"));
+  for (const action of ["out", "in", "reset"]) assert.match(inner[1], new RegExp(`<button type="button" class="btn zoom-btn" data-zoom="${action}">`, "u"));
   assert.ok(!/\son[a-z]+\s*=|<script(?![^>]*src=)/iu.test(indexHtml), "no inline handler or script");
 });
 
@@ -124,4 +124,20 @@ test("charts and bars are sized in rem and the grids shrink, so a larger root si
   assert.match(css, /grid-template-columns: minmax\(5rem, 42%\) minmax\(0, 1fr\) minmax\(4\.5em, max-content\);/u);
   assert.match(css, /\.spark \{[^}]*width: 5\.25rem;[^}]*height: 1\.5rem;/u);
   assert.match(css, /\.tl-search input \{[^}]*flex: 1 1 12\.5rem;[^}]*min-width: 0;/u);
+});
+
+test("each zoom button has a spoken label that contains its visible text, written once in i18n", () => {
+  const harness = fakeRoot();
+  bindZoomControl(harness.root, createZoom(memoryStore(), () => undefined));
+  for (const action of ["out", "in", "reset"]) {
+    const node = harness.nodes.get(`[data-zoom="${action}"]`);
+    assert.ok(node.attributes.get("aria-label").includes(node.textContent), action + " label includes its visible text");
+  }
+  const html = readFileSync(new URL("../plugin/ui/index.html", import.meta.url), "utf8");
+  const buttons = [...html.matchAll(/<button[^>]*data-zoom="\w+"([^>]*)>([^<]*)<\/button>/g)];
+  assert.equal(buttons.length, 3);
+  for (const [, attrs, text] of buttons) {
+    assert.ok(text.length > 0, "the HTML keeps the visible text so the buttons read before the script runs");
+    assert.ok(!/aria-label/.test(attrs), "the spoken label has one source");
+  }
 });

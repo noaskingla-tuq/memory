@@ -34,6 +34,7 @@ export interface HomeView {
   readonly loadingMore: boolean;
   readonly complete: boolean;
   readonly unavailableAgents: number;
+  readonly upgradableAgents?: number;
   readonly profile: ProfileHealth;
   readonly team: string | null;
   readonly sort: SortKey;
@@ -78,7 +79,9 @@ export function renderBanner(view: HomeView): SafeHtml {
   const parts: SafeHtml[] = [];
   if (view.notice !== null) parts.push(renderError(view.notice, "reload"));
   if (!view.complete) parts.push(html`<div class="notice" role="status"><span>${t("overview.incomplete")}</span> <button type="button" class="btn" data-act="reload">${t("common.refresh")}</button></div>`);
-  if (view.unavailableAgents > 0) parts.push(html`<div class="notice" role="status">${t("home.unavailable", { n: view.unavailableAgents })}</div>`);
+  const upgradable = Math.min(view.upgradableAgents ?? 0, view.unavailableAgents);
+  if (upgradable > 0) parts.push(html`<div class="notice" role="status" data-notice="legacy"><span>${t("home.legacy.body", { n: upgradable })}</span> <button type="button" class="btn" data-act="upgradeLegacy" data-legacy-n="${upgradable}">${t("home.legacy.action")}</button></div>`);
+  if (view.unavailableAgents > upgradable) parts.push(html`<div class="notice" role="status">${t("home.unavailable", { n: view.unavailableAgents - upgradable })}</div>`);
   const profile = profileNotice(view.profile);
   if (profile !== "") parts.push(html`<div class="notice" role="status" data-notice="profile">${profile}</div>`);
   return html`${parts}`;

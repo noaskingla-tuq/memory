@@ -5,10 +5,11 @@ export interface HomeActions {
   showHelp(): void;
   setTeam(value: string): void;
   setSort(value: string): void;
+  upgradeLegacy?(count: number): void;
 }
 
 interface Found {
-  readonly dataset: { readonly act?: string | undefined; readonly role?: string | undefined };
+  readonly dataset: { readonly act?: string | undefined; readonly role?: string | undefined; readonly legacyN?: string | undefined };
   readonly value?: string;
 }
 
@@ -41,6 +42,9 @@ export function bindHomeEvents(root: EventRoot, actions: HomeActions): void {
         break;
       case "showHelp":
         actions.showHelp();
+        break;
+      case "upgradeLegacy":
+        actions.upgradeLegacy?.(Number(hit.dataset.legacyN ?? 0));
         break;
       default:
         break;

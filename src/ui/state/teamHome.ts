@@ -63,6 +63,7 @@ export interface OverviewPage {
   readonly nextCursor: string | null;
   readonly complete: boolean;
   readonly unavailableAgents: number;
+  readonly upgradableAgents: number;
   readonly storageStatus: string;
   readonly profile: ProfileHealth;
 }
@@ -144,6 +145,7 @@ export function parseOverview(value: unknown): OverviewPage | null {
     nextCursor,
     complete: value.complete !== false,
     unavailableAgents: value.storage.unavailableAgents,
+    upgradableAgents: isCount(value.storage.upgradableAgents) ? value.storage.upgradableAgents : 0,
     storageStatus: value.storage.status,
     profile: parseProfileHealth(value.profile),
   };

@@ -14,6 +14,7 @@ import { SPACE_TIMELINE_ID, SPACE_TITLE_ID, spaceShell } from "./views/memorySpa
 import { bindSpaceEvents } from "./views/spaceEvents.js";
 import { bindStatusToggle, createStatusLine } from "./views/statusLine.js";
 import { bindLegacyTrial } from "./views/legacyTrial.js";
+import { createLegacyUpgrade } from "./views/legacyUpgrade.js";
 import { createTeamHome, type HomeTargets, type Preferences } from "./views/teamHomeController.js";
 import { homeShell } from "./views/teamHomeView.js";
 import { createTimeline, type TimelineTargets } from "./views/timelineController.js";
@@ -217,8 +218,11 @@ function route(): void {
   else showHome(previous?.name === "agent" ? previous.agentId : undefined);
 }
 
+const legacyUpgrade = createLegacyUpgrade({ client, reload: () => home.reload(), background: () => view });
+
 bindHomeEvents(view, {
   reload: () => void home.reload(),
+  upgradeLegacy: (count) => void legacyUpgrade.run(count),
   loadMore: () =>
     void home.loadMore().then((added) => {
       cardOf(added[0])?.focus();

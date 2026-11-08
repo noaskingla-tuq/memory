@@ -72,6 +72,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
     loadingMore: false,
     complete: true,
     unavailableAgents: 0,
+    upgradableAgents: 0,
     profile: HEALTHY_PROFILE,
     team: null,
     sort: "recent",
@@ -214,6 +215,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
       hasMore: page.nextCursor !== null,
       complete: page.complete,
       unavailableAgents: page.unavailableAgents,
+      upgradableAgents: page.upgradableAgents,
       profile: page.profile,
       team: validTeam(page.agents, state.team),
     });
@@ -243,6 +245,7 @@ export function createTeamHome(deps: TeamHomeDeps): TeamHome {
       hasMore: page.nextCursor !== null,
       complete: state.complete && page.complete,
       unavailableAgents: page.unavailableAgents,
+      upgradableAgents: page.upgradableAgents,
       profile: page.profile,
     });
     announce = true;

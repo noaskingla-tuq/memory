@@ -2,11 +2,13 @@ import { DETAIL_STRINGS } from "./detailStrings.js";
 import { SETTINGS_STRINGS } from "./settingsStrings.js";
 import { SPACE_STRINGS } from "./zhTWSpace.js";
 import { TIMELINE_STRINGS } from "./timelineStrings.js";
+import { LEGACY_UPGRADE_STRINGS } from "./legacyUpgradeStrings.js";
 import { TRIAL_STRINGS } from "./legacyTrialStrings.js";
 
 export const STRINGS = {
   ...SPACE_STRINGS,
   ...TRIAL_STRINGS,
+  ...LEGACY_UPGRADE_STRINGS,
   "app.title": "Cairn記憶管理",
   "status.loading": "讀取中…",
   "status.ok": "記憶服務運作中",

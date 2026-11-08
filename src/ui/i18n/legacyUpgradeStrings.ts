@@ -1,0 +1,16 @@
+export const LEGACY_UPGRADE_STRINGS = {
+  "home.legacy.body": "有 {n} 位 agent 的記憶是舊格式，升級後才看得到。",
+  "home.legacy.action": "升級",
+  "legacy.confirm.title": "要升級舊格式的記憶嗎？",
+  "legacy.confirm.intro": "有 {n} 位 agent 的記憶庫還是舊格式，所以目前讀不到。升級後，這些記憶就會出現在畫面上，內容不會變。",
+  "legacy.confirm.backup": "升級每一位之前，都會先自動備份那位 agent 的記憶庫；備份失敗的那一位就不會升級。",
+  "legacy.confirm.cancel": "取消",
+  "legacy.confirm.start": "升級 {n} 位",
+  "legacy.progress.title": "正在升級",
+  "legacy.progress.body": "已處理 {done} / {total} 位（成功 {upgraded}、失敗 {failed}）。請稍候，先不要關閉這個視窗。",
+  "legacy.result.title": "升級結果",
+  "legacy.result.ok": "知道了",
+  "legacy.result.summary": "成功 {upgraded} 位，失敗 {failed} 位。",
+  "legacy.result.failedHint": "失敗的那幾位沒有被改動，稍後可以再按一次升級。",
+  "legacy.result.unreadable": "升級的回應讀不懂，請重新整理後看看結果。",
+} as const;

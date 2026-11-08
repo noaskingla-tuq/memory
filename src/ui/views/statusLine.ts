@@ -45,7 +45,7 @@ const TOGGLE_SELECTOR = "[data-status-toggle]";
 
 type Organization = NonNullable<UiStatus["organization"]>;
 
-export const STATUS_WAITING_WARN_MS = 300_000;
+export const STATUS_WAITING_WARN_MS = 270_000;
 
 function waitingText(organization: Organization): string {
   const ms = organization.waiting?.sinceMs;

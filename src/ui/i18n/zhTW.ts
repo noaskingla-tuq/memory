@@ -29,7 +29,7 @@ export const STRINGS = {
   "status.organization.phase.paused": "AI 整理暫停",
   "status.organization.phase.error": "AI 整理遇到問題",
   "status.organization.waiting": "AI 回覆中，已等待 {n} 秒",
-  "status.organization.waitingLong": "AI 回覆已等待 {n} 秒，超過 5 分鐘，稍後會自動中止",
+  "status.organization.waitingLong": "AI 回覆已等待 {n} 秒，超過 270 秒，稍後會自動中止",
   "status.organization.reason": "（失敗階段 {phase}・主程式代碼 {code}）",
   "status.organization.reasonLocal": "（失敗階段 {phase}・外掛自行判定 {code}）",
   "status.organization.legacy": "舊工作 {n} 筆暫停中（可小量試跑）",

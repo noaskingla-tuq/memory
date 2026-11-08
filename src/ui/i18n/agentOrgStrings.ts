@@ -11,7 +11,7 @@ export const AGENT_ORG_STRINGS = {
   "ao.stopped": "已停止：共 {total} 筆（完成 {done}・失敗 {failed}・未處理 {untried}）",
   "ao.failedHint": "失敗的工作還在佇列裡，再按一次「立即整理」就會重送。",
   "ao.waiting": "AI 回覆中，已等待 {n} 秒",
-  "ao.waiting.long": "AI 回覆中，已等待 {n} 秒，超過 5 分鐘仍沒有結果，系統稍後會自動中止這一筆",
+  "ao.waiting.long": "AI 回覆中，已等待 {n} 秒，超過 270 秒仍沒有結果，系統稍後會自動中止這一筆",
   "ao.progress": "整理進度",
   "ao.blocked.disabled": "AI 整理目前已關閉，請先在設定開啟。",
   "ao.blocked.running": "這位 agent 已經在整理了。",

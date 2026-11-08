@@ -155,3 +155,16 @@ test("a second operation of a pair that has an unresolved call is refused with t
   await assert.rejects(invokeScoped(rig.port, rig.actor, "organize:next"), (error) => error.code === "RESOURCE_BUSY" && error.phase === "session_resume" && error.localCode === "pair_blocked");
   assert.equal(rig.state.sent, 0);
 });
+
+test("the wait counts from the send, not from the moment the caller was detached", async (t) => {
+  const rig = liveHost(t);
+  const controller = new AbortController();
+  const outcome = invokeScoped(rig.port, rig.actor, OP, { value: 1 }, controller.signal).then(() => null, (error) => error);
+  await ticks();
+  assert.equal(rig.state.sent, 1);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  controller.abort();
+  await outcome;
+  const waited = rig.port.waiting();
+  assert.ok(waited !== null && waited.sinceMs >= 250, "the 250 ms before the detach are part of the wait: " + JSON.stringify(waited));
+});

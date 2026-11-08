@@ -416,6 +416,7 @@ export function createHostMemoryModelPort(
     input.signal.addEventListener("abort", stopBefore, { once: true });
     controller.signal.addEventListener("abort", stopBefore, { once: true });
     let detached = false;
+    let sentAt: number | null = null;
     let rejectDetached: (error: Error) => void = () => {};
     const detachedCall = new Promise<never>((_, reject) => { rejectDetached = reject; });
     void detachedCall.catch(() => undefined);
@@ -534,10 +535,12 @@ export function createHostMemoryModelPort(
           hard: controller.signal, soft: input.signal, limits, isDisposed: () => disposed,
           setPhase: (phase) => { activePhase = phase; },
           remember: (record, handle) => { sessions.set(record.pairKey, { session: handle, record }); },
+          onSent: (at) => { sentAt = at; },
           onDetach: () => {
             if (detached) return;
             detached = true;
-            detachedSince.set(controller, Date.now());
+            // why: the wait the user sees counts from the send, because the first 30 seconds were spent before the caller was detached
+            detachedSince.set(controller, sentAt ?? Date.now());
             rejectDetached(serviceError("MODEL_TIMEOUT", "Memory model operation outlived its caller", undefined, "turn_timeout", DETACHED_LOCAL_CODE));
           },
         }, publicError);

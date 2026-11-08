@@ -29,29 +29,29 @@ async function statusMarkup(org, expanded = true) {
   return { html: target.innerHTML, state: target.dataset.state };
 }
 
-test("the agent page shows how long the AI has been replying, and switches to the warning style past 300 seconds", () => {
-  assert.equal(ui.WAITING_WARN_MS, 300_000);
+test("the agent page shows how long the AI has been replying, and switches to the warning style past 270 seconds", () => {
+  assert.equal(ui.WAITING_WARN_MS, 270_000);
   const normal = ui.agentOrgSection(model({ run: run(), waitingMs: 42_500 })).value;
   assert.ok(normal.includes('data-ao-waiting="normal"'));
   assert.ok(normal.includes("AI 回覆中，已等待 42 秒"));
   assert.ok(!normal.includes('data-ao-waiting="warn"'));
-  const edge = ui.agentOrgSection(model({ run: run(), waitingMs: 300_000 })).value;
-  assert.ok(edge.includes('data-ao-waiting="normal"'), "exactly 300 seconds is not yet over the limit");
-  const warn = ui.agentOrgSection(model({ run: run(), waitingMs: 301_000 })).value;
+  const edge = ui.agentOrgSection(model({ run: run(), waitingMs: 270_000 })).value;
+  assert.ok(edge.includes('data-ao-waiting="normal"'), "exactly 270 seconds is not yet over the limit");
+  const warn = ui.agentOrgSection(model({ run: run(), waitingMs: 271_000 })).value;
   assert.ok(warn.includes('data-ao-waiting="warn"'));
-  assert.ok(warn.includes("AI 回覆中，已等待 301 秒，超過 5 分鐘仍沒有結果"));
+  assert.ok(warn.includes("AI 回覆中，已等待 271 秒，超過 270 秒仍沒有結果"));
   assert.ok(!ui.agentOrgSection(model({ run: run() })).value.includes("data-ao-waiting"), "no wait, no line");
   assert.ok(ui.agentOrgSection(model({ waitingMs: 0 })).value.includes("已等待 0 秒"), "zero is a wait, not an absence");
 });
 
-test("the status line shows the wait in the folded line and in the panel, and warns past 300 seconds", async () => {
+test("the status line shows the wait in the folded line and in the panel, and warns past 270 seconds", async () => {
   const calm = await statusMarkup(organization({ waiting: { sinceMs: 12_000 } }));
   assert.ok(calm.html.includes("AI 回覆中，已等待 12 秒"));
   assert.ok(calm.html.includes('data-waiting="normal"'));
   assert.equal(calm.state, "ok");
-  const slow = await statusMarkup(organization({ waiting: { sinceMs: 301_000 } }));
+  const slow = await statusMarkup(organization({ waiting: { sinceMs: 271_000 } }));
   assert.ok(slow.html.includes('data-waiting="warn"'));
-  assert.ok(slow.html.includes("AI 回覆已等待 301 秒，超過 5 分鐘，稍後會自動中止"));
+  assert.ok(slow.html.includes("AI 回覆已等待 271 秒，超過 270 秒，稍後會自動中止"));
   assert.equal(slow.state, "warn");
   const none = await statusMarkup(organization({ waiting: null }));
   assert.ok(!none.html.includes("data-waiting") && !none.html.includes("已等待"));
@@ -107,10 +107,21 @@ test("snapshot: write the waiting displays as HTML when asked", async (t) => {
   const css = ["styles/tokens.css", "styles/app.css", "styles/agentOrg.css", "styles/status.css"].map((file) => readFileSync(join(UI_ROOT, file), "utf8").replace(/@import[^;]*;/gu, "")).join("\n");
   const section = (title, markup) => `<section><h2>${title}</h2>${markup}</section>`;
   const normalAgent = ui.agentOrgSection(model({ run: run(), waitingMs: 42_500 })).value;
-  const warnAgent = ui.agentOrgSection(model({ run: run(), waitingMs: 301_000 })).value;
+  const warnAgent = ui.agentOrgSection(model({ run: run(), waitingMs: 271_000 })).value;
   const normalStatus = await statusMarkup(organization({ waiting: { sinceMs: 42_500 } }));
-  const warnStatus = await statusMarkup(organization({ waiting: { sinceMs: 301_000 } }));
+  const warnStatus = await statusMarkup(organization({ waiting: { sinceMs: 271_000 } }));
   const page = `<!DOCTYPE html>\n<html lang="zh-Hant"><head><meta charset="utf-8"><title>AI 整理等待顯示快照</title><style>${css}\nbody{font:14px sans-serif;max-width:720px;margin:16px auto;padding:0 16px}section{margin-bottom:24px;border-top:1px solid #8884}.status-panel{position:static}</style></head><body><div class="ao">${section("agent 頁：一般等待（42 秒）", normalAgent)}${section("agent 頁：警示等待（301 秒）", warnAgent)}</div>${section("狀態列：一般等待（42 秒），data-state=" + normalStatus.state, `<div class="hdr-status">${normalStatus.html}</div>`)}${section("狀態列：警示等待（301 秒），data-state=" + warnStatus.state, `<div class="hdr-status">${warnStatus.html}</div>`)}</body></html>\n`;
   writeFileSync(join(out, "waiting-snapshot.html"), page, "utf8");
   assert.ok(page.includes('data-ao-waiting="warn"') && page.includes('data-waiting="warn"'));
+});
+
+test("both screens warn at the same threshold: 270 seconds after the send, which is before the 330 second backstop", async () => {
+  assert.equal(ui.WAITING_WARN_MS, 270_000);
+  assert.equal(ui.STATUS_WAITING_WARN_MS, 270_000);
+  const { TURN_BACKSTOP_MS } = await import("../out/adapters/model/turnLimits.js");
+  assert.ok(ui.WAITING_WARN_MS + 30_000 < TURN_BACKSTOP_MS, "the warning is visible for a while before the backstop frees the turn");
+  const edge = await statusMarkup(organization({ waiting: { sinceMs: 270_000 } }));
+  assert.ok(edge.html.includes('data-waiting="normal"'));
+  const over = await statusMarkup(organization({ waiting: { sinceMs: 270_001 } }));
+  assert.ok(over.html.includes('data-waiting="warn"'));
 });

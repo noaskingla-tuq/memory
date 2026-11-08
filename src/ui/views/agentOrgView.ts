@@ -18,7 +18,7 @@ export interface AgentOrgModel {
 }
 
 export const AGENT_ORG_ID = "space-org";
-export const WAITING_WARN_MS = 300_000;
+export const WAITING_WARN_MS = 270_000;
 
 export type AgentOrgState = "loading" | "idle" | "running" | "stopping" | "completed" | "stopped";
 

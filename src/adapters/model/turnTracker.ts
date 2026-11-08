@@ -38,6 +38,7 @@ export interface TurnRequest {
   readonly isDisposed: () => boolean;
   readonly setPhase: (phase: MemoryFailurePhase) => void;
   readonly onDetach: () => void;
+  readonly onSent?: (at: number) => void;
   readonly limits?: TurnLimits;
   readonly remember: (record: OrganizationSessionRecord, session: PluginBackendAiSessionV1) => void;
 }
@@ -207,6 +208,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
         throw publicError(error, "send");
       }
       turnId = turn.turnId;
+      request.onSent?.(Date.now());
       state = "running";
       request.setPhase("turn");
       const updatedSession: OrganizationSessionRecord = { ...current.record, turnCount: current.record.turnCount + 1, lastUsedAt: Date.now() };
@@ -217,6 +219,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       request.remember(updatedSession, current.session);
       for (const event of pending.splice(0)) enqueue(event);
     } else {
+      request.onSent?.(priorCall?.createdAt ?? Date.now());
       state = "running";
       for (const event of pending.splice(0)) enqueue(event);
     }

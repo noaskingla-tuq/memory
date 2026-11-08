@@ -275,7 +275,7 @@ export function createHostMemoryModelPort(
 
   const acquireSession = createTurnSessions({
     ai: resumeAi, task, resumeStore, isDisposed: () => disposed, isAbandoned: (id) => abandoned.has(id), deniedModel,
-    closeQuietly, persistSession, stateError, publicError,
+    closeQuietly, persistSession, stateError, publicError, ...(limits.openWaitMs === undefined ? {} : { abandonedWaitMs: limits.openWaitMs }),
   });
 
   // why: a close that does not settle must not fail a turn whose reply is already saved, so it is remembered and reported once to the next call or release

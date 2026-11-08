@@ -116,7 +116,8 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       await settleIfReady();
     } else if (event.kind === "completed") {
       const snapshot = current.session.turn;
-      if (snapshot?.turnId === turnId) output = snapshot.text;
+      // why: a resumed turn's snapshot is frozen at attach time, so it may only replace the streamed text when it is the finished reply or holds more than was streamed
+      if (snapshot?.turnId === turnId && (snapshot.terminal?.kind === "completed" || snapshot.text.length > output.length)) output = snapshot.text;
       if (Buffer.byteLength(output, "utf8") > REPLY_LIMIT) { await tooLong(); return; }
       terminal = true;
       armGrace();

@@ -34,6 +34,8 @@ import { createPunchOrganizationWorker } from "../application/punchOrganization.
 import { pairKey } from "../application/modelInvocationScope.js";
 import { createMigratingPunchReceiptStore } from "./punchStateMigration.js";
 import { readOrganizationSettings } from "./organizationSettings.js";
+import { unstickLocalDeadline } from "../application/organizationUnstick.js";
+import { backupStateOnce } from "../adapters/storage/stateBackup.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
@@ -89,6 +91,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   let profileTimer: ReturnType<typeof setInterval> | null = null;
   let profileRefreshing: Promise<void> | null = null;
   let workerStartup: Promise<void> = Promise.resolve();
+  let startupReady: Promise<void> = Promise.resolve();
   let workersStarted = false;
   let settingValues: Readonly<Record<string, boolean | number | string>> = {};
   try { settingValues = options.settings?.all() ?? {}; } catch {}
@@ -168,6 +171,17 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       sink: { accept: (request) => profileSync.handle(request) },
       sinkStatus: () => punchWorker?.status() ?? null,
     }).then(() => undefined).catch(() => undefined).finally(() => { profileRefreshing = null; });
+  };
+
+  // why: a migration failure must not block start-up, so it only shows in the organization status and the next start tries again
+  const unstickStrandedCalls = async (): Promise<void> => {
+    if (organizationStore === undefined) return;
+    const now = options.organizationNow ?? Date.now;
+    try {
+      await unstickLocalDeadline(organizationStore, now(), () => { backupStateOnce(dirname(options.dataRoot), "punch-organization.json", "punch-organization.pre-unstick.json"); });
+    } catch {
+      organization?.noteReleaseFault("unstick", { code: "STORAGE_BUSY", phase: "state", localCode: "unstick_failed", retryable: true, at: now() });
+    }
   };
 
   const ensure = (): Ready => {
@@ -285,6 +299,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       unsubscribeSettings?.();
       unsubscribeSettings = undefined;
       disposing ??= (async () => {
+        await startupReady;
         await model?.cancel();
         await punchWorker?.stop();
         await organization?.stop();
@@ -300,10 +315,14 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     startWorkers() {
       if (workersStarted || disposed) return;
       workersStarted = true;
-      organization?.start({ deferInitialRun: punchWorker !== undefined });
-      punchWorker?.start();
+      startupReady = (async () => {
+        await unstickStrandedCalls();
+        if (disposed) return;
+        organization?.start({ deferInitialRun: punchWorker !== undefined });
+        punchWorker?.start();
+      })();
       if (organization !== undefined && punchWorker !== undefined) {
-        workerStartup = punchWorker.initialCatchupReady().then(() => { if (!disposed) organization.resumeStartup(); });
+        workerStartup = startupReady.then(() => disposed ? undefined : punchWorker.initialCatchupReady()).then(() => { if (!disposed) organization.resumeStartup(); });
       }
       refreshProfile();
       if (options.host !== undefined) {
@@ -312,6 +331,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
       }
     },
     async idleWorkers() {
+      await startupReady;
       await punchWorker?.idle();
       if (punchWorker?.status() !== null) await workerStartup;
       await organization?.idle();

@@ -333,7 +333,7 @@ test("capture scope hashes use the original agent and source project, and distin
   assert.equal(sha256(JSON.stringify(["sw/a", "source-1"])).length, 64);
 });
 
-test("same pair reuses one host session, different pairs stay isolated, and each turn carries its own system and schema", async (t) => {
+test("every invoke opens its own host session, different pairs stay isolated, and each turn carries its own system and schema", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "memory-resume-pairs-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
@@ -345,11 +345,12 @@ test("same pair reuses one host session, different pairs stay isolated, and each
   await invokeScoped(port, actor, "organize:punch-1", "classify", "classify system with schema B", { selected: ["synthetic"] });
   await invokeScoped(port, { ...actor, projectId: "source-2" }, "organize:punch-1", "extract", "extract system with schema A", input);
   await invokeScoped(port, { ...actor, agentId: "sw/b" }, "organize:punch-1", "extract", "extract system with schema A", input);
-  assert.equal(h.counters.opened, 3);
-  assert.equal(h.counters.maxActiveSessions, 1, "closed idle session mappings do not occupy more than the host's one live session slot");
+  assert.equal(h.counters.opened, 4, "one fresh session per invoke");
+  assert.equal(h.counters.closed, 4, "each is closed as soon as its turn settles");
+  assert.equal(h.counters.maxActiveSessions, 1, "no two sessions are ever open together");
   assert.equal(h.counters.sent, 4);
   assert.equal(h.counters.resumes, 0);
-  assert.equal(h.openInputs[0].system.includes("extract system with schema A"), false);
+  assert.ok(h.openInputs.every((open) => !("resume" in open) && open.system.includes("with schema") === false), "a session opens with the base system only");
   assert.deepEqual(h.sent.slice(0, 2).map((turn) => [turn.operation, turn.operationSystem]), [
     ["extract", "extract system with schema A"],
     ["classify", "classify system with schema B"],
@@ -357,10 +358,11 @@ test("same pair reuses one host session, different pairs stay isolated, and each
   assert.ok(h.sent.every((turn) => turn.protocol === "cairn.model-turn/v1" && typeof turn.callKey === "string"));
   const saved = await store.readResumeState();
   assert.equal(Object.keys(saved.sessions).length, 3);
-  assert.equal(saved.sessions[pairKey("sw/a", "source-1")].hostSessionId, "session-1");
+  assert.equal(saved.sessions[pairKey("sw/a", "source-1")].hostSessionId, "session-2", "the pair record names the session of its latest call");
+  assert.equal(saved.sessions[pairKey("sw/a", "source-1")].turnCount, 1);
   assert.equal(Object.keys(saved.operations).length, 3);
   await port.cancel();
-  assert.equal(h.counters.closed, 3);
+  assert.equal(h.counters.closed, 4);
 });
 
 test("same request under different operation systems has distinct durable call identities", async (t) => {
@@ -532,7 +534,7 @@ test("same-pair sends serialize and different project pairs queue behind the one
   assert.equal(h.counters.maxInFlight, 1);
   h.releaseOne();
   await otherB;
-  assert.equal(h.counters.opened, 2);
+  assert.equal(h.counters.opened, 4, "each of the four calls opened a session of its own");
   assert.equal(h.counters.resumes, 0);
   await port.cancel();
   assert.equal(h.counters.activeSessions, 0);

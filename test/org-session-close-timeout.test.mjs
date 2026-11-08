@@ -67,9 +67,12 @@ test("a close() that never settles is abandoned after the limit, recorded as ses
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const h = hangingCloseAi();
   const port = createHostMemoryModelPort(h.ai, enabled, undefined, createLocalPunchOrganizationStore(dir), CLOSE_LIMIT_MS);
-  assert.deepEqual(await invokeScoped(port, actorOf("sw/a"), "organize:one"), { items: [] });
-
+  // why: the session is closed right after its own turn, so the bounded wait is spent inside the call that opened it and the saved reply is still returned
   const startedAt = Date.now();
+  assert.deepEqual(await invokeScoped(port, actorOf("sw/a"), "organize:one"), { items: [] });
+  const elapsed = Date.now() - startedAt;
+  assert.ok(elapsed >= CLOSE_LIMIT_MS - 20 && elapsed < CLOSE_LIMIT_MS + 1500, "released near the limit, not after the hang: " + elapsed + "ms");
+
   await assert.rejects(invokeScoped(port, actorOf("sw/b"), "organize:two"), (error) => {
     assert.equal(error.name, "MemoryServiceError");
     assert.equal(error.code, "RESOURCE_BUSY");
@@ -77,11 +80,9 @@ test("a close() that never settles is abandoned after the limit, recorded as ses
     assert.equal(error.retryable, true);
     return true;
   });
-  const elapsed = Date.now() - startedAt;
-  assert.ok(elapsed >= CLOSE_LIMIT_MS - 20 && elapsed < CLOSE_LIMIT_MS + 1500, "released near the limit, not after the hang: " + elapsed + "ms");
 
   assert.deepEqual(await invokeScoped(port, actorOf("sw/b"), "organize:three"), { items: [] });
-  assert.equal(h.counters.closeCalls, 1, "the stuck session was asked to close once; the abandoned handle is not retried by the next call");
+  assert.equal(h.counters.closeCalls, 2, "the stuck session was asked to close once and is not retried; the third call closed only its own session");
   await port.cancel();
 });
 
@@ -360,6 +361,6 @@ test("after a hard cancel and then a close timeout, the retry sends on a fresh s
   assert.equal(opens.length, opensBefore + 1, "the retry opened exactly one new session");
   assert.deepEqual(opens.filter((entry) => entry?.resume !== undefined), [], "the old session was never asked to resume");
   const saved = Object.values((await store.readResumeState()).sessions);
-  assert.deepEqual(saved.map((record) => record.state), ["active"], "the retry saved its own session");
+  assert.deepEqual(saved.map((record) => record.state), ["invalidated"], "the retry opened its own session, and its close never confirmed either, so the record is not resumable");
   await port.cancel();
 });

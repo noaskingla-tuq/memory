@@ -391,8 +391,8 @@ test("a durable retryable failed turn blocks same-day daily resend across a job-
   const nextDate = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, "0")}-${String(nextDay.getDate()).padStart(2, "0")}`;
   assert.equal(row.lastAttemptDate, nextDate);
   assert.equal(row.state, "pending");
-  assert.equal(counters.opened, 1);
-  assert.equal(counters.resumed, 1);
+  assert.equal(counters.opened, 2, "every send opens its own session, the retry included");
+  assert.equal(counters.resumed, 0, "a failed turn is closed in the journal, so there is nothing to read back");
 });
 
 test("same-day reply-ready storage recovery retries the Cairn commit without another model send", async (t) => {
@@ -611,7 +611,7 @@ test("production service organizes settled punches by default without toggling a
   const { backend } = startBackend(t, { host: h.host, settings: h.settings });
   backend.startWorkers(); await backend.idleWorkers();
   assert.equal(h.aiCalls, 2);
-  assert.equal(h.closed, 1);
+  assert.equal(h.closed, 2, "each of the two model calls opened and closed its own session");
   const memories = await callInspect(backend, { scope: "project", limit: 12 }, { agentId: "sw/a", projectId: "project" });
   assert.equal(memories.result.value.memories.length, 2);
   assert.ok(memories.result.value.memories.some((memory) => memory.origin === "agent-inferred"));
@@ -635,7 +635,7 @@ test("production service admits raw context with retired host state, then captur
   h.enable(); await backend.idleWorkers();
   const organized = await callInspect(backend, { scope: "project", limit: 12 }, { agentId: "sw/a", projectId: "project" });
   assert.equal(organized.result.value.memories.length, 2);
-  assert.equal(h.aiCalls, 2); assert.equal(h.closed, 1);
+  assert.equal(h.aiCalls, 2); assert.equal(h.closed, 2);
   const inferred = organized.result.value.memories.find((memory) => memory.origin === "agent-inferred");
   assert.ok(inferred);
   const detail = await callInspect(backend, { scope: "project", memoryId: inferred.id }, { agentId: "sw/a", projectId: "project" });

@@ -19,7 +19,6 @@ async function rotationRig(t, { callFields = {}, sessionExtra = {} }) {
 const SCENARIOS = [
   ["the model was changed after the call was sent", { sessionExtra: SOL }],
   ["the call already has a sequenceNo and the model was changed", { callFields: { sequenceNo: 3 }, sessionExtra: SOL }],
-  ["the session reached its turn limit", { sessionExtra: { turnCount: 20 } }],
   ["the policy revision changed", { sessionExtra: { policyRevision: "older-policy" } }],
   ["the session has been idle for 30 days", { sessionExtra: { lastUsedAt: T0 - 31 * 24 * 60 * 60_000 } }],
 ];
@@ -39,6 +38,21 @@ for (const [label, setup] of SCENARIOS) {
     assert.deepEqual(sessions.map((entry) => [entry.state, entry.hostSessionId]), [["active", "fresh-1"]]);
   });
 }
+
+test("a high turnCount no longer blocks the resume: the sent call is read back from its own session and nothing is sent again", async (t) => {
+  const { store } = tempStore(t);
+  const actor = actorOf("sw/a");
+  const call = await callRecord(actor, OP, { hostSessionId: "host-old", turnId: "turn-old", phase: "sent", hostErrorCode: null, retryable: false });
+  await seed(store, { sessions: [sessionRecord(actor, "host-old", "active", { turnCount: 20 })], calls: [call] });
+  const host = recoverAi({ resume: (id, make) => make(id, { turnId: "turn-old", text: JSON.stringify(REPLY), terminal: { kind: "completed" } }) });
+  const port = portOf(host.ai, store, { graceMs: 50, backstopMs: 60_000 });
+  t.after(() => port.cancel());
+  assert.deepEqual(await invokeScoped(port, actor, OP), REPLY);
+  assert.deepEqual((await callsOf(store, OP, actor)).map((entry) => [entry.occurrence, entry.phase, entry.turnId]), [[0, "reply_ready", "turn-old"]]);
+  assert.equal(host.counters.resumes, 1);
+  assert.equal(host.counters.opened, 0);
+  assert.equal(host.counters.sent, 0);
+});
 
 test("the rotation closing does not hide another operation of the pair that still needs recovery", async (t) => {
   const rig = await rotationRig(t, { sessionExtra: SOL });

@@ -43,7 +43,6 @@ export interface TurnRequest {
   readonly onSent?: (at: number) => void;
   readonly trace?: TraceSink;
   readonly limits?: TurnLimits;
-  readonly remember: (record: OrganizationSessionRecord, session: PluginBackendAiSessionV1) => void;
 }
 
 const cancelled = (): MemoryServiceError => new MemoryServiceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled");
@@ -227,7 +226,6 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
         await journal.persistSession(updatedSession);
         await journal.save(context, operation, callKey, "sent", { hostSessionId: current.session.sessionId, turnId });
       }
-      request.remember(updatedSession, current.session);
       for (const event of pending.splice(0)) enqueue(event);
     } else {
       const sentBefore = priorCall?.createdAt ?? Date.now();

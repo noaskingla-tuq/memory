@@ -111,7 +111,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     enabled: () => organizationSettings().enabled,
     frequency: () => organizationSettings().frequency,
     dailyTime: () => organizationSettings().dailyTime,
-    ...(model === undefined ? {} : { awaitPending: (job: { readonly actor: { readonly agentId: string; readonly projectId: string | null } }) => model.awaitPair(job.actor.agentId, job.actor.projectId), waiting: () => model.waiting() }),
+    ...(model === undefined ? {} : { awaitPending: (job: { readonly actor: { readonly agentId: string; readonly projectId: string | null } }, signal: AbortSignal) => model.awaitPair(job.actor.agentId, job.actor.projectId, signal), waiting: () => model.waiting() }),
     ...(options.organizationNow === undefined ? {} : { now: options.organizationNow }),
     async capture(job) {
       const active = ensure();

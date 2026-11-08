@@ -9,6 +9,7 @@ import { memoryActorSchema } from "../../vendor/teamuq-contract/contract.mjs";
 import { operationKey, pairKey } from "./modelInvocationScope.js";
 import { dailyRoundStatus, failedModelAttemptInRound, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
 import { captureOutcome, captureWithContinuation, isPairBlocked, replyProgress } from "./organizationQueue.js";
+import { AWAIT_CAP_MS, STALL_LOCAL_CODE, awaitUnlessStopped, createStallGuard, stallOutcome } from "./organizationStall.js";
 import { createAgentOrganization, createAgentRun } from "./organizationAgentRun.js";
 import { classifyLegacyJob, isTrialRow, summarizeTrial, trialBreaker, type LegacyTrialRequest, type LegacyTrialResponse, type TrialSummary } from "./organizationTrial.js";
 
@@ -71,7 +72,8 @@ export interface OrganizationOptions {
   readonly claimDailyRound?: (localDate: string) => Promise<boolean>;
   readonly beginOrResumeDailyRound?: OrganizationResumeStorePort["beginOrResumeDailyRound"];
   readonly capture: (job: { actor: MemoryActor; input: MemoryCaptureInput; memoryId: string; allowModelSend?: boolean }) => Promise<MemoryResult<unknown>>;
-  readonly awaitPending?: (job: { readonly actor: MemoryActor }) => Promise<void>;
+  readonly awaitPending?: (job: { readonly actor: MemoryActor }, signal: AbortSignal) => Promise<void>;
+  readonly awaitCapMs?: number;
   readonly waiting?: () => { readonly sinceMs: number } | null;
   readonly now?: () => number;
   readonly pollMs?: number;
@@ -90,6 +92,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
   let stopRequested = false;
   let trialQueue: Promise<unknown> = Promise.resolve();
   const agentRun = createAgentRun();
+  const stall = createStallGuard();
   // why: a failed host-session release happens after the job result is final, so no job row carries it; each pair keeps its own record and the map order is recency
   const releaseFaults = new Map<string, OrganizationReleaseFault>();
   let status: OrganizationStatus = {
@@ -199,6 +202,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     let round: OrganizationDailyRound | null = existingRound ?? null;
     let roundActive = currentFrequency === "immediate";
     if (!options.enabled()) {
+      stall.reset();
       await updateStatus(rows, existingRound === undefined ? null : { date: schedule.date, value: existingRound });
       return;
     }
@@ -270,6 +274,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       if (trialRow && !trialEnded && stopRequested) { trialEnded = true; await endTrial("stopped", null); }
       if (trialRow && trialEnded) continue;
       if (phaseOf(state, job, now()).phase === "operator_reconcile") continue;
+      if (stall.paused()) { if (agentRow) agentRun.record(job.punchId, "blocked"); continue; }
       const hasReply = replyReady(state, job);
       const dailySendBlocked = !trialRow && !agentRow && runFrequency === "daily"
         && (job.lastAttemptDate === date || failedModelAttemptInRound(state, job, date, dailyTime));
@@ -285,10 +290,16 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
       const { result } = await captureWithContinuation({
         capture: attempt,
         readProgress: async () => replyProgress(await resumeState(), job),
-        awaitPending: async () => { await options.awaitPending?.(job); },
+        awaitPending: async () => {
+          if (options.awaitPending === undefined) return;
+          await awaitUnlessStopped((signal) => options.awaitPending!(job, signal), () => stopped || !options.enabled() || (agentRow && agentRun.wantsStop()), options.awaitCapMs ?? AWAIT_CAP_MS);
+        },
         shouldStop: () => stopped || !options.enabled() || (agentRow && agentRun.wantsStop()),
       });
       if (stopped) { cut = true; break; }
+      if (options.enabled() && !(agentRow && agentRun.wantsStop()) && !isPairBlocked(result)) {
+        stall.observe(stallOutcome(result));
+      }
       // why: another operation of this pair holds it, which says nothing about this job, so it keeps its attempt count and its day
       if (isPairBlocked(result)) { if (agentRow) agentRun.record(job.punchId, "blocked"); continue; }
       const { code, classificationFailed, terminalOutcome } = captureOutcome(result);
@@ -460,7 +471,13 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     },
     status: (): OrganizationStatus => {
       const waiting = options.waiting?.() ?? null;
-      const current: OrganizationStatus = { ...status, ...(waiting === null ? {} : { waiting }), ...(!options.enabled() ? { state: "disabled" as const } : {}) };
+      const stalled = options.enabled() && stall.paused();
+      // why: the pause reuses an existing failure code, and the host and local codes tell the stall apart from a plain busy host
+      const current: OrganizationStatus = {
+        ...status, ...(waiting === null ? {} : { waiting }),
+        ...(stalled ? { state: "paused" as const, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: STALL_LOCAL_CODE, retryable: true } : {}),
+        ...(!options.enabled() ? { state: "disabled" as const } : {}),
+      };
       const releaseFault = [...releaseFaults.values()].pop() ?? null;
       // why: a job's own failure is the more specific cause, so the release fault only fills an otherwise clean status
       if (releaseFault === null || current.state === "disabled" || current.lastError !== null) return current;

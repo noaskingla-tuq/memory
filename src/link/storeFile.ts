@@ -6,8 +6,6 @@ import { z } from "zod";
 export const LINK_DIR_NAME = "memory-link-v1";
 export const MAX_FILE_BYTES = 4 * 1024 * 1024;
 export const MAX_LISTED_FILES = 32;
-export const MAX_SOURCE_LENGTH = 200;
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/u;
 
 const FILE_NAME = /^[0-9a-f]{64}\.json$/;
 const RETRYABLE_WRITE_CODES = new Set(["ENOSPC", "EDQUOT", "EBUSY", "EPERM", "EACCES", "EAGAIN", "EMFILE"]);
@@ -71,7 +69,7 @@ const itemSchema = z
 const fileSchema = z
   .object({
     version: z.literal(1),
-    source: z.string().min(1).max(MAX_SOURCE_LENGTH),
+    source: z.string().min(1).max(200),
     revision: z.number().int().min(0),
     items: z.array(itemSchema),
   })
@@ -79,10 +77,6 @@ const fileSchema = z
 
 export function partitionKeyOf(who: { readonly source: { readonly kind: string; readonly pluginId?: string } }): string {
   return who.source.kind === "plugin" ? `plugin:${who.source.pluginId ?? ""}` : "core";
-}
-
-export function isValidPartitionKey(key: string): boolean {
-  return key.length <= MAX_SOURCE_LENGTH && (key === "core" || (key.length > "plugin:".length && key.startsWith("plugin:") && !CONTROL_CHARS.test(key)));
 }
 
 export function fileIdOf(source: string): string {

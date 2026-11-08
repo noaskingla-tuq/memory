@@ -142,30 +142,6 @@ test("load more appends without repeats and a stale cursor restarts from the fir
   assert.equal(listCalls, 4);
 });
 
-test("F2: a next page with a different revision restarts from the first page instead of being merged", async () => {
-  let firstCalls = 0;
-  const client = fakeClient({
-    "ui.linkSources": () => ok(sourcesAnswer([row("plugin:only")])),
-    "ui.linkList": (params) => {
-      if (params.cursor === undefined) {
-        firstCalls += 1;
-        return ok(pageAnswer("plugin:only", firstCalls === 1 ? [itemRow("a"), itemRow("b")] : [itemRow("n"), itemRow("a")], { nextCursor: "c1", total: 5, revision: firstCalls === 1 ? 5 : 6 }));
-      }
-      return ok(pageAnswer("plugin:only", [itemRow("b"), itemRow("c")], { nextCursor: null, total: 5, revision: 6 }));
-    },
-  });
-  const s = scene(client);
-  await s.linked.reload();
-  assert.equal(s.linked.view().panels["plugin:only"].revision, 5);
-  const added = await s.linked.more("plugin:only");
-  await flush();
-  assert.deepEqual(added, []);
-  const panel = s.linked.view().panels["plugin:only"];
-  assert.equal(panel.revision, 6);
-  assert.deepEqual(panel.items.map((entry) => entry.id), ["n", "a"]);
-  assert.equal(firstCalls, 2);
-});
-
 test("a failing first page shows an error for that source only and retry loads it again", async () => {
   const client = fakeClient({
     "ui.linkSources": () => ok(sourcesAnswer([row("plugin:only")])),

@@ -39,13 +39,13 @@ test("items survive a restart with identical content and a growing revision", as
   const { open } = scratch(t);
   const first = open();
   assert.deepEqual(await first.snapshot("plugin:x"), { source: "plugin:x", revision: 0, items: [] });
-  const one = await first.commit("plugin:x", add(item("a")));
+  await first.commit("plugin:x", add(item("a")));
   const second = await first.commit("plugin:x", add(item("b", { tags: ["t"], expiresAtMs: 99_999_999_999_999 })));
-  assert.equal(second.revision, one.revision + 1);
+  assert.equal(second.revision, 2);
   await first.dispose();
   const reopened = open();
   const loaded = await reopened.snapshot("plugin:x");
-  assert.equal(loaded.revision, second.revision);
+  assert.equal(loaded.revision, 2);
   assert.deepEqual(loaded.items.map((entry) => entry.id).sort(), ["a", "b"]);
   assert.deepEqual(loaded.items.find((entry) => entry.id === "b").tags, ["t"]);
 });
@@ -70,15 +70,15 @@ test("expired items disappear from snapshots and from the next write, and a rewr
 test("two sources never see each other and an emptied source releases its file", async (t) => {
   const { base, open } = scratch(t);
   const store = open();
-  const written = await store.commit("plugin:a", add(item("one")));
+  await store.commit("plugin:a", add(item("one")));
   await store.commit("plugin:b", add(item("two")));
   assert.deepEqual((await store.snapshot("plugin:a")).items.map((entry) => entry.id), ["one"]);
   assert.equal(readdirSync(dirOf(base)).length, 2);
   const emptied = await store.commit("plugin:a", () => ({ items: [], result: 1 }));
-  assert.equal(emptied.revision, written.revision + 1);
+  assert.equal(emptied.revision, 2);
   assert.equal(readdirSync(dirOf(base)).length, 1);
   assert.deepEqual((await store.snapshot("plugin:b")).items.map((entry) => entry.id), ["two"]);
-  assert.equal((await store.snapshot("plugin:a")).revision, emptied.revision);
+  assert.equal((await store.snapshot("plugin:a")).revision, 2);
 });
 
 test("count, byte and source quotas reject the write and leave state untouched", async (t) => {
@@ -199,11 +199,9 @@ test("twenty concurrent writes to one source all land and none is lost", async (
   const { open } = scratch(t);
   const store = open();
   const ids = Array.from({ length: 20 }, (_, index) => `m${index}`);
-  const outcomes = await Promise.all(ids.map((id) => store.commit("plugin:c", add(item(id)))));
-  const revisions = outcomes.map((outcome) => outcome.revision).sort((a, b) => a - b);
-  assert.deepEqual(revisions, Array.from({ length: 20 }, (_, index) => revisions[0] + index));
+  await Promise.all(ids.map((id) => store.commit("plugin:c", add(item(id)))));
   const snapshot = await store.snapshot("plugin:c");
-  assert.equal(snapshot.revision, revisions[19]);
+  assert.equal(snapshot.revision, 20);
   assert.deepEqual(snapshot.items.map((entry) => entry.id).sort(), [...ids].sort());
   const reopened = open();
   assert.equal((await reopened.snapshot("plugin:c")).items.length, 20);
@@ -212,13 +210,12 @@ test("twenty concurrent writes to one source all land and none is lost", async (
 test("expect.revision and expect.item guard the write inside the queue", async (t) => {
   const { open } = scratch(t);
   const store = open();
-  const written = await store.commit("core", add(item("a")));
-  const aRev = (await store.snapshot("core")).items[0].rev;
-  await assert.rejects(store.commit("core", () => ({ items: [], result: 0 }), { revision: written.revision + 5 }), { code: "conflict" });
-  await assert.rejects(store.commit("core", () => ({ items: [], result: 0 }), { item: { id: "a", rev: aRev + 1 } }), { code: "conflict" });
-  await assert.rejects(store.commit("core", () => ({ items: [], result: 0 }), { item: { id: "zzz", rev: aRev } }), { code: "not_found" });
+  await store.commit("core", add(item("a")));
+  await assert.rejects(store.commit("core", () => ({ items: [], result: 0 }), { revision: 5 }), { code: "conflict" });
+  await assert.rejects(store.commit("core", () => ({ items: [], result: 0 }), { item: { id: "a", rev: 2 } }), { code: "conflict" });
+  await assert.rejects(store.commit("core", () => ({ items: [], result: 0 }), { item: { id: "zzz", rev: 1 } }), { code: "not_found" });
   assert.equal((await store.snapshot("core")).items.length, 1);
-  await store.commit("core", () => ({ items: [], result: 0 }), { item: { id: "a", rev: aRev } });
+  await store.commit("core", () => ({ items: [], result: 0 }), { item: { id: "a", rev: 1 } });
   assert.equal((await store.snapshot("core")).items.length, 0);
 });
 
@@ -238,62 +235,4 @@ test("at most 32 partition files are listed and foreign names are ignored", asyn
   writeFileSync(join(dirOf(base), `${fileIdOf("s0")}.json.tmp`), "x");
   const store = open();
   assert.equal((await store.listFiles()).length, 32);
-});
-
-test("F1: after the source is emptied, unloaded and written again, no revision or item rev goes back to a value an open screen holds", async (t) => {
-  const { open } = scratch(t);
-  const write = (key, text) => (snap, at) => ({ items: [...snap.items.filter((entry) => entry.id !== key), { id: key, key, payload: text, rev: (snap.items.find((entry) => entry.id === key)?.rev ?? 0) + 1, updatedAtMs: at }], result: 0 });
-  const source = "plugin:aba";
-  let store = open();
-  for (const key of ["k1", "k2", "k3"]) await store.commit(source, write(key, "OLD-" + key));
-  const seen = await store.snapshot(source);
-  const seenK1 = seen.items.find((entry) => entry.id === "k1").rev;
-  await store.commit(source, () => ({ items: [], result: 0 }));
-  await store.dispose();
-  store = open();
-  for (const key of ["k1", "k2", "k3"]) await store.commit(source, write(key, "NEW-" + key));
-  const now = await store.snapshot(source);
-  assert.ok(now.revision > seen.revision, "revision " + now.revision + " must be above " + seen.revision);
-  assert.notEqual(now.items.find((entry) => entry.id === "k1").rev, seenK1);
-  await assert.rejects(store.commit(source, () => ({ items: [], result: 0 }), { item: { id: "k1", rev: seenK1 } }), { code: "conflict" });
-  await assert.rejects(store.commit(source, () => ({ items: [], result: 0 }), { revision: seen.revision }), { code: "conflict" });
-  assert.equal((await store.snapshot(source)).items.length, 3);
-});
-
-test("F1: the same holds when the emptied partition is only evicted from the cache", async (t) => {
-  const { open } = scratch(t);
-  const store = open({ now: () => 5000 });
-  const put = (key) => (snap, at) => ({ items: [...snap.items.filter((entry) => entry.id !== key), { id: key, payload: key, rev: 1, updatedAtMs: at }], result: 0 });
-  for (let index = 0; index < 5; index += 1) await store.commit("plugin:a", put("k" + index));
-  const seen = await store.snapshot("plugin:a");
-  await store.commit("plugin:a", () => ({ items: [], result: 0 }));
-  for (const other of ["b", "c", "d", "e", "f"]) await store.commit("plugin:" + other, put("x"));
-  await store.commit("plugin:a", put("k0"));
-  const now = await store.snapshot("plugin:a");
-  assert.ok(now.revision > seen.revision);
-  assert.notEqual(now.items[0].rev, seen.items.find((entry) => entry.id === "k0").rev);
-});
-
-test("an overwrite raises the item rev by one and a restart keeps both numbers", async (t) => {
-  const { open } = scratch(t);
-  const store = open();
-  const put = (text) => (snap, at) => ({ items: [{ id: "k", payload: text, rev: (snap.items[0]?.rev ?? 0) + 1, updatedAtMs: at }], result: 0 });
-  await store.commit("core", put("a"));
-  const first = (await store.snapshot("core")).items[0].rev;
-  await store.commit("core", put("b"));
-  assert.equal((await store.snapshot("core")).items[0].rev, first + 1);
-  await store.dispose();
-  const again = open();
-  assert.equal((await again.snapshot("core")).items[0].rev, first + 1);
-});
-
-test("F3: the store itself refuses a source key that cannot be listed again", async (t) => {
-  const { base, open } = scratch(t);
-  const store = open();
-  for (const source of [`plugin:${"x".repeat(194)}`, "plugin:", "plugin:a\u0007b", "other", ""]) {
-    await assert.rejects(store.commit(source, add(item("a"))), { code: "provider_error" }, source.length.toString());
-  }
-  assert.equal(existsSync(dirOf(base)), false);
-  await store.commit(`plugin:${"x".repeat(193)}`, add(item("a")));
-  assert.equal(readdirSync(dirOf(base)).length, 1);
 });

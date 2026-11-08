@@ -34,13 +34,7 @@ export interface ProviderRefusal extends Error {
   readonly retryAfterMs?: number;
 }
 
-const refusals = new WeakSet<object>();
-
-export const isRefusal = (value: unknown): value is ProviderRefusal => typeof value === "object" && value !== null && refusals.has(value);
-
 export function refuse(code: string, details: { readonly retryAfterMs?: number } = {}): ProviderRefusal {
   const known: ProviderErrorCode = Object.hasOwn(PLAIN, code) ? (code as ProviderErrorCode) : "provider_error";
-  const refusal = Object.assign(new Error(plain(known)), details, { code: known });
-  refusals.add(refusal);
-  return refusal;
+  return Object.assign(new Error(plain(known)), details, { code: known });
 }

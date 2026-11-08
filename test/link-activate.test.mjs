@@ -78,7 +78,7 @@ test("T-3: link writes and the ui.link* methods never touch memory-cairn-v1 and 
   const listed = await handle.call("ui.linkList", { source: "plugin:other.plugin" });
   assert.equal(listed.items[0].id, "k");
   assert.equal((await handle.call("ui.linkGet", { source: "plugin:other.plugin", id: "k" })).ok, true);
-  const removed = await handle.call("ui.linkForget", { action: "item", source: "plugin:other.plugin", id: "k", expectedItemRev: listed.items[0].rev });
+  const removed = await handle.call("ui.linkForget", { action: "item", source: "plugin:other.plugin", id: "k", expectedItemRev: 1 });
   assert.equal(removed.ok, true);
   assert.equal((await call("recall", { limit: 5 })).value.items.length, 0);
   assert.deepEqual(snapshotOf(join(base, "memory-cairn-v1")), cairnBefore);

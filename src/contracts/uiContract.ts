@@ -399,7 +399,7 @@ export const uiStatusSuccess = z
   })
   .strict();
 
-const linkSource = z.string().min(1).max(200).regex(/^(?:core|plugin:[^\u0000-\u001f\u007f]+)$/u);
+const linkSource = z.string().min(1).max(200).regex(/^(?:core|plugin:[^\u0000-\u001f\u007f]{1,190})$/u);
 const linkFileId = z.string().regex(/^[0-9a-f]{64}$/u);
 const linkItemId = z.string().min(1).max(128);
 const linkTags = z.array(z.string().min(1).max(32)).max(8);

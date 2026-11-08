@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
-  StoreError, classifyWriteError, createFsIo, fileIdOf, isValidPartitionKey, itemBytes, loadFile, payloadBytes, serializePartition,
+  StoreError, classifyWriteError, createFsIo, fileIdOf, itemBytes, loadFile, payloadBytes, serializePartition,
   type FileStat, type LinkItem, type PartitionState, type StoreIo,
 } from "./storeFile.js";
 
@@ -91,7 +91,6 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
   const summaries = new Map<string, { readonly stat: FileStat; readonly description: FileDescription }>();
   const generations = new Map<string, number>();
   const writeFailed = new Set<string>();
-  const revisionFloor = new Map<string, number>();
   const tails = new Map<string, Promise<void>>();
   let disposed = false;
 
@@ -164,7 +163,6 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
     },
 
     commit(source, mutate, expect) {
-      if (!isValidPartitionKey(source)) return Promise.reject(new StoreError("provider_error", "source_invalid"));
       const fileId = fileIdOf(source);
       return enqueue(fileId, async () => {
         const state = load(source);
@@ -180,16 +178,7 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
         const out = mutate(snap, at);
         if (out.items === snap.items) return { result: out.result, revision: snap.revision, changed: false };
         if (overQuota(snap.items, out.items)) throw new StoreError("quota_exceeded");
-        // why: a partition with no file has no revision history; restarting from 0 would reuse numbers an open screen still holds, so continue above everything seen this run and above the wall clock
-        const revision = (state.revision > 0 ? state.revision : Math.max(revisionFloor.get(fileId) ?? 0, at)) + 1;
-        // why: an item's rev only has to grow for its id; a new id takes the partition revision so an id that was deleted and written again never gets a rev an old screen still holds
-        const before = new Map(snap.items.map((item) => [item.id, item]));
-        const stamped = out.items.map((item) => {
-          if (before.get(item.id) === item) return item;
-          const prior = before.get(item.id);
-          return { ...item, rev: prior === undefined ? revision : Math.max(item.rev, prior.rev + 1) };
-        });
-        const next: PartitionState = { source, revision, items: stamped };
+        const next: PartitionState = { source, revision: state.revision + 1, items: out.items };
         try {
           persist(fileId, next);
         } catch (error) {
@@ -198,7 +187,6 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
           throw failure;
         }
         writeFailed.delete(source);
-        revisionFloor.set(fileId, next.revision);
         bump(fileId);
         remember(fileId, next);
         return { result: out.result, revision: next.revision, changed: true };

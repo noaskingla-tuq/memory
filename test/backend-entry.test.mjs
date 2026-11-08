@@ -100,10 +100,10 @@ test("an unsafe data root is reported as storage_unsafe and refuses writes witho
   assert.equal(written.results[0].error.code, "STORAGE_UNSAFE");
 });
 
-test("activate gives back exactly { call, dispose, link } on <dataDir>/memory-cairn-v1", async (t) => {
+test("activate gives back exactly { call, dispose } on <dataDir>/memory-cairn-v1", async (t) => {
   const { base, own } = temporaryDirectory(t);
   const handle = own(await activate(context(base)));
-  assert.deepEqual(Object.keys(handle).sort(), ["call", "dispose", "link"]);
+  assert.deepEqual(Object.keys(handle).sort(), ["call", "dispose"]);
   assert.equal(Object.isFrozen(handle), true);
   assert.equal(existsSync(join(base, "memory-cairn-v1", "agents")), true);
 

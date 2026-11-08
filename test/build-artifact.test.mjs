@@ -126,7 +126,7 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   const html = readFileSync(join(dist, "stage", "ui", "index.html"), "utf8");
   assert.match(html, /<title>Cairn記憶管理<\/title>/u);
   assert.match(html, /<a id="brand-home" class="hdr-brand" href="#\/" aria-label="Cairn記憶管理，回到總覽">/u);
-  assert.match(html, /<nav id="primary-nav" class="hdr-nav" aria-label="主要導覽">\s*<a id="nav-overview" href="#\/">總覽<\/a>\s*<a id="nav-linked" href="#\/linked">外掛記憶<\/a>\s*<a id="nav-settings" href="#\/settings">設定<\/a>/u);
+  assert.match(html, /<nav id="primary-nav" class="hdr-nav" aria-label="主要導覽">\s*<a id="nav-overview" href="#\/">總覽<\/a>\s*<a id="nav-settings" href="#\/settings">設定<\/a>/u);
   assert.match(html, /<img class="hdr-logo" src="\.\.\/cairn-icon\.png" width="24" height="24" alt="">/u);
   assert.equal(sha256Bytes(readFileSync(join(dist, "stage", "cairn-icon.png"))), "48a8a8c7b2fbefa172def0acadec39670cc68c4959538d311a9ad0d06519fc02");
   assert.deepEqual(scanUiFile("ui/index.html", html), []);

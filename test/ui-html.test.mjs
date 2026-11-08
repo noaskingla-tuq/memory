@@ -152,5 +152,5 @@ test("innerHTML is written only by mount and the dialog body, and bridge APIs st
     if (/tuqPlugin/u.test(text)) bridge.push(name);
   }
   assert.deepEqual(writers.sort(), ["components/dialog.ts", "dom/html.ts"]);
-  assert.deepEqual(bridge.sort(), ["api/agentAvatarClient.ts", "api/backendClient.ts", "api/settingsClient.ts"]);
+  assert.deepEqual(bridge.sort(), ["api/agentAvatarClient.ts", "api/aiOptionsClient.ts", "api/backendClient.ts", "api/settingsClient.ts"]);
 });

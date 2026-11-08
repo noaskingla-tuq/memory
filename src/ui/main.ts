@@ -1,5 +1,6 @@
 import { backendClient } from "./api/backendClient.js";
 import { agentAvatarClient } from "./api/agentAvatarClient.js";
+import { aiOptionsClient } from "./api/aiOptionsClient.js";
 import { settingsClient, type SettingKey } from "./api/settingsClient.js";
 import { openDialog } from "./components/dialog.js";
 import { html, mount } from "./dom/html.js";
@@ -20,6 +21,7 @@ import { homeShell } from "./views/teamHomeView.js";
 import { createTimeline, type TimelineTargets } from "./views/timelineController.js";
 import { bindTimelineEvents } from "./views/timelineEvents.js";
 import { bindSettingsEvents } from "./views/settingsEvents.js";
+import { changeProvider, type AiChoices } from "./views/settingsPicker.js";
 import { settingsPage } from "./views/settingsView.js";
 import { TIMELINE_IDS, timelineShell } from "./views/timelineView.js";
 
@@ -69,6 +71,9 @@ const status = createStatusLine({
 const home = createTeamHome({ client, now, preferences, agentAvatar: agentAvatarClient() });
 const space = createMemorySpace({ client, now });
 const settings = createSettingsState(settingsClient());
+const aiOptions = aiOptionsClient();
+let aiChoices: AiChoices = { status: "pending" };
+let aiChoicesLoad = 0;
 
 const timeline = createTimeline({ client, now, onOpenDetail: (ref) => void detail.open(ref) });
 
@@ -155,7 +160,7 @@ function renderSettings(snapshot: SettingsSnapshot = settings.view()): void {
   const action = active?.dataset.settingsAction;
   const start = active instanceof HTMLInputElement && active.type === "text" ? active.selectionStart : null;
   const end = active instanceof HTMLInputElement && active.type === "text" ? active.selectionEnd : null;
-  mount(view, settingsPage(snapshot));
+  mount(view, settingsPage(snapshot, aiChoices));
   if (fieldKey !== undefined) {
     const replacement = view.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-setting-key="${fieldKey}"]`);
     if (replacement !== null && !replacement.disabled) {
@@ -195,10 +200,21 @@ function showAgent(agentId: string): void {
   document.getElementById(SPACE_TITLE_ID)?.focus();
 }
 
+function loadAiChoices(): void {
+  const generation = ++aiChoicesLoad;
+  aiChoices = { status: "pending" };
+  void aiOptions.load().then((options) => {
+    if (generation !== aiChoicesLoad) return;
+    aiChoices = options === null ? { status: "unavailable" } : { status: "ready", options };
+    if (current?.name === "settings") renderSettings();
+  });
+}
+
 function showSettings(): void {
   home.attach(null);
   timeline.attach(null);
   void settings.load();
+  loadAiChoices();
   renderSettings();
   document.getElementById("settings-title")?.focus();
 }
@@ -395,6 +411,7 @@ settings.subscribe((snapshot) => {
 
 bindSettingsEvents(view, {
   update: (key, value) => settings.update(key, value),
+  changeProvider: (value) => changeProvider(settings, aiChoices, value),
   save: () => void settings.save(),
   cancel: () => void settings.cancel(),
   retryLoad: () => void settings.load(),

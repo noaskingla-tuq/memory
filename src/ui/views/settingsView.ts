@@ -2,6 +2,7 @@ import { html, type SafeHtml } from "../dom/html.js";
 import { t, type StringKey } from "../i18n/index.js";
 import type { SettingKey } from "../api/settingsClient.js";
 import type { SettingsOutcome, SettingsSnapshot } from "../state/settings.js";
+import { modelSelect, providerSelect, type AiChoices } from "./settingsPicker.js";
 
 const labels: Readonly<Record<SettingKey, StringKey>> = {
   organizationEnabled: "settings.enabled.label",
@@ -111,16 +112,23 @@ function dailyTimeField(snapshot: SettingsSnapshot, disabled: boolean): SafeHtml
   </div>`;
 }
 
-function textField(snapshot: SettingsSnapshot, key: "organizationProvider" | "organizationModel", disabled: boolean): SafeHtml {
+function textField(snapshot: SettingsSnapshot, key: "organizationProvider" | "organizationModel", disabled: boolean, choices: AiChoices): SafeHtml {
   const provider = key === "organizationProvider";
   const id = provider ? "settings-provider" : "settings-model";
   const helpId = `${id}-help`;
   const effectId = `${id}-effect`;
   const statusId = `${id}-status`;
   const status = keyStatus(snapshot.outcomes[key], snapshot.dirtyKeys.includes(key), snapshot.savingKey === key);
+  const describedBy = `${helpId} ${effectId} ${statusId}`;
+  const value = snapshot.draft?.[key] as string ?? "";
+  const control = choices.status === "ready"
+    ? provider
+      ? providerSelect(choices.options, value, describedBy, disabled)
+      : modelSelect(choices.options, snapshot.draft?.organizationProvider ?? "", value, describedBy, disabled)
+    : textInput(id, key, value, t(provider ? "settings.provider.placeholder" : "settings.model.placeholder"), describedBy, disabled || choices.status === "pending");
   return html`<div class="setting-row">
     <div class="setting-copy"><label for="${id}">${t(labels[key])}</label><p id="${helpId}">${t(provider ? "settings.provider.help" : "settings.model.help")}</p><p id="${effectId}">${t(provider ? "settings.provider.effect" : "settings.model.effect")}</p>${conflictCopy(snapshot, key)}</div>
-    <div class="setting-control">${textInput(id, key, snapshot.draft?.[key] as string ?? "", t(provider ? "settings.provider.placeholder" : "settings.model.placeholder"), `${helpId} ${effectId} ${statusId}`, disabled)}<p id="${statusId}" class="setting-key-status" aria-live="polite">${status}</p></div>
+    <div class="setting-control">${control}<p id="${statusId}" class="setting-key-status" aria-live="polite">${status}</p></div>
   </div>`;
 }
 
@@ -173,13 +181,13 @@ function actions(snapshot: SettingsSnapshot, busy: boolean): SafeHtml {
   return html`<div class="settings-actions">${actionButton(t(saveLabel), "save", "submit", !canSave, true)}${actionButton(t("settings.action.cancel"), "cancel", "button", !canCancel)}</div>`;
 }
 
-export function settingsPage(snapshot: SettingsSnapshot): SafeHtml {
+export function settingsPage(snapshot: SettingsSnapshot, choices: AiChoices = { status: "unavailable" }): SafeHtml {
   const isReady = snapshot.phase === "ready" && snapshot.draft !== null;
   const busy = snapshot.phase === "loading" || snapshot.saving || snapshot.reconciling;
   const fieldsDisabled = busy || snapshot.hasUnknown;
   const body = isReady
     ? html`<fieldset class="settings-card"><legend>${t("settings.group.organization")}</legend>${organizationField(snapshot, fieldsDisabled)}${frequencyField(snapshot, fieldsDisabled)}${dailyTimeField(snapshot, fieldsDisabled)}</fieldset>
-      <fieldset class="settings-card"><legend>${t("settings.group.provider")}</legend>${textField(snapshot, "organizationProvider", fieldsDisabled)}${textField(snapshot, "organizationModel", fieldsDisabled)}</fieldset>
+      <fieldset class="settings-card"><legend>${t("settings.group.provider")}</legend>${textField(snapshot, "organizationProvider", fieldsDisabled, choices)}${textField(snapshot, "organizationModel", fieldsDisabled, choices)}</fieldset>
       <fieldset class="settings-card"><legend>${t("settings.group.budget")}</legend>${budgetField(snapshot, fieldsDisabled)}</fieldset>
       ${saveFeedback(snapshot)}${snapshot.savedCount > 0 && snapshot.dirtyKeys.length > 0 ? html`<p class="settings-saved-note">${t("settings.note.savedKeys")}</p>` : html``}`
     : snapshot.phase === "loading"

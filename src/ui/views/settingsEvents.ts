@@ -3,6 +3,7 @@ import { t } from "../i18n/index.js";
 
 export interface SettingsActions {
   update(key: SettingKey, value: SettingValue): void;
+  changeProvider(value: string): void;
   save(): void;
   cancel(): void;
   retryLoad(): void;
@@ -33,6 +34,8 @@ export function bindSettingsEvents(root: HTMLElement, actions: SettingsActions):
     const key = keyOf(control.dataset.settingKey);
     if (key === "organizationEnabled" && control instanceof HTMLInputElement) actions.update(key, control.checked);
     if (key === "organizationFrequency" && control instanceof HTMLSelectElement) actions.update(key, control.value);
+    if (key === "organizationProvider" && control instanceof HTMLSelectElement) actions.changeProvider(control.value);
+    if (key === "organizationModel" && control instanceof HTMLSelectElement) actions.update(key, control.value);
   };
   const onSubmit = (event: Event): void => {
     const target = event.target;

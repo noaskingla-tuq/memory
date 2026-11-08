@@ -3,6 +3,8 @@ import { MemoryServiceError, type MemoryFailurePhase } from "../../domain/errors
 import type { MemoryModelInvocationContext } from "../../application/modelPort.js";
 import type { OrganizationCallRecord, OrganizationSessionRecord } from "../../application/punchDataPorts.js";
 import { DEFAULT_TURN_LIMITS, TURN_BACKSTOP_CODE, type TurnLimits } from "./turnLimits.js";
+import { startTurnTrace } from "./turnTrace.js";
+import type { TraceSink } from "../storage/organizationTrace.js";
 
 export const REPLY_LIMIT = 16_384;
 export const DETACHED_LOCAL_CODE = "detached_running";
@@ -39,6 +41,7 @@ export interface TurnRequest {
   readonly setPhase: (phase: MemoryFailurePhase) => void;
   readonly onDetach: () => void;
   readonly onSent?: (at: number) => void;
+  readonly trace?: TraceSink;
   readonly limits?: TurnLimits;
   readonly remember: (record: OrganizationSessionRecord, session: PluginBackendAiSessionV1) => void;
 }
@@ -71,6 +74,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
   let graceTimer: ReturnType<typeof setTimeout> | undefined;
   let backstopTimer: ReturnType<typeof setTimeout> | undefined;
   const limits = request.limits ?? DEFAULT_TURN_LIMITS;
+  const trace = startTurnTrace(request.trace);
   const pending: PluginBackendAiTurnEventV1[] = [];
   let eventChain = Promise.resolve();
   let resolveAnswer: ((value: unknown) => void) | undefined;
@@ -86,8 +90,9 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
   const settleIfReady = async (): Promise<void> => {
     if (settled || !terminal || (sequenceNo === null && !graceOver)) return;
     settled = true;
-    try { resolveAnswer?.(request.parseReply(output)); }
+    try { resolveAnswer?.(request.parseReply(output)); trace.settle(sequenceNo !== null ? "seq" : "grace"); }
     catch (error) {
+      trace.settle("error");
       await writeFailed({ turnId, sequenceNo, retryable: false, partialDelivered: false, hostErrorCode: "json_parse" });
       rejectAnswer?.(error as Error);
     }
@@ -103,10 +108,12 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
   };
   const tooLong = async (): Promise<void> => {
     settled = true;
+    trace.settle("error");
     await writeFailed({ turnId, sequenceNo, retryable: false, partialDelivered: true, hostErrorCode: "reply_too_long" });
     rejectAnswer?.(outputInvalid("Memory model reply is too large"));
   };
   const process = async (event: PluginBackendAiTurnEventV1): Promise<void> => {
+    if (turnId !== null && event.turnId === turnId) trace.event(event.kind);
     if (settled || turnId === null || event.turnId !== turnId) return;
     if (event.kind === "textDelta") {
       output += event.text;
@@ -125,6 +132,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       await settleIfReady();
     } else if (event.kind === "failed") {
       settled = true;
+      trace.settle("failed");
       await writeFailed({ turnId, sequenceNo, retryable: event.retryable, partialDelivered: event.partialDelivered, hostErrorCode: event.code });
       rejectAnswer?.(event.code === "access_revoked" ? new MemoryServiceError("MODEL_POLICY_DENIED", "Memory host permission is unavailable", false, "policy")
         : event.code === "quota_exhausted" ? new MemoryServiceError("RESOURCE_BUSY", "Memory AI quota is exhausted", event.retryable, "quota")
@@ -133,6 +141,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
         : new MemoryServiceError("RESOURCE_BUSY", "Memory host model turn failed", event.retryable, "turn"));
     } else if (event.kind === "interrupted") {
       settled = true;
+      trace.settle("interrupted");
       await writeFailed({ turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: "interrupted" });
       rejectAnswer?.(cancelled());
     }
@@ -148,7 +157,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       interruptionWrite = writeFailed({ turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: code });
       void interruptionWrite.catch(() => undefined);
     }
-    if (!settled) { settled = true; rejectAnswer?.(reason()); }
+    if (!settled) { settled = true; trace.settle(code === TURN_BACKSTOP_CODE ? "backstop" : "cancel"); rejectAnswer?.(reason()); }
   };
   const onHard = (): void => stopHost();
   // why: a turn the host never ends would hold the pair lock for ever, so the backstop frees it and retires the session the stuck turn may have wedged
@@ -208,7 +217,9 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
         throw publicError(error, "send");
       }
       turnId = turn.turnId;
-      request.onSent?.(Date.now());
+      const sentNow = Date.now();
+      request.onSent?.(sentNow);
+      trace.sent(turnId, sentNow, false);
       state = "running";
       request.setPhase("turn");
       const updatedSession: OrganizationSessionRecord = { ...current.record, turnCount: current.record.turnCount + 1, lastUsedAt: Date.now() };
@@ -219,7 +230,9 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       request.remember(updatedSession, current.session);
       for (const event of pending.splice(0)) enqueue(event);
     } else {
-      request.onSent?.(priorCall?.createdAt ?? Date.now());
+      const sentBefore = priorCall?.createdAt ?? Date.now();
+      request.onSent?.(sentBefore);
+      trace.sent(turnId, sentBefore, true);
       state = "running";
       for (const event of pending.splice(0)) enqueue(event);
     }
@@ -252,6 +265,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
     return value;
   } catch (error) {
     if (interruptionWrite !== undefined) await interruptionWrite.catch(() => undefined);
+    trace.settle("error");
     if (error instanceof MemoryServiceError) throw error;
     throw publicError(error, turnId === null ? "send" : "turn");
   } finally {
@@ -260,6 +274,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       void current.session.interrupt().catch(() => undefined);
       await writeFailed({ turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: "cancelled_local" }).catch(() => undefined);
     }
+    trace.end();
     off();
   }
 }

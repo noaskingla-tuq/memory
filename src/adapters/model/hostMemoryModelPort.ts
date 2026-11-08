@@ -7,6 +7,7 @@ import type { OrganizationSettings } from "../../backend/organizationSettings.js
 import type { TeamuqTaskBinding } from "../../application/teamuqTaskBinding.js";
 import { ROTATION_BLOCKED_LOCAL_CODE, isStrandedSent, reconcileAfterResumeError, reconcileBeforeSession, reconcileWithSession, type CallRecoveryDeps } from "./recoverCall.js";
 import { DEFAULT_TURN_LIMITS, type TurnLimits } from "./turnLimits.js";
+import type { TraceSink } from "../storage/organizationTrace.js";
 import { DETACHED_LOCAL_CODE, REPLY_LIMIT, runTurn, type PairSession, type TurnJournal } from "./turnTracker.js";
 import { PAIR_BLOCKED_LOCAL_CODE } from "../../application/organizationQueue.js";
 
@@ -77,6 +78,7 @@ export function createHostMemoryModelPort(
   resumeStore?: OrganizationResumeStorePort,
   closeTimeoutMs = SESSION_CLOSE_TIMEOUT_MS,
   limits: TurnLimits = DEFAULT_TURN_LIMITS,
+  trace?: TraceSink,
 ): MemoryModelPort & { interrupt(): void; releasePair(agentId: string, projectId: string | null): Promise<void>; awaitPair(agentId: string, projectId: string | null, signal?: AbortSignal): Promise<void>; waiting(): { readonly sinceMs: number } | null; cancel(): Promise<void> } {
   const resumeAi = ai as unknown as ResumeAi;
   const active = new Set<AbortController>();
@@ -532,7 +534,7 @@ export function createHostMemoryModelPort(
         return runTurn({
           current: currentSession, context: activeInvocation, operation: opKey, callKey: selectedCallKey, body,
           savedCall: stored, priorCall: callInfo?.prior, journal, parseCached, parseReply,
-          hard: controller.signal, soft: input.signal, limits, isDisposed: () => disposed,
+          hard: controller.signal, soft: input.signal, limits, isDisposed: () => disposed, ...(trace === undefined ? {} : { trace }),
           setPhase: (phase) => { activePhase = phase; },
           remember: (record, handle) => { sessions.set(record.pairKey, { session: handle, record }); },
           onSent: (at) => { sentAt = at; },

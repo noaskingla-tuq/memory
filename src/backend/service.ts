@@ -36,6 +36,9 @@ import { createMigratingPunchReceiptStore } from "./punchStateMigration.js";
 import { readOrganizationSettings } from "./organizationSettings.js";
 import { unstickLocalDeadline } from "../application/organizationUnstick.js";
 import { backupStateOnce } from "../adapters/storage/stateBackup.js";
+import { createOrganizationTrace } from "../adapters/storage/organizationTrace.js";
+import type { StartupEvent } from "../application/organizationStartup.js";
+import { catchupEntry, startupEntry } from "./traceWiring.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
@@ -50,6 +53,7 @@ export interface BackendOptions {
   readonly backupHooks?: Partial<BackupHooks>;
   readonly organizationNow?: () => number;
   readonly hostSessionCloseTimeoutMs?: number;
+  readonly traceMaxBytes?: number;
   readonly unstickRetryMs?: number;
   readonly profilePath?: string;
   readonly profileIo?: ProfileIo;
@@ -103,7 +107,9 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   // why: a host without the Program API (older Core) gets no binding, so its AI turns never carry a taskId and never call Program
   const teamuqTask = options.host?.program === undefined ? undefined : createTeamuqTaskBinding({ program: options.host.program, store: createTeamuqTaskStore(dirname(options.dataRoot)), profile });
   const organizationStore = options.host === undefined ? undefined : createLocalPunchOrganizationStore(dirname(options.dataRoot));
-  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, teamuqTask, organizationStore, options.hostSessionCloseTimeoutMs);
+  // why: the trace is a diagnostic record only; nothing in the service reads it back
+  const trace = options.host === undefined ? undefined : createOrganizationTrace({ dir: dirname(options.dataRoot), ...(options.traceMaxBytes === undefined ? {} : { maxBytes: options.traceMaxBytes }) });
+  const model = options.host?.ai === undefined ? undefined : createHostMemoryModelPort(options.host.ai, organizationSettings, teamuqTask, organizationStore, options.hostSessionCloseTimeoutMs, undefined, trace);
   const profileSync = createProfileSync({ table: profile, filePath: profilePath, now: options.uiNow ?? Date.now, ...(options.profileIo === undefined ? {} : { io: options.profileIo }) });
 
   const organization = organizationStore === undefined ? undefined : createPunchOrganizationWorker({
@@ -111,6 +117,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     enabled: () => organizationSettings().enabled,
     frequency: () => organizationSettings().frequency,
     dailyTime: () => organizationSettings().dailyTime,
+    ...(trace === undefined ? {} : { onStartup: (event: StartupEvent) => trace.write(startupEntry(event)) }),
     ...(model === undefined ? {} : { awaitPending: (job: { readonly actor: { readonly agentId: string; readonly projectId: string | null } }, signal: AbortSignal) => model.awaitPair(job.actor.agentId, job.actor.projectId, signal), waiting: () => model.waiting() }),
     ...(options.organizationNow === undefined ? {} : { now: options.organizationNow }),
     async capture(job) {
@@ -152,7 +159,11 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     ...(organizationStore === undefined ? {} : { resumeStore: organizationStore }),
     onAdmitted: (punch, memoryId) => organization!.enqueue(punch, memoryId),
     // why: a round that ended without a stop code is enough to let the organization start, even if the catch-up has more pages to go
-    onProgress: (event) => { if (event.event === "punch_catchup" && event.stoppedCode === null) organization?.resumeStartup(event.complete === true ? "catchup_complete" : "round_ended"); },
+    onProgress: (event) => {
+      const entry = catchupEntry(event);
+      if (entry !== null) trace?.write(entry);
+      if (event.event === "punch_catchup" && event.stoppedCode === null) organization?.resumeStartup(event.complete === true ? "catchup_complete" : "round_ended");
+    },
     writer: {
       async rememberMany(inputs) {
         const request = {

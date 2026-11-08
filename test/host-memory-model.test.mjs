@@ -132,16 +132,16 @@ test("invalid JSON, oversized UTF-8 and rejected sends clean up listeners and se
     assert.equal(h.counters.off, 1);
   }
 });
-test("a completed event without contentSaved cannot be treated as a durable model reply", async () => {
+test("a completed event with its output is a reliable reply on its own: contentSaved is optional, and the reply settles after the grace", async () => {
   const h = mockAi({ send: async ({ emit }) => { emit({ kind: "textDelta", text: '{"items":[]}' }); emit({ kind: "completed" }); return { turnId: "t" }; } });
-  const controller = new AbortController();
-  const pending = invoke(createHostMemoryModelPort(h.ai, enabled), controller.signal);
-  const rejection = assert.rejects(pending, { code: "RESOURCE_BUSY" });
-  await new Promise((resolve) => setImmediate(resolve));
-  controller.abort();
-  await rejection;
+  const port = createHostMemoryModelPort(h.ai, enabled, undefined, undefined, undefined, { graceMs: 30, backstopMs: 60_000 });
+  const started = Date.now();
+  assert.deepEqual(await invoke(port), { items: [] });
+  assert.ok(Date.now() - started >= 25, "it waited the grace for a contentSaved that never came");
   assert.equal(h.counters.sent, 1);
   assert.equal(h.counters.closed, 1);
+  assert.equal(h.counters.interrupted, 0);
+  await port.cancel();
 });
 test("abort and disposal interrupt a stalled turn that has no journal to keep a late reply", async () => {
   for (const mode of ["abort", "dispose"]) {

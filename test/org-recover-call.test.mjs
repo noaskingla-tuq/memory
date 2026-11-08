@@ -4,13 +4,13 @@ import { REPLY, actorOf, callRecord, callsOf, invokeScoped, portOf, recoverAi, s
 
 const OP = "organize:stranded";
 
-async function stranded(t, { session, calls = {}, resume, closedSessionResume }) {
+async function stranded(t, { session, calls = {}, resume, closedSessionResume, limits }) {
   const { store } = tempStore(t);
   const actor = actorOf("sw/a");
   const record = await callRecord(actor, OP, { hostSessionId: "host-old", turnId: "turn-old", ...calls });
   await seed(store, { sessions: session === null ? [] : [sessionRecord(actor, "host-old", session)], calls: [record] });
   const host = recoverAi({ resume, closedSessionResume });
-  const port = portOf(host.ai, store);
+  const port = portOf(host.ai, store, limits);
   t.after(() => port.cancel());
   return { store, actor, host, port };
 }
@@ -100,10 +100,22 @@ test("row 4: a completed turn with a sequence number is read back as reply_ready
   assert.equal(rig.host.counters.sent, 0);
 });
 
-test("row 5: a completed turn without a sequence number is unrecoverable and the call is sent again", async (t) => {
+test("row 5: a completed turn without a sequence number is read back from its output as reply_ready, with no second send", async (t) => {
+  const rig = await stranded(t, {
+    session: "active", calls: { sequenceNo: null }, limits: { graceMs: 30, backstopMs: 60_000 },
+    resume: (id, make) => make(id, { turnId: "turn-old", text: JSON.stringify(REPLY), terminal: { kind: "completed" } }),
+  });
+  assert.deepEqual(await invokeScoped(rig.port, rig.actor, OP), REPLY);
+  const list = await callsOf(rig.store, OP, rig.actor);
+  assert.equal(list.length, 1);
+  assert.deepEqual([list[0].phase, list[0].sequenceNo], ["reply_ready", null]);
+  assert.equal(rig.host.counters.sent, 0);
+});
+
+test("row 5: a completed turn that kept no output cannot be read back, so it is unrecoverable and the call is sent again", async (t) => {
   const rig = await stranded(t, {
     session: "active", calls: { sequenceNo: null },
-    resume: (id, make) => make(id, { turnId: "turn-old", text: JSON.stringify(REPLY), terminal: { kind: "completed" } }),
+    resume: (id, make) => make(id, { turnId: "turn-old", text: "", terminal: { kind: "completed" } }),
   });
   const list = await resent(rig);
   assert.equal(list[0].hostErrorCode, "reconciled_unrecoverable");

@@ -6,6 +6,7 @@ import type { OrganizationCallRecord, OrganizationOperationRecord, OrganizationS
 import type { OrganizationSettings } from "../../backend/organizationSettings.js";
 import type { TeamuqTaskBinding } from "../../application/teamuqTaskBinding.js";
 import { ROTATION_BLOCKED_LOCAL_CODE, isStrandedSent, reconcileAfterResumeError, reconcileBeforeSession, reconcileWithSession, type CallRecoveryDeps } from "./recoverCall.js";
+import { DEFAULT_TURN_LIMITS, type TurnLimits } from "./turnLimits.js";
 import { DETACHED_LOCAL_CODE, REPLY_LIMIT, runTurn, type PairSession, type TurnJournal } from "./turnTracker.js";
 import { PAIR_BLOCKED_LOCAL_CODE } from "../../application/organizationQueue.js";
 
@@ -54,7 +55,7 @@ function operationRecord(state: Awaited<ReturnType<OrganizationResumeStorePort["
 function parseCached(call: OrganizationCallRecord): unknown {
   if (call.replyJson === null) throw serviceError("RESOURCE_BUSY", "A previous memory turn requires reconciliation", undefined, "session_resume");
   if (typeof call.hostSessionId !== "string" || call.hostSessionId.length === 0 || typeof call.turnId !== "string" || call.turnId.length === 0
-    || !Number.isSafeInteger(call.sequenceNo)) throw serviceError("RESOURCE_BUSY", "Saved memory model reply is not linked to a completed turn", undefined, "session_resume");
+    || !(call.sequenceNo === null || Number.isSafeInteger(call.sequenceNo))) throw serviceError("RESOURCE_BUSY", "Saved memory model reply is not linked to a completed turn", undefined, "session_resume");
   if (Buffer.byteLength(call.replyJson, "utf8") !== call.responseBytes || sha256(call.replyJson) !== call.replySha256) {
     throw serviceError("STORAGE_BUSY", "Saved memory recovery state failed integrity validation", false, "state");
   }
@@ -75,7 +76,8 @@ export function createHostMemoryModelPort(
   task?: TeamuqTaskBinding,
   resumeStore?: OrganizationResumeStorePort,
   closeTimeoutMs = SESSION_CLOSE_TIMEOUT_MS,
-): MemoryModelPort & { interrupt(): void; releasePair(agentId: string, projectId: string | null): Promise<void>; awaitPair(agentId: string, projectId: string | null): Promise<void>; waiting(): { readonly sinceMs: number } | null; cancel(): Promise<void> } {
+  limits: TurnLimits = DEFAULT_TURN_LIMITS,
+): MemoryModelPort & { interrupt(): void; releasePair(agentId: string, projectId: string | null): Promise<void>; awaitPair(agentId: string, projectId: string | null, signal?: AbortSignal): Promise<void>; waiting(): { readonly sinceMs: number } | null; cancel(): Promise<void> } {
   const resumeAi = ai as unknown as ResumeAi;
   const active = new Set<AbortController>();
   const tails = new Set<Promise<unknown>>();
@@ -245,7 +247,7 @@ export function createHostMemoryModelPort(
     key: string,
     callKey: string,
     turnId: string,
-    sequenceNo: number,
+    sequenceNo: number | null,
     value: unknown,
   ): Promise<void> => {
     if (resumeStore === undefined) return;
@@ -529,7 +531,7 @@ export function createHostMemoryModelPort(
         return runTurn({
           current: currentSession, context: activeInvocation, operation: opKey, callKey: selectedCallKey, body,
           savedCall: stored, priorCall: callInfo?.prior, journal, parseCached, parseReply,
-          hard: controller.signal, soft: input.signal, isDisposed: () => disposed,
+          hard: controller.signal, soft: input.signal, limits, isDisposed: () => disposed,
           setPhase: (phase) => { activePhase = phase; },
           remember: (record, handle) => { sessions.set(record.pairKey, { session: handle, record }); },
           onDetach: () => {
@@ -576,7 +578,7 @@ export function createHostMemoryModelPort(
     countTokens: (_policy, text) => Buffer.byteLength(text, "utf8"),
     invoke,
     interrupt() { for (const controller of active) controller.abort(); },
-    awaitPair: (agentId, projectId) => withPairLock(pairKey(agentId, projectId), async () => undefined),
+    awaitPair: (agentId, projectId, signal) => withPairLock(pairKey(agentId, projectId), async () => undefined, signal),
     waiting() {
       if (detachedSince.size === 0) return null;
       return { sinceMs: Math.max(0, Date.now() - Math.min(...detachedSince.values())) };

@@ -96,4 +96,4 @@ export function recoverAi({ resume, closedSessionResume = true } = {}) {
   return { ai, counters, make };
 }
 
-export const portOf = (ai, store) => createHostMemoryModelPort(ai, settings, undefined, store);
+export const portOf = (ai, store, limits) => createHostMemoryModelPort(ai, settings, undefined, store, undefined, limits);

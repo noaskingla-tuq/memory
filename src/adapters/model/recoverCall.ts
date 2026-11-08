@@ -55,6 +55,6 @@ export async function reconcileWithSession(deps: CallRecoveryDeps, pair: string,
     await deps.failCall(call, { retryable: true, partialDelivered: false, hostErrorCode: "interrupted" });
     return true;
   }
-  if (terminal?.kind === "completed" && call.sequenceNo === null) return giveUp(deps, call, saved);
+  if (terminal?.kind === "completed" && turn.text.length === 0) return giveUp(deps, call, saved);
   return false;
 }

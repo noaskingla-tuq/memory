@@ -2,6 +2,7 @@ import type { PluginBackendAiSessionV1, PluginBackendAiTurnEventV1 } from "@team
 import { MemoryServiceError, type MemoryFailurePhase } from "../../domain/errors.js";
 import type { MemoryModelInvocationContext } from "../../application/modelPort.js";
 import type { OrganizationCallRecord, OrganizationSessionRecord } from "../../application/punchDataPorts.js";
+import { DEFAULT_TURN_LIMITS, TURN_BACKSTOP_CODE, type TurnLimits } from "./turnLimits.js";
 
 export const REPLY_LIMIT = 16_384;
 export const DETACHED_LOCAL_CODE = "detached_running";
@@ -15,7 +16,7 @@ export interface PairSession {
 
 export interface TurnJournal {
   save(context: MemoryModelInvocationContext, operation: string, callKey: string, phase: OrganizationCallRecord["phase"], fields?: Partial<OrganizationCallRecord>): Promise<OrganizationCallRecord>;
-  saveReply(context: MemoryModelInvocationContext, operation: string, callKey: string, turnId: string, sequenceNo: number, value: unknown): Promise<void>;
+  saveReply(context: MemoryModelInvocationContext, operation: string, callKey: string, turnId: string, sequenceNo: number | null, value: unknown): Promise<void>;
   persistSession(record: OrganizationSessionRecord): Promise<void>;
 }
 
@@ -37,6 +38,7 @@ export interface TurnRequest {
   readonly isDisposed: () => boolean;
   readonly setPhase: (phase: MemoryFailurePhase) => void;
   readonly onDetach: () => void;
+  readonly limits?: TurnLimits;
   readonly remember: (record: OrganizationSessionRecord, session: PluginBackendAiSessionV1) => void;
 }
 
@@ -64,6 +66,10 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
   let interruptionWrite: Promise<void> | undefined;
   let terminal = false;
   let settled = false;
+  let graceOver = false;
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
+  let backstopTimer: ReturnType<typeof setTimeout> | undefined;
+  const limits = request.limits ?? DEFAULT_TURN_LIMITS;
   const pending: PluginBackendAiTurnEventV1[] = [];
   let eventChain = Promise.resolve();
   let resolveAnswer: ((value: unknown) => void) | undefined;
@@ -77,13 +83,22 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
     state = "failed";
   };
   const settleIfReady = async (): Promise<void> => {
-    if (settled || !terminal || sequenceNo === null) return;
+    if (settled || !terminal || (sequenceNo === null && !graceOver)) return;
     settled = true;
     try { resolveAnswer?.(request.parseReply(output)); }
     catch (error) {
       await writeFailed({ turnId, sequenceNo, retryable: false, partialDelivered: false, hostErrorCode: "json_parse" });
       rejectAnswer?.(error as Error);
     }
+  };
+  // why: a completed event with output is a reliable reply on its own; contentSaved is only awaited for a short grace and is optional after it
+  const armGrace = (): void => {
+    if (graceTimer !== undefined || sequenceNo !== null) return;
+    graceTimer = setTimeout(() => {
+      graceOver = true;
+      eventChain = eventChain.then(settleIfReady).catch((error) => { settled = true; rejectAnswer?.(error as Error); });
+    }, limits.graceMs);
+    graceTimer.unref?.();
   };
   const tooLong = async (): Promise<void> => {
     settled = true;
@@ -104,6 +119,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       if (snapshot?.turnId === turnId) output = snapshot.text;
       if (Buffer.byteLength(output, "utf8") > REPLY_LIMIT) { await tooLong(); return; }
       terminal = true;
+      armGrace();
       await settleIfReady();
     } else if (event.kind === "failed") {
       settled = true;
@@ -124,21 +140,32 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
   };
   const consume = (event: PluginBackendAiTurnEventV1): void => { if (turnId === null) pending.push(event); else enqueue(event); };
   const listenerOff = current.session.onEvent(consume);
-  const stopHost = (): void => {
+  const stopHost = (code = "cancelled_local", reason: () => MemoryServiceError = cancelled): void => {
     if (sendStarted || turnId !== null) void current.session.interrupt().catch(() => undefined);
     if (journal !== undefined && turnId !== null && !settled) {
-      interruptionWrite = writeFailed({ turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: "cancelled_local" });
+      interruptionWrite = writeFailed({ turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: code });
       void interruptionWrite.catch(() => undefined);
     }
-    if (!settled) { settled = true; rejectAnswer?.(cancelled()); }
+    if (!settled) { settled = true; rejectAnswer?.(reason()); }
+  };
+  const onHard = (): void => stopHost();
+  // why: a turn the host never ends would hold the pair lock for ever, so the backstop frees it and retires the session the stuck turn may have wedged
+  const onBackstop = (): void => {
+    if (settled) return;
+    stopHost(TURN_BACKSTOP_CODE, () => new MemoryServiceError("MODEL_TIMEOUT", "Memory model turn passed the backstop", true, "turn_timeout", TURN_BACKSTOP_CODE));
+    const written = interruptionWrite ?? Promise.resolve();
+    interruptionWrite = written.then(() => journal?.persistSession({ ...current.record, state: "invalidated" }));
+    void interruptionWrite.catch(() => undefined);
   };
   // why: without a journal nothing can store a reply that arrives after the caller left, so a soft stop there is a plain cancel
   const onSoft = (): void => { if (!detachable) stopHost(); };
-  hard.addEventListener("abort", stopHost, { once: true });
+  hard.addEventListener("abort", onHard, { once: true });
   soft.addEventListener("abort", onSoft, { once: true });
   const off = (): void => {
     listenerOff();
-    hard.removeEventListener("abort", stopHost);
+    hard.removeEventListener("abort", onHard);
+    clearTimeout(graceTimer);
+    clearTimeout(backstopTimer);
     soft.removeEventListener("abort", onSoft);
   };
   // why: while the send is still pending there is no turn id to follow, so either stop leaves the outcome unknown and the call blocks until it is reconciled
@@ -192,10 +219,14 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
       state = "running";
       for (const event of pending.splice(0)) enqueue(event);
     }
+    backstopTimer = setTimeout(onBackstop, limits.backstopMs);
+    backstopTimer.unref?.();
     const snapshot = current.session.turn;
-    if (turnId !== null && snapshot?.turnId === turnId && snapshot.terminal?.kind === "completed" && sequenceNo !== null) {
+    // why: a turn this call sent delivers its own events, so only a turn found again on a resumed session is read back from its snapshot
+    if (priorTurnId !== null && turnId !== null && snapshot?.turnId === turnId && snapshot.terminal?.kind === "completed") {
       output = snapshot.text;
       terminal = true;
+      armGrace();
       void settleIfReady();
     }
     let value: unknown;
@@ -210,7 +241,7 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
     const replyJson = JSON.stringify(value);
     if (replyJson === undefined || Buffer.byteLength(replyJson, "utf8") > REPLY_LIMIT) throw outputInvalid("Memory model reply is too large");
     if (journal !== undefined) {
-      await journal.saveReply(context, operation, callKey, turnId!, sequenceNo!, value);
+      await journal.saveReply(context, operation, callKey, turnId!, sequenceNo, value);
       terminalWritten = true;
       state = "reply_ready";
     }

@@ -15,7 +15,7 @@ const organization = (overrides = {}) => ({
   sourceGeneration: null, sourceHighWatermark: null, sourcePages: null, sourceScanned: null, sourceReceived: null, sourceEligible: null, sourceCheckpointed: null,
   lastError: null, errorPhase: null, hostErrorCode: null, retryable: null, partialDelivered: null, lastAttemptAt: null, updatedAt: null, dailyRound: null, ...overrides,
 });
-const statusOf = (org) => ({ ok: true, version: "1.4.7", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 5, organization: org });
+const statusOf = (org) => ({ ok: true, version: "1.4.8", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 5, organization: org });
 
 async function statusMarkup(org, expanded = true) {
   const target = { innerHTML: "", dataset: {} };

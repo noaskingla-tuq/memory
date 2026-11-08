@@ -94,7 +94,7 @@ test("three stuck jobs in a row pause the organization with an existing code, la
   assert.equal(paused.hostErrorCode, "turn_backstop");
   assert.equal(paused.localErrorCode, STALL_LOCAL_CODE);
   assert.equal(paused.retryable, true);
-  const wrap = (organization) => ({ ok: true, version: "1.4.7", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
+  const wrap = (organization) => ({ ok: true, version: "1.4.8", cairnCommit: "a".repeat(40), storage: { status: "ready" }, profile: { generation: null, receivedAt: null, agents: 0, projects: 0, sink: null }, lastWriteAt: null, uptimeSec: 1, organization });
   assert.equal(parseUiResponse("ui.status", wrap(paused)), true);
 
   const probe = await worker.agentOrganization({ action: "run", agentId: "sw/a" });

@@ -376,6 +376,7 @@ export const uiAgentOrganizationSuccess = z.object({
   blocked: z.enum(["disabled", "running", "other_running", "no_candidates", "not_running"]).nullable(),
   run: uiAgentRunSchema.nullable(),
   waiting: z.object({ sinceMs: count }).strict().nullable().optional(),
+  syncing: z.boolean().optional(),
   pauseReason: pauseReasonSchema.nullable().optional(),
   stall: stallSchema.nullable().optional(),
 }).strict();
@@ -439,6 +440,7 @@ export const uiStatusSuccess = z
       lastAttemptAt: count.nullable(),
       updatedAt: count.nullable(),
       waiting: z.object({ sinceMs: count }).strict().nullable().optional(),
+      syncing: z.boolean().optional(),
       pauseReason: pauseReasonSchema.nullable().optional(),
       stall: stallSchema.nullable().optional(),
       dailyRound: z.object({

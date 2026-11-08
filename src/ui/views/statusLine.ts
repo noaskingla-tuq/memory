@@ -100,7 +100,7 @@ function failureReason(organization: Organization): string {
 // why: the compact line keeps the priority the full line always had: storage trouble, then the organization phase, then plain service health
 function compactText(status: UiStatus, ready: boolean): string {
   const organization = status.organization;
-  const parts = [ready ? (organization === undefined ? t("status.ok") : stalled(organization) ? t("status.compact.stall", { n: organization.stall!.count }) : t(`status.organization.phase.${organization.state}`)) : t("status.storageTrouble").replace(/。$/u, "")];
+  const parts = [ready ? (organization === undefined ? t("status.ok") : organization.syncing === true ? t("status.organization.syncing") : stalled(organization) ? t("status.compact.stall", { n: organization.stall!.count }) : t(`status.organization.phase.${organization.state}`)) : t("status.storageTrouble").replace(/。$/u, "")];
   // why: a running trial is the one thing that must stay visible while the panel is folded
   if (organization?.trial?.state === "running") parts.push(t("trial.compact", { done: organization.trial.attempted, adopted: organization.trial.adopted }));
   if (organization?.waiting != null) parts.push(waitingText(organization));
@@ -119,6 +119,8 @@ function frame(state: StatusView["state"], text: string, extra: SafeHtml, panel:
 }
 
 function organizationItems(organization: Organization): SafeHtml {
+  // why: while the work records are still being synced the counts are not known yet, so only the one thing that matters is shown
+  if (organization.syncing === true) return html`<li data-syncing>${t("status.organization.syncing")}</li>`;
   const controls = trialControls(organization);
   const legacy = organization.legacyUnlinked > 0 ? html`${t("status.organization.legacy", { n: organization.legacyUnlinked })}` : EMPTY_HTML;
   const jobs = legacy.value === "" && controls === EMPTY_HTML ? EMPTY_HTML : html`<li class="muted">${legacy}${controls}</li>`;

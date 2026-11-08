@@ -10,6 +10,7 @@ import { operationKey, pairKey } from "./modelInvocationScope.js";
 import { dailyRoundStatus, failedModelAttemptInRound, localRoundDate, nextLocalDay, phaseOf, replyReady, type Job } from "./organizationJobState.js";
 import { captureOutcome, captureWithContinuation, isPairBlocked, replyProgress } from "./organizationQueue.js";
 import { AWAIT_CAP_MS, STALL_LOCAL_CODE, awaitUnlessStopped, createStallGuard, stallOutcome } from "./organizationStall.js";
+import { createStartupGate, type StartupEvent, type StartupRelease } from "./organizationStartup.js";
 import { deriveState, findBlockingCode, type PauseReason } from "./organizationStatusState.js";
 import { createAgentOrganization, createAgentRun } from "./organizationAgentRun.js";
 import { classifyLegacyJob, isTrialRow, summarizeTrial, trialBreaker, type LegacyTrialRequest, type LegacyTrialResponse, type TrialSummary } from "./organizationTrial.js";
@@ -41,6 +42,7 @@ export interface OrganizationStatus {
   readonly lastAttemptAt: number | null;
   readonly updatedAt: number | null;
   readonly waiting?: { readonly sinceMs: number } | null;
+  readonly syncing?: boolean;
   readonly pauseReason?: PauseReason | null;
   readonly stall?: { readonly count: number; readonly limit: number } | null;
   readonly dailyRound: null | {
@@ -80,13 +82,14 @@ export interface OrganizationOptions {
   readonly waiting?: () => { readonly sinceMs: number } | null;
   readonly now?: () => number;
   readonly pollMs?: number;
+  readonly startupCapMs?: number;
+  readonly onStartup?: (event: StartupEvent) => void;
 }
 
 export function createPunchOrganizationWorker(options: OrganizationOptions) {
   const now = options.now ?? Date.now;
   let stopped = false;
   let started = false;
-  let startupReady = true;
   let requested = false;
   let retryNow = false;
   let knownKeys: Set<string> | undefined;
@@ -96,6 +99,7 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
   let trialQueue: Promise<unknown> = Promise.resolve();
   const agentRun = createAgentRun();
   const stall = createStallGuard();
+  const gate = createStartupGate({ now, ...(options.startupCapMs === undefined ? {} : { capMs: options.startupCapMs }), ...(options.onStartup === undefined ? {} : { onChange: options.onStartup }) });
   // why: a failed host-session release happens after the job result is final, so no job row carries it; each pair keeps its own record and the map order is recency
   const releaseFaults = new Map<string, OrganizationReleaseFault>();
   let status: OrganizationStatus = {
@@ -198,6 +202,8 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
   };
   const run = async (): Promise<void> => {
     if (stopRequested) await endTrial("stopped", null);
+    // why: before the first catch-up has finished (or the cap passed) nothing can start, so the job file is not read at all
+    if (options.enabled() && frequency() === "daily" && !gate.check()) return;
     const rows = await jobs();
     const currentFrequency = frequency();
     const dailyTime = options.dailyTime?.() ?? "02:00";
@@ -221,7 +227,6 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     let dailyClosed = false;
     let replyOnly = false;
     if (currentFrequency === "daily") {
-      if (!startupReady) { await updateStatus(rows, existingRound === undefined ? null : { date: schedule.date, value: existingRound }); return; }
       if (existingRound?.state === "completed") {
         const deferredMembers = rows.filter(({ job }) => job.state === "pending" && job.resumeDisposition !== "legacy_unlinked"
           && job.queueSequence !== undefined && job.queueSequence > existingRound.snapshot.queueSequenceHighWatermark).length;
@@ -435,12 +440,12 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     start(settings: { readonly deferInitialRun?: boolean } = {}) {
       if (started || stopped) return;
       started = true;
-      startupReady = settings.deferInitialRun !== true;
+      if (settings.deferInitialRun === true) gate.defer();
       timer = setInterval(wake, options.pollMs ?? 30_000);
       timer.unref();
       wake();
     },
-    resumeStartup() { if (!started || stopped || startupReady) return; startupReady = true; requested = false; wake(); },
+    resumeStartup(reason: StartupRelease = "catchup_complete") { if (!started || stopped || !gate.release(reason)) return; requested = false; wake(); },
     wake,
     settingsChanged() { retryNow = true; stall.reset(); wake(); },
     legacyTrial(request: LegacyTrialRequest): Promise<LegacyTrialResponse> {
@@ -472,9 +477,10 @@ export function createPunchOrganizationWorker(options: OrganizationOptions) {
     status: (): OrganizationStatus => {
       const waiting = options.waiting?.() ?? null;
       const stalled = options.enabled() && stall.paused();
+      const syncing = options.enabled() && frequency() === "daily" && gate.waiting();
       // why: the pause reuses an existing failure code, and the host and local codes tell the stall apart from a plain busy host
       const current: OrganizationStatus = {
-        ...status, ...(waiting === null ? {} : { waiting }),
+        ...status, ...(waiting === null ? {} : { waiting }), ...(syncing ? { syncing: true, state: status.state === "disabled" ? "idle" as const : status.state } : {}),
         ...(stalled ? { pauseReason: "stall" as const, stall: { count: stall.count(), limit: stall.limit }, state: "paused" as const, lastError: "RESOURCE_BUSY", errorPhase: "turn_timeout", hostErrorCode: "turn_backstop", localErrorCode: STALL_LOCAL_CODE, retryable: true } : {}),
         ...(!options.enabled() ? { state: "disabled" as const, pauseReason: null } : {}),
       };

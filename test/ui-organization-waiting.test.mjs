@@ -153,3 +153,31 @@ test("an old error and the legacy job count read as neutral notes: no pause word
   const error = await statusMarkup(organization({ state: "error", lastError: "STORAGE_BUSY", errorPhase: "commit" }));
   assert.ok(!error.html.includes("先前有工作遇到"), "a real error keeps its own wording");
 });
+
+test("while the work records are syncing, the status line and the agent page say so instead of showing a run at 0 of N", async () => {
+  const folded = await statusMarkup(organization({ state: "idle", syncing: true }), false);
+  assert.ok(folded.html.includes("正在同步工作紀錄，同步完成後開始整理"), folded.html);
+  assert.ok(!folded.html.includes("AI 整理已啟用"));
+  const open = await statusMarkup(organization({ state: "idle", syncing: true, pending: 0 }));
+  assert.ok(open.html.includes("data-syncing"));
+  assert.ok(!open.html.includes("待整理 0"), "the counts are not known yet, so they are not shown");
+  const page = ui.agentOrgSection(model({ run: run({ done: 0, failed: 0, untried: 23, total: 23 }), syncing: true })).value;
+  assert.ok(page.includes("正在同步工作紀錄，同步完成後開始整理"));
+  assert.ok(!page.includes("整理中：已處理") && !page.includes("<progress"), page);
+  const idle = ui.agentOrgSection(model({ syncing: true })).value;
+  assert.ok(idle.includes("正在同步工作紀錄"));
+  assert.ok(ui.agentOrgSection(model({ run: run() })).value.includes("整理中：已處理"), "without syncing the run reads as before");
+});
+
+test("the controller reads syncing, pauseReason and stall from the agent answer", async () => {
+  const answers = [{ ok: true, action: "status", agentId: AGENT, pending: 23, blocked: null, run: run({ total: 23, done: 0, failed: 0, untried: 23 }), syncing: true, waiting: null }];
+  const org = ui.createAgentOrg({
+    client: { async call() { return { ok: true, value: answers[0] }; } },
+    scheduler: { set: () => 1, clear: () => undefined }, visibility: { isVisible: () => true, subscribe: () => () => undefined },
+  });
+  const target = { innerHTML: "" };
+  await org.attach(target, AGENT);
+  assert.equal(org.model().syncing, true);
+  assert.ok(target.innerHTML.includes("正在同步工作紀錄"));
+  assert.equal(parseUiResponse("ui.agentOrganization", answers[0]), true);
+});

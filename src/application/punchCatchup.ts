@@ -380,6 +380,7 @@ export function createPunchCatchupWorker(options: PunchCatchupOptions): PunchCat
 
   const run = (): void => {
     if (stopped || active !== null) { pending = true; return; }
+    log({ event: "punch_catchup_start" });
     active = catchUp().then((result) => {
       log({ event: "punch_catchup", ...result });
       if (result.complete) markInitialCatchupReady();

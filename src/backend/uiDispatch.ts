@@ -41,6 +41,7 @@ function isPlainObject(value: unknown): boolean {
 function organizationHints(status: OrganizationStatus | undefined): Record<string, unknown> {
   return {
     waiting: status?.waiting ?? null,
+    ...(status?.syncing === undefined ? {} : { syncing: status.syncing }),
     ...(status?.pauseReason === undefined ? {} : { pauseReason: status.pauseReason }),
     ...(status?.stall === undefined ? {} : { stall: status.stall }),
   };

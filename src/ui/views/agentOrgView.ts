@@ -15,6 +15,7 @@ export interface AgentOrgModel {
   readonly notice: StringKey | null;
   readonly error: ErrorDescription | null;
   readonly waitingMs?: number | null;
+  readonly syncing?: boolean;
   readonly pauseReason?: string | null;
   readonly stallCount?: number | null;
 }
@@ -41,6 +42,8 @@ function counts(run: UiAgentRun): Record<string, number> {
 function line(model: AgentOrgModel, state: AgentOrgState): string {
   const run = model.run;
   if (state === "loading") return t("ao.loading");
+  // why: a run that cannot start yet must not read as 0 of N in progress
+  if (model.syncing === true && (state === "running" || state === "idle")) return t("ao.syncing");
   if (run !== null && state === "running") return t("ao.running", counts(run));
   if (run !== null && state === "stopping") return t("ao.stopping", counts(run));
   if (run !== null && state === "completed") return t("ao.done", counts(run));
@@ -78,7 +81,7 @@ function actions(model: AgentOrgModel, state: AgentOrgState): SafeHtml {
 
 function meter(model: AgentOrgModel, state: AgentOrgState): SafeHtml {
   const run = model.run;
-  if (run === null || state === "loading" || state === "idle") return EMPTY_HTML;
+  if (run === null || state === "loading" || state === "idle" || model.syncing === true) return EMPTY_HTML;
   return html`<progress class="ao-progress" max="${run.total}" value="${run.done + run.failed}" aria-label="${t("ao.progress")}"></progress>`;
 }
 

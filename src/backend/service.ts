@@ -151,6 +151,8 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     receipts: createMigratingPunchReceiptStore(options.host, createLocalPunchReceiptStore(dirname(options.dataRoot))),
     ...(organizationStore === undefined ? {} : { resumeStore: organizationStore }),
     onAdmitted: (punch, memoryId) => organization!.enqueue(punch, memoryId),
+    // why: a round that ended without a stop code is enough to let the organization start, even if the catch-up has more pages to go
+    onProgress: (event) => { if (event.event === "punch_catchup" && event.stoppedCode === null) organization?.resumeStartup(event.complete === true ? "catchup_complete" : "round_ended"); },
     writer: {
       async rememberMany(inputs) {
         const request = {

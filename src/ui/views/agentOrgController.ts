@@ -28,15 +28,15 @@ export interface AgentOrg {
 
 const BLANK: AgentOrgModel = { phase: "loading", agentId: "", pending: 0, run: null, blocked: null, busy: false, notice: null, error: null, waitingMs: null };
 
-interface Parsed { pending: number; blocked: string | null; run: UiAgentRun | null; waitingMs: number | null; pauseReason: string | null; stallCount: number | null }
+interface Parsed { syncing: boolean; pending: number; blocked: string | null; run: UiAgentRun | null; waitingMs: number | null; pauseReason: string | null; stallCount: number | null }
 
 function parse(value: unknown): Parsed | null {
-  const answer = value as { ok?: unknown; pending?: unknown; blocked?: unknown; run?: unknown; waiting?: { sinceMs?: unknown } | null; pauseReason?: unknown; stall?: { count?: unknown } | null } | null;
+  const answer = value as { ok?: unknown; pending?: unknown; blocked?: unknown; run?: unknown; waiting?: { sinceMs?: unknown } | null; pauseReason?: unknown; syncing?: unknown; stall?: { count?: unknown } | null } | null;
   if (typeof answer !== "object" || answer === null || answer.ok !== true || typeof answer.pending !== "number") return null;
   const run = answer.run;
   const valid = run === null || (typeof run === "object" && run !== undefined && typeof (run as { state?: unknown }).state === "string");
   if (!valid) return null;
-  return { pending: answer.pending, blocked: typeof answer.blocked === "string" ? answer.blocked : null, run: run as UiAgentRun | null, waitingMs: typeof answer.waiting?.sinceMs === "number" ? answer.waiting.sinceMs : null,
+  return { syncing: answer.syncing === true, pending: answer.pending, blocked: typeof answer.blocked === "string" ? answer.blocked : null, run: run as UiAgentRun | null, waitingMs: typeof answer.waiting?.sinceMs === "number" ? answer.waiting.sinceMs : null,
     pauseReason: typeof answer.pauseReason === "string" ? answer.pauseReason : null, stallCount: typeof answer.stall?.count === "number" ? answer.stall.count : null };
 }
 
@@ -73,7 +73,7 @@ export function createAgentOrg(deps: AgentOrgDeps): AgentOrg {
     const answer = parse(result.value);
     state = answer === null
       ? { ...state, phase: "ready", busy: false, error: describeError("malformed_response", "client") }
-      : { phase: "ready", agentId, pending: answer.pending, blocked: answer.blocked, run: answer.run, waitingMs: answer.waitingMs, pauseReason: answer.pauseReason, stallCount: answer.stallCount, busy: false, notice: answer.blocked === null ? notice : null, error: null };
+      : { phase: "ready", agentId, pending: answer.pending, blocked: answer.blocked, run: answer.run, waitingMs: answer.waitingMs, syncing: answer.syncing, pauseReason: answer.pauseReason, stallCount: answer.stallCount, busy: false, notice: answer.blocked === null ? notice : null, error: null };
     render();
     schedule();
   }

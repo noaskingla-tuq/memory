@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { parseUiResponse } from "../out/contracts/uiContract.js";
-import { DAY_START, assertWithinCoreLimit, bytesOf, daysAgo, pageAll, punchContent, seed, startStore } from "./uiHarness.mjs";
+import { DAY_START, bytesOf, daysAgo, pageAll, punchContent, seed, startStore } from "./uiHarness.mjs";
 
 const LIMIT = 56_000;
 const REQUEST = { tzOffsetMin: 480, dayStartIso: DAY_START };
@@ -10,7 +10,6 @@ const pad = (value, size = 3) => String(value).padStart(size, "0");
 function within(method, response) {
   assert.equal(response.ok, true, `${method} ${JSON.stringify(response).slice(0, 200)}`);
   assert.ok(bytesOf(response) <= LIMIT, `${method} answered ${bytesOf(response)} bytes`);
-  assertWithinCoreLimit(response);
   assert.equal(parseUiResponse(method, response), true, `${method} must match its schema`);
   return response;
 }

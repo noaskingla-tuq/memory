@@ -1,4 +1,4 @@
-export type Route = { readonly name: "home" } | { readonly name: "settings" } | { readonly name: "linked" } | { readonly name: "agent"; readonly agentId: string };
+export type Route = { readonly name: "home" } | { readonly name: "settings" } | { readonly name: "agent"; readonly agentId: string };
 
 const AGENT_PREFIX = "#/agent/";
 
@@ -11,7 +11,6 @@ export function agentHref(agentId: string): string {
 
 export function parseRoute(hash: string): Route {
   if (hash === "#/settings") return { name: "settings" };
-  if (hash === "#/linked") return { name: "linked" };
   if (!hash.startsWith(AGENT_PREFIX)) return { name: "home" };
   try {
     const agentId = decodeURIComponent(hash.slice(AGENT_PREFIX.length));

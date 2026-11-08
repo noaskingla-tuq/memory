@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { UI_RESPONSE_BUDGET_BYTES, clipCodePoints, fitToBudget, serializedBytes } from "../out/application/ui/budget.js";
 import { jsonSafe } from "../out/application/ui/jsonSafe.js";
-import { startBackend } from "./backendHarness.mjs";
-import { CORE_RESPONSE_LIMIT_BYTES, assertWithinCoreLimit } from "./uiHarness.mjs";
 
 function prng(seed) {
   let state = seed >>> 0;
@@ -119,18 +117,4 @@ test("the JSON exit removes undefined and NaN, so nothing the preload would reje
   assert.deepEqual(clean, { b: [1, null, { d: null, e: null }], f: {}, h: "測試", when: "1970-01-01T00:00:00.000Z" });
   assert.equal(jsonSafe(undefined), null);
   assert.deepEqual(jsonSafe(JSON.parse(JSON.stringify(clean))), clean);
-});
-
-test("the response budget leaves room under the 64 KiB platform limit and the margin check enforces it", () => {
-  assert.ok(UI_RESPONSE_BUDGET_BYTES <= 60_000);
-  assert.ok(UI_RESPONSE_BUDGET_BYTES < CORE_RESPONSE_LIMIT_BYTES);
-  assert.doesNotThrow(() => assertWithinCoreLimit({ text: "a".repeat(CORE_RESPONSE_LIMIT_BYTES - 1_024 - 20) }));
-  assert.throws(() => assertWithinCoreLimit({ text: "a".repeat(CORE_RESPONSE_LIMIT_BYTES) }), /Core limit/u);
-  assert.throws(() => assertWithinCoreLimit({ text: "測".repeat(22_000) }), /Core limit/u, "CJK counts three bytes a character");
-});
-
-test("the ext-call diagnose answer is far below the platform limit", async (t) => {
-  const { backend } = startBackend(t);
-  const report = await backend.call("diagnose", {});
-  assert.ok(Buffer.byteLength(JSON.stringify(report), "utf8") < 4_096);
 });

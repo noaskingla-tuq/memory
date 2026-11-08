@@ -1,5 +1,4 @@
 import { DETAIL_STRINGS } from "./detailStrings.js";
-import { LINKED_STRINGS } from "./linkedStrings.js";
 import { SETTINGS_STRINGS } from "./settingsStrings.js";
 import { SPACE_STRINGS } from "./zhTWSpace.js";
 import { TIMELINE_STRINGS } from "./timelineStrings.js";
@@ -160,7 +159,6 @@ export const STRINGS = {
   ...TIMELINE_STRINGS,
   ...DETAIL_STRINGS,
   ...SETTINGS_STRINGS,
-  ...LINKED_STRINGS,
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

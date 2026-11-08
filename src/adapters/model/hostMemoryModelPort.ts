@@ -502,7 +502,7 @@ export function createHostMemoryModelPort(
       let timer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([Promise.all([...tails]), new Promise<void>((resolve) => { timer = setTimeout(resolve, closeTimeoutMs); })]);
       clearTimeout(timer);
-      await Promise.all([...live].map(closeQuietly).concat(acquireSession.idle()));
+      await Promise.all([...live].map(closeQuietly).concat(acquireSession.idle(closeTimeoutMs)));
       live.clear();
     },
   };

@@ -45,12 +45,12 @@ export interface TurnSessionRequest {
 
 const cancelledError = (): MemoryServiceError => new MemoryServiceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled");
 
-export type TurnSessionAcquire = ((request: TurnSessionRequest) => Promise<PairSession>) & { idle(): Promise<void> };
+export type TurnSessionAcquire = ((request: TurnSessionRequest) => Promise<PairSession>) & { idle(limitMs: number): Promise<void> };
 
 export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
   const { ai, task, resumeStore } = deps;
 
-  const acquireOne = async (request: TurnSessionRequest): Promise<PairSession> => {
+  const acquireOne = async (request: TurnSessionRequest, hold: () => void): Promise<PairSession> => {
     const { invocation, pair, providerId, modelId, signal } = request;
     let taskId = task === undefined ? null : await task.resolve(invocation.canonicalAgentId);
     const openFresh = async (): Promise<PluginBackendAiSessionV1> => {
@@ -97,6 +97,7 @@ export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
         await deps.persistSession({ ...saved, state: (error as { code?: string } | null)?.code === "session_not_found" ? "expired" : "invalidated" });
         throw deps.publicError(error, "session_resume");
       }
+      hold();
       if (gone()) { await deps.closeQuietly(resumed); throw cancelledError(); }
       if (resumed.sessionId !== saved.hostSessionId || resumed.effective.providerId !== saved.providerId || resumed.effective.modelId !== saved.modelId) {
         await deps.closeQuietly(resumed);
@@ -112,6 +113,7 @@ export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
     }
 
     const created = await openFresh();
+    hold();
     if (gone()) { await deps.closeQuietly(created); throw cancelledError(); }
     if (created.effective.providerId !== providerId || created.effective.modelId !== modelId || deps.deniedModel(created.effective.providerId) || deps.deniedModel(created.effective.modelId)) {
       await deps.closeQuietly(created);
@@ -131,17 +133,28 @@ export function createTurnSessions(deps: TurnSessionDeps): TurnSessionAcquire {
 
   // why: the host allows one session per plugin, so a later open waits for an earlier one that the caller already walked away from
   const inflight = new Set<Promise<unknown>>();
+  const held = new Set<Promise<void>>();
   const acquire = async (request: TurnSessionRequest): Promise<PairSession> => {
     while (inflight.size > 0) {
       const aborted = new Promise<void>((resolve) => { request.signal.addEventListener("abort", () => resolve(), { once: true }); });
       if (!request.signal.aborted) await Promise.race([Promise.allSettled([...inflight]), aborted]);
       if (request.signal.aborted || deps.isDisposed()) throw cancelledError();
     }
-    const run = acquireOne(request);
-    const forget = (): void => { inflight.delete(run); };
+    let release = (): void => {};
+    const run = acquireOne(request, () => {
+      const pending = new Promise<void>((resolve) => { release = resolve; });
+      held.add(pending);
+      void pending.then(() => held.delete(pending));
+    });
+    const forget = (): void => { inflight.delete(run); release(); };
     inflight.add(run);
     run.then(forget, forget);
     return run;
   };
-  return Object.assign(acquire, { idle: async (): Promise<void> => { await Promise.allSettled([...inflight]); } });
+  return Object.assign(acquire, { idle: async (limitMs: number): Promise<void> => {
+    // why: shutdown waits only for opens that already hold a session; one the host never answers is closed when it finally arrives
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([Promise.allSettled([...held]), new Promise<void>((resolve) => { timer = setTimeout(resolve, limitMs); })]);
+    clearTimeout(timer);
+  } });
 }

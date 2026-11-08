@@ -15,8 +15,8 @@ const URL_ASSET = /new URL\(\s*(['"])([^'"]+)\1\s*,\s*import\.meta\.url/gu
 // why: Cairn builds a worker path as new URL('.', import.meta.url).href + '<file>.mjs'; the directory form alone names no file, so the checked target is the joined file name
 const DIRECTORY_ASSET = /new URL\(\s*(['"])\.\1\s*,\s*import\.meta\.url\s*\)\.href\s*\+\s*(['"])([^'"]+)\2/gu
 const PRIVATE_KEY_BLOCK = new RegExp(`-----BEGIN ${'(?:[A-Z0-9]+ )*'}PRIVATE KEY-----`, 'u')
-// why: this plugin only needs host APIs available since Core 1.7.12; its SDK and CLI are synced to the public 1.7.15 devkit
-const MIN_CORE_VERSION = '>=1.7.12'
+// why: the SDK and CLI are synced to the public 1.8.2 kit, and this manifest is only validated from that Core version
+const MIN_CORE_VERSION = '>=1.8.2'
 const RESOURCE_RANGES = { memoryMB: [256, 512], bootTimeoutSec: [10, 30] }
 const PLUGIN_ID = 'teamuq.memory'
 const RELEASE_METADATA = JSON.parse(readFileSync(join(REPO_ROOT, 'release-metadata.json'), 'utf8'))
@@ -145,6 +145,7 @@ export function verifyArtifact(file, { anchors = 'self', pubFile, dev = false } 
   check('manifest backendMethods do not list memory.profile.sync@1: Core pushes the name table through its own gate and the view never calls it', !methods.some((method) => String(method).includes('profile.sync')), methods.join(', '))
   const resources = manifest.resources ?? {}
   check('manifest resources follow the S0 recommendation', resources.cpuThreads === 1 && resources.maxSessions === EXPECTED_MAX_SESSIONS && resources.idleUnloadSec === 180 && Object.entries(RESOURCE_RANGES).every(([field, [low, high]]) => resources[field] >= low && resources[field] <= high), JSON.stringify(resources))
+  check('manifest description says the memories are local, that AI organization hands work records to the chosen AI provider, and no longer claims all data stays local', typeof manifest.description === 'string' && !manifest.description.includes('資料留在本機') && manifest.description.includes('AI 提供者') && manifest.description.includes('記憶存在本機'), String(manifest.description))
   check(dev ? `manifest version is a 1.0.x patch above package.json version ${packageJson.version} (dev-pack --bump-patch)` : `manifest version equals package.json version ${packageJson.version}`, dev ? isPatchAbove(manifest.version, packageJson.version) : manifest.version === packageJson.version, String(manifest.version))
   check(`manifest pluginApi is set and minCoreVersion is ${MIN_CORE_VERSION}`, typeof manifest.pluginApi === 'string' && manifest.minCoreVersion === MIN_CORE_VERSION, `${manifest.pluginApi} ${manifest.minCoreVersion}`)
 

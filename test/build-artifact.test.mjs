@@ -101,7 +101,11 @@ test("the stage holds a self-contained backend.mjs and a manifest built from the
   const manifest = JSON.parse(readFileSync(join(dist, "stage", "manifest.json"), "utf8"));
   assert.equal(manifest.version, packageJson.version);
   assert.equal(manifest.name, "Cairn記憶管理");
-  assert.equal(manifest.minCoreVersion, ">=1.7.12");
+  assert.equal(manifest.minCoreVersion, ">=1.8.2");
+  assert.equal(manifest.description.includes("資料留在本機"), false);
+  assert.ok(manifest.description.includes("AI 提供者") && manifest.description.includes("記憶存在本機"));
+  assert.equal("provides" in manifest, false);
+  assert.equal("residency" in manifest, false);
   assert.deepEqual(
     { id: manifest.id, publisher: manifest.publisher, trustTier: manifest.trustTier, entry: manifest.entry, permissions: manifest.permissions, data: manifest.data },
     { id: "teamuq.memory", publisher: "teamuq", trustTier: "full-trust", entry: { ui: "ui/index.html", backend: "backend.mjs" }, permissions: ["ui:view", "backend:invoke", "agent:avatar-read", "work-records:read", "agent-directory:read", "project-directory:read", "plugin-state:read", "data:legacy-migrate", "settings:plugin", "ai:chat", "program:data:projects:write", "program:data:tasks:write"], data: { uninstall: "keep", legacyMigrations: [{ id: "cairn-v1", source: "memory-cairn-v1", target: "memory-cairn-v1" }] } },
@@ -188,10 +192,10 @@ test("verify-artifact resolves a directory URL joined with a file name and rejec
 test("verify-artifact rejects a manifest that permits a Core older than the pinned public API", async (t) => {
   const report = await tamperedArtifact(t, (stageDir) => {
     const file = join(stageDir, "manifest.json");
-    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.7.12", ">=1.7.0"));
+    writeFileSync(file, readFileSync(file, "utf8").replace(">=1.8.2", ">=1.7.0"));
   });
   assert.equal(report.ok, false);
-  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.7.12"));
+  assert.ok(failedChecks(report).includes("manifest pluginApi is set and minCoreVersion is >=1.8.2"));
 });
 
 test("verify-artifact rejects a backend that imports Cairn or a package by a bare name", async (t) => {

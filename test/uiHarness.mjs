@@ -104,3 +104,11 @@ export async function pageAll(call, first, { max = 500 } = {}) {
 export const DAY_START = "2026-09-29T16:00:00.000Z";
 export const DAY_MS = 86_400_000;
 export const daysAgo = (days, hour = 3) => new Date(Date.parse(DAY_START) + hour * 3_600_000 - days * DAY_MS).toISOString();
+
+export const CORE_RESPONSE_LIMIT_BYTES = 65_536;
+
+export function assertWithinCoreLimit(result) {
+  const bytes = Buffer.byteLength(JSON.stringify(result), "utf8");
+  if (bytes > CORE_RESPONSE_LIMIT_BYTES - 1_024) throw new Error(`a ui answer is ${bytes} bytes, above the Core limit minus its 1 KiB margin`);
+  return bytes;
+}

@@ -9,10 +9,6 @@ export const UI_METHOD_NAMES = [
   "ui.forget",
   "ui.status",
   "ui.legacyTrial",
-  "ui.linkSources",
-  "ui.linkList",
-  "ui.linkGet",
-  "ui.linkForget",
 ] as const;
 
 export type UiMethodName = (typeof UI_METHOD_NAMES)[number];
@@ -399,57 +395,6 @@ export const uiStatusSuccess = z
   })
   .strict();
 
-const linkSource = z.string().min(1).max(200).regex(/^(?:core|plugin:[^\u0000-\u001f\u007f]{1,190})$/u);
-const linkFileId = z.string().regex(/^[0-9a-f]{64}$/u);
-const linkItemId = z.string().min(1).max(128);
-const linkTags = z.array(z.string().min(1).max(32)).max(8);
-const epochMs = z.number().int().min(0);
-
-export const uiLinkSourcesRequest = z.object({}).strict();
-export const uiLinkListRequest = z
-  .object({ source: linkSource, limit: z.number().int().min(1).max(UI_LIMITS.listMaxLimit).default(UI_LIMITS.listDefaultLimit), cursor: cursor.optional() })
-  .strict();
-export const uiLinkGetRequest = z.object({ source: linkSource, id: linkItemId }).strict();
-export const uiLinkForgetRequest = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("item"), source: linkSource, id: linkItemId, expectedItemRev: z.number().int().min(1) }).strict(),
-  z.object({ action: z.literal("source"), source: linkSource, expectedRevision: z.number().int().min(1) }).strict(),
-  z.object({ action: z.literal("damaged"), fileId: linkFileId }).strict(),
-]);
-
-export const uiLinkSourcesSuccess = z
-  .object({
-    ok: z.literal(true),
-    sources: z
-      .array(
-        z.object({ source: linkSource.nullable(), fileId: linkFileId, state: z.enum(["ok", "corrupt"]), count, sizeBytes: count, revision: count, updatedAtMs: epochMs.nullable() }).strict(),
-      )
-      .max(32),
-    totals: z.object({ sources: count, count, sizeBytes: count, corrupt: count }).strict(),
-    limits: z.object({ items: count, bytes: count, sources: count }).strict(),
-  })
-  .strict();
-
-const linkListItem = z
-  .object({ id: linkItemId, snippet: codePointsAtMost(UI_LIMITS.listSnippetChars), tags: linkTags, sizeBytes: count, rev: z.number().int().min(1), updatedAtMs: epochMs, expiresAtMs: epochMs.nullable() })
-  .strict();
-
-export const uiLinkListSuccess = z
-  .object({ ok: z.literal(true), source: linkSource, revision: count, total: count, items: z.array(linkListItem).max(UI_LIMITS.listMaxLimit), nextCursor: cursorOrNull })
-  .strict();
-
-export const uiLinkGetSuccess = z
-  .object({
-    ok: z.literal(true),
-    source: linkSource,
-    revision: count,
-    item: z
-      .object({ id: linkItemId, text: z.string().max(16_000), tags: linkTags, sizeBytes: count, rev: z.number().int().min(1), updatedAtMs: epochMs, expiresAtMs: epochMs.nullable() })
-      .strict(),
-  })
-  .strict();
-
-export const uiLinkForgetSuccess = z.object({ ok: z.literal(true), forgotten: count, revision: count.nullable() }).strict();
-
 export const uiFailureSchema = z
   .object({
     ok: z.literal(false),
@@ -468,10 +413,6 @@ export const UI_METHOD_SCHEMAS = {
   "ui.forget": { request: uiForgetRequest, success: uiForgetSuccess },
   "ui.status": { request: uiStatusRequest, success: uiStatusSuccess },
   "ui.legacyTrial": { request: uiLegacyTrialRequest, success: uiLegacyTrialSuccess },
-  "ui.linkSources": { request: uiLinkSourcesRequest, success: uiLinkSourcesSuccess },
-  "ui.linkList": { request: uiLinkListRequest, success: uiLinkListSuccess },
-  "ui.linkGet": { request: uiLinkGetRequest, success: uiLinkGetSuccess },
-  "ui.linkForget": { request: uiLinkForgetRequest, success: uiLinkForgetSuccess },
 } as const satisfies Record<UiMethodName, { request: z.ZodTypeAny; success: z.ZodTypeAny }>;
 
 export type UiFailure = z.infer<typeof uiFailureSchema>;
@@ -489,12 +430,6 @@ export type UiForgetRequest = z.infer<typeof uiForgetRequest>;
 export type UiListRequest = z.infer<typeof uiListRequest>;
 export type UiSearchRequest = z.infer<typeof uiSearchRequest>;
 export type UiLegacyTrialRequest = z.infer<typeof uiLegacyTrialRequest>;
-export type UiLinkListRequest = z.infer<typeof uiLinkListRequest>;
-export type UiLinkGetRequest = z.infer<typeof uiLinkGetRequest>;
-export type UiLinkForgetRequest = z.infer<typeof uiLinkForgetRequest>;
-export type UiLinkSources = z.infer<typeof uiLinkSourcesSuccess>;
-export type UiLinkList = z.infer<typeof uiLinkListSuccess>;
-export type UiLinkGet = z.infer<typeof uiLinkGetSuccess>;
 export type UiTrial = z.infer<typeof uiTrialSchema>;
 
 export type UiParamsResult = { readonly ok: true; readonly value: unknown } | { readonly ok: false };

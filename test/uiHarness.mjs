@@ -3,13 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { NO_PROFILE } from "../out/application/ui/profilePort.js";
 import { createBackend } from "../out/backend/service.js";
-import { dispatchUi } from "../out/backend/uiDispatch.js";
-import { createLinkAdmin } from "../out/link/linkAdmin.js";
-import { createLinkStore } from "../out/link/linkStore.js";
-import { createMemoryStoreGroup } from "../out/link/memoryStoreGroup.js";
-import { createProvider } from "../out/link/provider.js";
 import { PIN_PATH } from "./backendHarness.mjs";
 
 export const agentHashOf = (agentId) => createHash("sha256").update(agentId).digest("hex");
@@ -110,47 +104,3 @@ export async function pageAll(call, first, { max = 500 } = {}) {
 export const DAY_START = "2026-09-29T16:00:00.000Z";
 export const DAY_MS = 86_400_000;
 export const daysAgo = (days, hour = 3) => new Date(Date.parse(DAY_START) + hour * 3_600_000 - days * DAY_MS).toISOString();
-
-export const CORE_RESPONSE_LIMIT_BYTES = 65_536;
-
-export function assertWithinCoreLimit(result) {
-  const bytes = Buffer.byteLength(JSON.stringify(result), "utf8");
-  if (bytes > CORE_RESPONSE_LIMIT_BYTES - 1_024) throw new Error(`a ui answer is ${bytes} bytes, above the Core limit minus its 1 KiB margin`);
-  return bytes;
-}
-
-const linkChannel = { closed: false, emit: async () => undefined };
-let linkSequence = 0;
-
-export function startLink(t, options = {}) {
-  const base = options.base ?? mkdtempSync(join(tmpdir(), "teamuq-link-admin-"));
-  const clock = { now: options.start ?? 1_000_000 };
-  const now = () => clock.now;
-  const store = createLinkStore({ dataDir: base, now, ...(options.io === undefined ? {} : { io: options.io }), ...(options.limits === undefined ? {} : { limits: options.limits }) });
-  const admin = createLinkAdmin(store);
-  const group = createMemoryStoreGroup({ store });
-  const provider = createProvider({ category: "teamuq.memory@1", dataClass: "local", maxSessions: 64, modules: [group], now, callRatePerSecond: 100_000, callBurst: 100_000 });
-  let closed = false;
-  const close = async () => {
-    if (closed) return;
-    closed = true;
-    provider.dispose();
-    await store.dispose();
-  };
-  t.after(async () => {
-    await close();
-    if (options.base === undefined) rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
-  });
-  async function connect(pluginId) {
-    linkSequence += 1;
-    const linkId = `ulink-${linkSequence}`;
-    const who = { source: pluginId === undefined ? { kind: "core" } : { kind: "plugin", pluginId }, category: "teamuq.memory@1" };
-    await provider.open({ linkId, who, group: { id: "memory-store" }, mode: "call", channel: linkChannel });
-    let sequence = 0;
-    const call = (method, ...args) => provider.call({ id: `u${linkSequence}-${(sequence += 1)}`, method, args, who, group: { id: "memory-store" }, linkId });
-    call.withId = (id, method, ...args) => provider.call({ id, method, args, who, group: { id: "memory-store" }, linkId });
-    return call;
-  }
-  const ui = (method, params, extra = {}) => dispatchUi(method, params, { storageStatus: () => "ready", services: () => undefined, profile: NO_PROFILE, link: admin, ...extra });
-  return { base, clock, store, admin, provider, connect, ui, close };
-}

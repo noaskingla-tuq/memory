@@ -106,12 +106,7 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
     while (cache.size > CONTENT_CACHE_SIZE) cache.delete(cache.keys().next().value as string);
   };
 
-  const open = (): void => {
-    if (disposed) throw new StoreError("disposed");
-  };
-
   async function load(source: string): Promise<PartitionState> {
-    open();
     const fileId = fileIdOf(source);
     const cached = cache.get(fileId);
     if (cached !== undefined) {
@@ -203,7 +198,6 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
     },
 
     async health(source) {
-      open();
       const fileId = fileIdOf(source);
       let state: PartitionState;
       try {
@@ -220,12 +214,10 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
     },
 
     async listFiles() {
-      open();
       return io.list();
     },
 
     async describeFile(fileId) {
-      open();
       const stat = await io.stat(fileId);
       if (stat === undefined) throw new StoreError("not_found");
       const known = summaries.get(fileId);

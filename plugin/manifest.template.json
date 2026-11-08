@@ -31,6 +31,6 @@
       { "key": "organizationDailyTime", "type": "text", "label": "每日開始時間（本機時區）", "default": "02:00", "maxLength": 5, "help": "24 小時制 HH:mm；只在每天一輪時使用。" }
     ]
   },
-  "backendMethods": ["ui.overview", "ui.agentStats", "ui.list", "ui.search", "ui.get", "ui.forget", "ui.status", "ui.legacyTrial", "ui.linkSources", "ui.linkList", "ui.linkGet", "ui.linkForget"],
+  "backendMethods": ["ui.overview", "ui.agentStats", "ui.list", "ui.search", "ui.get", "ui.forget", "ui.status", "ui.legacyTrial"],
   "data": { "uninstall": "keep", "legacyMigrations": [{ "id": "cairn-v1", "source": "memory-cairn-v1", "target": "memory-cairn-v1" }] }
 }

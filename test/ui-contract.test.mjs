@@ -54,10 +54,6 @@ const SUCCESS = {
     sameSession: [ITEM],
   },
   "ui.forget": { ok: true, forgotten: true },
-  "ui.linkSources": { ok: true, sources: [{ source: "plugin:x.y", fileId: "a".repeat(64), state: "ok", count: 2, sizeBytes: 40, revision: 3, updatedAtMs: 1000 }], totals: { sources: 1, count: 2, sizeBytes: 40, corrupt: 0 }, limits: { items: 2000, bytes: 2097152, sources: 32 } },
-  "ui.linkList": { ok: true, source: "plugin:x.y", revision: 3, total: 1, items: [{ id: "k", snippet: "內容", tags: ["t"], sizeBytes: 9, rev: 1, updatedAtMs: 1000, expiresAtMs: null }], nextCursor: null },
-  "ui.linkGet": { ok: true, source: "plugin:x.y", revision: 3, item: { id: "k", text: "{}", tags: [], sizeBytes: 2, rev: 1, updatedAtMs: 1000, expiresAtMs: 2000 } },
-  "ui.linkForget": { ok: true, forgotten: 1, revision: null },
   "ui.legacyTrial": { ok: true, action: "start", requested: 5, adopted: 5, candidates: 90, skippedAmbiguous: 0, blocked: null, trial: null },
   "ui.status": {
     ok: true,
@@ -72,9 +68,9 @@ const SUCCESS = {
 
 const accepts = (method, params) => parseUiParams(method, params).ok;
 
-test("every one of the twelve ui.* methods has a request schema and a success schema", () => {
+test("every one of the eight ui.* methods has a request schema and a success schema", () => {
   assert.deepEqual(Object.keys(UI_METHOD_SCHEMAS).sort(), [...UI_METHOD_NAMES].sort());
-  assert.equal(UI_METHOD_NAMES.length, 12);
+  assert.equal(UI_METHOD_NAMES.length, 8);
   for (const method of UI_METHOD_NAMES) {
     assert.equal(typeof UI_METHOD_SCHEMAS[method].request.safeParse, "function", method);
     assert.equal(typeof UI_METHOD_SCHEMAS[method].success.safeParse, "function", method);

@@ -38,7 +38,7 @@ import { unstickLocalDeadline } from "../application/organizationUnstick.js";
 import { backupStateOnce } from "../adapters/storage/stateBackup.js";
 import { createOrganizationTrace } from "../adapters/storage/organizationTrace.js";
 import type { StartupEvent } from "../application/organizationStartup.js";
-import { catchupEntry, startupEntry } from "./traceWiring.js";
+import { createCatchupTrace, startupEntry } from "./traceWiring.js";
 
 export interface BackendOptions {
   readonly dataRoot: string;
@@ -153,6 +153,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     if (schedulingChanged) organization?.settingsChanged();
   }); } catch { settingValues = {}; }
 
+  const traceCatchup = createCatchupTrace(trace);
   const punchWorker = options.host === undefined ? undefined : createPunchCatchupWorker({
     feed: createPunchFeed(options.host),
     receipts: createMigratingPunchReceiptStore(options.host, createLocalPunchReceiptStore(dirname(options.dataRoot))),
@@ -160,8 +161,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
     onAdmitted: (punch, memoryId) => organization!.enqueue(punch, memoryId),
     // why: a round that ended without a stop code is enough to let the organization start, even if the catch-up has more pages to go
     onProgress: (event) => {
-      const entry = catchupEntry(event);
-      if (entry !== null) trace?.write(entry);
+      traceCatchup(event);
       if (event.event === "punch_catchup" && event.stoppedCode === null) organization?.resumeStartup(event.complete === true ? "catchup_complete" : "round_ended");
     },
     writer: {

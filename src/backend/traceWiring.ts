@@ -1,4 +1,4 @@
-import type { TraceEntry } from "../adapters/storage/organizationTrace.js";
+import type { TraceEntry, TraceSink } from "../adapters/storage/organizationTrace.js";
 import type { StartupEvent } from "../application/organizationStartup.js";
 
 const number = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -16,4 +16,21 @@ export function catchupEntry(event: Readonly<Record<string, unknown>>): TraceEnt
 
 export function startupEntry(event: StartupEvent): TraceEntry {
   return event.state === "waiting" ? { kind: "startup", state: "waiting" } : { kind: "startup", state: "ready", reason: event.reason, waitedMs: event.waitedMs };
+}
+
+// why: an idle round (nothing examined, nothing written, no stop) would push the turn lines out of the size-capped file, so its start is held back and dropped with its end
+export function createCatchupTrace(sink: TraceSink | undefined): (event: Readonly<Record<string, unknown>>) => void {
+  let held: TraceEntry | null = null;
+  return (event) => {
+    if (sink === undefined) return;
+    const entry = catchupEntry(event);
+    if (entry === null) return;
+    if (entry.phase === "start") { held = entry; return; }
+    const idle = entry.phase === "end" && entry.examined === 0 && entry.written === 0 && entry.stoppedCode === null;
+    const start = held;
+    held = null;
+    if (idle) return;
+    if (start !== null) sink.write(start);
+    sink.write(entry);
+  };
 }

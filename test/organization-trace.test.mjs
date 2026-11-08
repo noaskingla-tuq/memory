@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createHostMemoryModelPort } from "../out/adapters/model/hostMemoryModelPort.js";
 import { TRACE_FILE, TRACE_MAX_BYTES, createOrganizationTrace, sanitizeTraceEntry } from "../out/adapters/storage/organizationTrace.js";
 import { createBackend } from "../out/backend/service.js";
-import { catchupEntry, startupEntry } from "../out/backend/traceWiring.js";
+import { catchupEntry, createCatchupTrace, startupEntry } from "../out/backend/traceWiring.js";
 import { REPLY, actorOf, callRecord, invokeScoped, recoverAi, seed, sessionRecord, settings, tempStore } from "./recoverHarness.mjs";
 
 const PIN_PATH = resolve(fileURLToPath(new URL("../cairn-pin.json", import.meta.url)));
@@ -182,7 +182,7 @@ test("catch-up and start-up entries copy counts and codes only", () => {
   assert.deepEqual(startupEntry({ state: "ready", reason: "cap", waitedMs: 5 }), { kind: "startup", state: "ready", reason: "cap", waitedMs: 5 });
 });
 
-test("through the backend: the start-up and the first catch-up round are traced in order, and nothing but metadata is in the file", async (t) => {
+test("through the backend: an idle first catch-up round leaves no catch-up lines, the start-up gate is traced, and nothing but metadata is in the file", async (t) => {
   const base = mkdtempSync(join(tmpdir(), "memory-trace-backend-"));
   t.after(() => rmSync(base, { recursive: true, force: true }));
   const snapshot = { snapshotId: "s", generation: "g", highWatermark: "p" };
@@ -199,11 +199,26 @@ test("through the backend: the start-up and the first catch-up round are traced 
   await backend.idleWorkers();
   const rows = linesOf(base);
   const shape = rows.map((row) => row.kind + ":" + (row.phase ?? row.state) + (row.reason === undefined ? "" : ":" + row.reason));
-  assert.deepEqual(shape.slice(0, 2), ["startup:waiting", "catchup:start"], shape.join(" "));
-  assert.ok(shape.includes("catchup:end"));
+  assert.equal(shape[0], "startup:waiting", shape.join(" "));
   assert.ok(shape.some((entry) => entry.startsWith("startup:ready")), "the gate change is traced: " + shape.join(" "));
-  assert.ok(shape.indexOf("catchup:end") < shape.findIndex((entry) => entry.startsWith("startup:ready")));
-  const end = rows.find((row) => row.phase === "end");
-  assert.equal(end.complete, true);
-  assert.equal(end.stoppedCode, null);
+  assert.deepEqual(rows.filter((row) => row.kind === "catchup"), [], "an idle round writes neither its start nor its end: " + shape.join(" "));
+});
+
+test("an idle catch-up round (nothing examined, nothing written, no stop) writes neither start nor end; any other round writes both", () => {
+  const rounds = (events) => {
+    const written = [];
+    const trace = createCatchupTrace({ write: (entry) => written.push(entry) });
+    for (const event of events) trace(event);
+    return written.map((entry) => entry.phase);
+  };
+  const start = { event: "punch_catchup_start" };
+  const end = (fields) => ({ event: "punch_catchup", complete: true, stoppedCode: null, examined: 0, written: 0, pending: 0, ...fields });
+  assert.deepEqual(rounds([start, end({})]), []);
+  assert.deepEqual(rounds([start, end({}), start, end({})]), []);
+  assert.deepEqual(rounds([start, end({ examined: 4 })]), ["start", "end"]);
+  assert.deepEqual(rounds([start, end({ written: 1 })]), ["start", "end"]);
+  assert.deepEqual(rounds([start, end({ stoppedCode: "writer_unavailable" })]), ["start", "end"]);
+  assert.deepEqual(rounds([start, { event: "punch_catchup_failed", code: "Error" }]), ["start", "failed"]);
+  assert.deepEqual(rounds([start, end({}), start, end({ examined: 2 })]), ["start", "end"]);
+  assert.doesNotThrow(() => createCatchupTrace(undefined)(start));
 });

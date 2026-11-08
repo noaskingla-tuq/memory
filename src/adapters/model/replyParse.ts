@@ -14,8 +14,8 @@ export function parseCached(call: OrganizationCallRecord): unknown {
 }
 
 export function parseReply(text: string): unknown {
-  const fence = String.fromCharCode(96).repeat(3);
-  const json = text.trim().replace(new RegExp("^" + fence + "(?:json)?\s*\n([\s\S]*?)\n" + fence + "$", "u"), "$1");
+  // why: a regex literal keeps its backslashes as written, which a quoted pattern string loses when the file passes through a shell
+  const json = text.trim().replace(/^```(?:json)?\s*\n([\s\S]*?)\n```$/u, "$1");
   try { return JSON.parse(json); }
   catch { throw new MemoryServiceError("MODEL_OUTPUT_INVALID", "Memory model returned invalid JSON", false, "reply_contract"); }
 }

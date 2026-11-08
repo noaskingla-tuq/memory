@@ -1,4 +1,4 @@
-import type { AgentDirectoryPort } from "../ports.js";
+import type { AgentDirectoryPort, LegacyUpgradePort } from "../ports.js";
 import type { MemoryApplication } from "../memoryApplication.js";
 import { AgentIndex } from "./agentIndex.js";
 import { createCursorCodec, type CursorCodec } from "./cursor.js";
@@ -15,6 +15,7 @@ export interface StatsCacheEntry {
 
 export interface UiServices {
   readonly index: AgentIndex;
+  readonly legacy?: LegacyUpgradePort;
   readonly application: Pick<MemoryApplication, "execute">;
   readonly cursors: CursorCodec;
   readonly profile: ProfilePort;
@@ -27,6 +28,7 @@ export interface UiServices {
 
 export interface UiServicesInput {
   readonly layout: AgentDirectoryPort;
+  readonly legacy?: LegacyUpgradePort;
   readonly application: Pick<MemoryApplication, "execute">;
   readonly profile?: ProfilePort;
   readonly newClock?: () => Clock;
@@ -38,6 +40,7 @@ export interface UiServicesInput {
 export function createUiServices(input: UiServicesInput): UiServices {
   return {
     index: new AgentIndex(input.layout),
+    ...(input.legacy === undefined ? {} : { legacy: input.legacy }),
     application: input.application,
     cursors: createCursorCodec(),
     profile: input.profile ?? NO_PROFILE,

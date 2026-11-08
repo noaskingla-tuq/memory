@@ -55,6 +55,7 @@ const SUCCESS = {
   },
   "ui.forget": { ok: true, forgotten: true },
   "ui.legacyTrial": { ok: true, action: "start", requested: 5, adopted: 5, candidates: 90, skippedAmbiguous: 0, blocked: null, trial: null },
+  "ui.upgradeLegacy": { ok: true, upgraded: 1, failed: 1, results: [{ agentHash: "a".repeat(64), ok: true }, { agentHash: "b".repeat(64), ok: false, code: "STORAGE_BUSY" }], remaining: 0 },
   "ui.status": {
     ok: true,
     version: "1.0.0",
@@ -68,9 +69,9 @@ const SUCCESS = {
 
 const accepts = (method, params) => parseUiParams(method, params).ok;
 
-test("every one of the eight ui.* methods has a request schema and a success schema", () => {
+test("every one of the nine ui.* methods has a request schema and a success schema", () => {
   assert.deepEqual(Object.keys(UI_METHOD_SCHEMAS).sort(), [...UI_METHOD_NAMES].sort());
-  assert.equal(UI_METHOD_NAMES.length, 8);
+  assert.equal(UI_METHOD_NAMES.length, 9);
   for (const method of UI_METHOD_NAMES) {
     assert.equal(typeof UI_METHOD_SCHEMAS[method].request.safeParse, "function", method);
     assert.equal(typeof UI_METHOD_SCHEMAS[method].success.safeParse, "function", method);

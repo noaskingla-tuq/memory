@@ -77,6 +77,11 @@ export interface AgentDirectoryPort {
   agentsFingerprint(): string;
 }
 
+export interface LegacyUpgradePort {
+  legacyCandidate(agentHash: string): boolean;
+  upgradeLegacy(agentHash: string): void;
+}
+
 export interface ObservabilityPort {
   emit(event: Readonly<Record<string, unknown>>): void;
 }

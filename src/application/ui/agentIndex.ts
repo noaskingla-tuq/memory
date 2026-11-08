@@ -70,7 +70,11 @@ export class AgentIndex {
   ) {}
 
   markDirty(agentId: string): void {
-    const hash = sha256(agentId);
+    this.markDirtyHash(sha256(agentId));
+  }
+
+  // why: a legacy upgrade knows an agent only by its directory name, which is the same sha256
+  markDirtyHash(hash: string): void {
     this.generations.set(hash, (this.generations.get(hash) ?? 0) + 1);
     const known = this.listing?.directories.find((directory) => directory.agentHash === hash);
     if (known === undefined || known.state !== "ready") this.listing = null;

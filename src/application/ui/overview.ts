@@ -4,6 +4,7 @@ import { UI_LIMITS } from "../../contracts/uiContract.js";
 import type { IndexedAgent } from "./agentIndex.js";
 import { binCounts } from "./dayBins.js";
 import { uiFailure, UiResultTooLarge } from "./failures.js";
+import { legacyCandidates } from "./legacyUpgrade.js";
 import { compareText } from "./ordering.js";
 import { fitPage } from "./paging.js";
 import { agentNames, projectNames } from "./names.js";
@@ -102,6 +103,7 @@ export async function runOverview(
     const at = entry.indexed.agent.namespaces.reduce<string | null>((latest, namespace) => (namespace.lastAt !== null && (latest === null || namespace.lastAt > latest) ? namespace.lastAt : latest), null);
     return at !== null && (newest === null || at > newest) ? at : newest;
   }, null);
+  const upgradable = legacyCandidates(services, snapshot.unavailable).length;
   const stamp = services.profile.stamp();
   const health = services.profile.health();
   const wrap = (kept: readonly Card[], nextCursor: string | null): Record<string, unknown> => ({
@@ -111,7 +113,7 @@ export async function runOverview(
     nextCursor,
     complete: snapshot.complete,
     profile: { generation: stamp.generation, receivedAt: stamp.receivedAt, incomplete: health.incomplete, corrupt: health.corrupt, omitted: health.omitted },
-    storage: { status: storageStatus, unavailableAgents: snapshot.unavailable.length },
+    storage: { status: storageStatus, unavailableAgents: snapshot.unavailable.length, ...(upgradable > 0 ? { upgradableAgents: upgradable } : {}) },
   });
   const paged = fitPage({
     items: cards,

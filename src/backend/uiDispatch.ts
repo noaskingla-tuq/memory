@@ -5,6 +5,7 @@ import { runGet } from "../application/ui/detail.js";
 import { UiResultTooLarge, uiFailure } from "../application/ui/failures.js";
 import { runForget } from "../application/ui/forget.js";
 import { jsonSafe } from "../application/ui/jsonSafe.js";
+import { runUpgradeLegacy } from "../application/ui/legacyUpgrade.js";
 import { runListing } from "../application/ui/listing.js";
 import { runOverview } from "../application/ui/overview.js";
 import { runStatus } from "../application/ui/status.js";
@@ -63,6 +64,8 @@ async function run(method: UiMethodName, params: unknown, deps: UiDispatchDeps, 
       return runListing("search", request, services, clock);
     case "ui.get":
       return runGet(request, services, clock);
+    case "ui.upgradeLegacy":
+      return runUpgradeLegacy(request, services, clock);
     case "ui.forget": {
       const result = await runForget(request, services);
       if (result.ok) {

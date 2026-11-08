@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { openCairnCore } from "../adapters/cairn/cairnCoreAdapter.js";
 import { CairnDataLayout } from "../adapters/storage/dataLayout.js";
+import type { BackupHooks } from "../adapters/storage/upgradeBackup.js";
 import { PROFILE_DIRECTORY, PROFILE_FILE, loadProfileFile, type ProfileIo } from "../adapters/ui/profileStore.js";
 import { CoreHandlePool } from "../application/coreHandlePool.js";
 import { MemoryApplication } from "../application/memoryApplication.js";
@@ -44,6 +45,7 @@ export interface BackendOptions {
   readonly uiSampleRows?: number;
   readonly uiNow?: () => number;
   readonly uiReceiptChunk?: number;
+  readonly backupHooks?: Partial<BackupHooks>;
   readonly organizationNow?: () => number;
   readonly hostSessionCloseTimeoutMs?: number;
   readonly profilePath?: string;
@@ -171,7 +173,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
   const ensure = (): Ready => {
     if (ready !== undefined) return ready;
     try {
-      const layout = new CairnDataLayout(options.dataRoot, { pinPath: options.pinPath, trustedBase: dirname(options.dataRoot) });
+      const layout = new CairnDataLayout(options.dataRoot, { pinPath: options.pinPath, trustedBase: dirname(options.dataRoot), ...(options.backupHooks === undefined ? {} : { backupHooks: options.backupHooks }) });
       layout.preflight();
       const openAgentCore = options.openAgentCore ?? (options.openCore === undefined && model !== undefined ? (path: string, agentId: string) => openCairnCore(path, { agentId, port: model }) : undefined);
       const pool = new CoreHandlePool({ layout, openCore, ...(openAgentCore === undefined ? {} : { openAgentCore }) });
@@ -181,6 +183,7 @@ export function createBackend(options: BackendOptions): MemoryBackend {
         pool,
         ui: createUiServices({
           layout,
+          legacy: layout,
           application,
           profile,
           ...(options.uiClock === undefined ? {} : { newClock: options.uiClock }),

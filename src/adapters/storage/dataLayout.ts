@@ -29,7 +29,9 @@ import type {
 } from "../../application/ports.js";
 import { MemoryServiceError } from "../../domain/errors.js";
 import { openCairnCore } from "../cairn/cairnCoreAdapter.js";
+import { readCairn } from "../ui/cairnReader.js";
 import { DEFAULT_PIN_PATH, readCairnPin } from "./cairnPin.js";
+import { isLegacyCairnSchema, readSchemaHeader } from "./legacySchema.js";
 import {
   backupAgentDatabase,
   defaultBackupHooks,
@@ -407,6 +409,7 @@ export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
     readonly databasePath: string;
     readonly stored: StoredIdentity;
     readonly fromCommit: string;
+    readonly verify?: () => void;
   }): void {
     if (holdsData(input.databasePath)) {
       backupAgentDatabase(
@@ -432,6 +435,7 @@ export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
           "Memory database could not be opened after the backup; identity metadata is unchanged",
         );
       }
+      input.verify?.();
     }
     rewriteIdentity(
       this.realRoot,
@@ -441,6 +445,38 @@ export class CairnDataLayout implements DataLayoutPort, AgentDirectoryPort {
       input.fromCommit,
       this.policy,
     );
+  }
+
+  legacyCandidate(agentHash: string): boolean {
+    return this.legacyUpgradeInput(agentHash) !== undefined;
+  }
+
+  upgradeLegacy(agentHash: string): void {
+    const input = this.legacyUpgradeInput(agentHash);
+    if (input === undefined) throw new MemoryServiceError("STORAGE_UNSUPPORTED", "Memory database is not a legacy Cairn database that can be upgraded");
+    this.upgradeAgent({
+      ...input,
+      verify: () => {
+        if (!readCairn(input.databasePath, () => true).ok) {
+          throw new MemoryServiceError("STORAGE_UNSUPPORTED", "Memory database is still not readable after the Cairn upgrade; identity metadata is unchanged");
+        }
+      },
+    });
+  }
+
+  private legacyUpgradeInput(agentHash: string) {
+    const directory = this.inspectAgentDirectory(agentHash);
+    if (directory?.state !== "ready" || directory.databasePath === null) return undefined;
+    if (!isLegacyCairnSchema(readSchemaHeader(directory.databasePath))) return undefined;
+    const identityPath = join(this.agentsRoot, agentHash, "identity.json");
+    if (!existsSync(identityPath)) return undefined;
+    try {
+      const identity = resolveIdentity(this.realRoot, identityPath, agentHash, this.policy);
+      if (identity.upgradeFrom === undefined) return undefined;
+      return { agentHash, identityPath, databasePath: directory.databasePath, stored: identity.stored, fromCommit: identity.upgradeFrom };
+    } catch {
+      return undefined;
+    }
   }
 
   preflight(): void {

@@ -20,7 +20,7 @@ const enabled = () => readOrganizationSettings({ organizationEnabled: true });
 // why: the first opened session's close() never settles, which is the host hang seen in the field
 function hangingCloseAi({ hangAll = false } = {}) {
   const counters = { opened: 0, closeCalls: 0, sent: 0, openOptions: [] };
-  const options = { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
+  const options = { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
   return {
     counters,
     ai: {
@@ -32,7 +32,7 @@ function hangingCloseAi({ hangAll = false } = {}) {
         let listener;
         // why: a resume request is answered with the session it asked for, as a host that still holds that session would
         const session = {
-          sessionId: openOptions?.resume ?? "close-session-" + index, effective: { providerId: "mock", modelId: "allowed", effort: null }, turn: null,
+          sessionId: openOptions?.resume ?? "close-session-" + index, effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null }, turn: null,
           onEvent(next) { listener = next; return () => { listener = undefined; }; },
           async send() {
             counters.sent += 1;
@@ -321,19 +321,19 @@ test("each pair keeps its own close timeout record: another pair's successful re
 });
 
 // why: this pins an accepted trade-off, not an ideal: an unfinished operation whose session could not be confirmed closed is never resumed, so it waits for the 7-day operator reconcile
-test("after a turn timeout and then a close timeout, retrying the unfinished operation is blocked as session_resume and never resumes the old session", async (t) => {
+test("after a turn timeout and then a close timeout, the retry sends on a fresh session and never resumes the old one", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "memory-close-unresolved-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const store = createLocalPunchOrganizationStore(dir);
   const opens = [];
-  const options = { providers: [{ id: "mock", state: "ready", models: [{ id: "allowed", isDefault: true }] }], defaultProviderId: "mock", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
+  const options = { providers: [{ id: "codex", state: "ready", models: [{ id: "gpt-6-luna", isDefault: true }] }], defaultProviderId: "codex", capabilities: { closedSessionResume: true }, quota: { state: "ok" }, limits: { systemChars: 10_000, inputChars: 20_000, transcriptLines: 80 } };
   // why: the turn never answers, so the 300 ms turn limit fires, and the only session ever opened never confirms its close
   const ai = {
     async getOptions() { return options; },
     async openSession(openOptions) {
       opens.push(openOptions);
       return {
-        sessionId: openOptions?.resume ?? "unresolved-session-" + opens.length, effective: { providerId: "mock", modelId: "allowed", effort: null }, turn: null,
+        sessionId: openOptions?.resume ?? "unresolved-session-" + opens.length, effective: { providerId: "codex", modelId: "gpt-6-luna", effort: null }, turn: null,
         onEvent() { return () => undefined; },
         async send() { return { turnId: "turn-never-answered" }; },
         close() { return new Promise(() => {}); },
@@ -347,15 +347,12 @@ test("after a turn timeout and then a close timeout, retrying the unfinished ope
   await assert.rejects(port.releasePair(actor.agentId, actor.projectId), (error) => error.code === "RESOURCE_BUSY" && error.phase === "session_close");
   const opensBefore = opens.length;
 
-  await assert.rejects(invokeScoped(port, actor, "organize:x"), (error) => {
-    assert.equal(error.name, "MemoryServiceError");
-    assert.equal(error.code, "RESOURCE_BUSY");
-    assert.equal(error.phase, "session_resume");
-    return true;
-  });
-  assert.equal(opens.length, opensBefore, "the retry opened no session at all");
+  const firstCalls = Object.values(Object.values((await store.readResumeState()).operations)[0].calls);
+  assert.deepEqual(firstCalls.map((call) => [call.phase, call.hostErrorCode, call.retryable, call.partialDelivered]), [["failed", "cancelled_local", true, false]], "the timed-out call is closed, not left sent");
+  await assert.rejects(invokeScoped(port, actor, "organize:x"), (error) => error.code === "MODEL_TIMEOUT" && error.phase === "turn_timeout");
+  assert.equal(opens.length, opensBefore + 1, "the retry opened exactly one new session");
   assert.deepEqual(opens.filter((entry) => entry?.resume !== undefined), [], "the old session was never asked to resume");
   const saved = Object.values((await store.readResumeState()).sessions);
-  assert.deepEqual(saved.map((record) => record.state), ["invalidated"], "the record stays invalidated until the operator reconcile");
+  assert.deepEqual(saved.map((record) => record.state), ["active"], "the retry saved its own session");
   await port.cancel();
 });

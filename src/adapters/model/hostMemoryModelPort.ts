@@ -5,6 +5,7 @@ import { legacyModelCallKey, modelCallKey, modelRequestSha256, operationKey, pai
 import type { OrganizationCallRecord, OrganizationOperationRecord, OrganizationSessionRecord, OrganizationResumeStorePort } from "../../application/punchDataPorts.js";
 import type { OrganizationSettings } from "../../backend/organizationSettings.js";
 import type { TeamuqTaskBinding } from "../../application/teamuqTaskBinding.js";
+import { isStrandedSent, reconcileAfterResumeError, reconcileBeforeSession, reconcileWithSession, type CallRecoveryDeps } from "./recoverCall.js";
 
 const operations = new Set<MemoryModelOperation>(["select", "rank", "extract", "reconcile", "qualify", "qualifyCandidates", "classify", "relate", "reviewBasis"]);
 const deniedModel = (id: string): boolean => /astra/i.test(id);
@@ -428,6 +429,11 @@ export function createHostMemoryModelPort(
       canonicalAgentId: input.agentId, sourceProjectId: null, operationId: "unscoped", modelOperation: input.operation,
       operationSystemSha256: sha256(input.system), canonicalRequestSha256: modelRequestSha256(input.input), sameRequestOccurrence: 0,
     };
+    const recovery: CallRecoveryDeps | undefined = resumeStore === undefined ? undefined : {
+      resumeStore,
+      failCall: async (call, fields) => { await savePhase(activeInvocation, opKey, call.callKey, "failed", fields); },
+      persistSession,
+    };
     try {
       if (!operations.has(input.operation)) throw serviceError("MODEL_POLICY_DENIED", "Memory model operation is not allowed", false, "policy");
       if (invocation !== undefined && invocation.canonicalAgentId !== input.agentId) throw serviceError("MODEL_POLICY_DENIED", "Memory invocation identity does not match", false, "policy");
@@ -477,9 +483,17 @@ export function createHostMemoryModelPort(
         if (body.length > options.limits.inputChars || Buffer.byteLength(BASE_SYSTEM + body, "utf8") > selected.contextBudget - 2_048) {
           throw serviceError("MODEL_POLICY_DENIED", "Memory input exceeds the configured budget", false);
         }
+        const stranded = isStrandedSent(callInfo?.prior) ? callInfo!.prior : undefined;
+        if (stranded !== undefined && await reconcileBeforeSession(recovery!, pair, stranded)) return keyedWork();
         activePhase = "session_open";
-        const currentSession = await bounded(() => getSession(activeInvocation, pair, opKey, provider.id, model.id, input.policy.revision, options, controller));
+        let currentSession: PairSession;
+        try { currentSession = await bounded(() => getSession(activeInvocation, pair, opKey, provider.id, model.id, input.policy.revision, options, controller)); }
+        catch (error) {
+          if (stranded !== undefined && await reconcileAfterResumeError(recovery!, pair, stranded)) return keyedWork();
+          throw error;
+        }
         session = currentSession.session;
+        if (stranded !== undefined && await reconcileWithSession(recovery!, pair, stranded, currentSession.session)) return keyedWork();
         if (resumeStore !== undefined) {
           const stored = callInfo?.prior ?? await savePhase(activeInvocation, opKey, selectedCallKey, "prepared", {
             hostSessionId: currentSession.session.sessionId, turnId: null, sequenceNo: null,
@@ -583,7 +597,7 @@ export function createHostMemoryModelPort(
             : serviceError("RESOURCE_BUSY", "Memory host model turn failed", event.retryable, "turn"));
         } else if (event.kind === "interrupted") {
           settled = true;
-          if (resumeStore !== undefined) await savePhase(context, operation, callKey, "sent", { turnId, sequenceNo, retryable: true, partialDelivered: output.length > 0, hostErrorCode: "interrupted" });
+          if (resumeStore !== undefined) await savePhase(context, operation, callKey, "failed", { turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: "interrupted" });
           rejectAnswer?.(timedOut ? serviceError("MODEL_TIMEOUT", "Memory model operation timed out", undefined, "turn_timeout") : serviceError("RESOURCE_BUSY", "Memory model operation was cancelled", undefined, "cancelled"));
         }
       };
@@ -595,7 +609,7 @@ export function createHostMemoryModelPort(
       const interrupted = (): void => {
         if (sendStarted || turnId !== null) void current.session.interrupt().catch(() => undefined);
         if (resumeStore !== undefined && turnId !== null) {
-          interruptionWrite = savePhase(context, operation, callKey, "sent", { turnId, sequenceNo, retryable: true, partialDelivered: output.length > 0, hostErrorCode: "local_deadline" }).then(() => undefined);
+          interruptionWrite = savePhase(context, operation, callKey, "failed", { turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: "cancelled_local" }).then(() => undefined);
           void interruptionWrite.catch(() => undefined);
         }
         if (!settled) { settled = true; rejectAnswer?.(timedOut ? serviceError("MODEL_TIMEOUT", "Memory model operation timed out") : serviceError("RESOURCE_BUSY", "Memory model operation was cancelled")); }
@@ -652,7 +666,11 @@ export function createHostMemoryModelPort(
         return value;
       } catch (error) {
         if (interruptionWrite !== undefined) await interruptionWrite;
-        if (resumeStore !== undefined && turnId !== null && !settled) await savePhase(context, operation, callKey, "sent", { turnId, sequenceNo, retryable: true, partialDelivered: output.length > 0, hostErrorCode: "turn_pending" });
+        if (resumeStore !== undefined && turnId !== null && !settled) {
+          // why: the turn keeps running on the host, so it is stopped before the call is closed as cancelled_local
+          void current.session.interrupt().catch(() => undefined);
+          await savePhase(context, operation, callKey, "failed", { turnId, sequenceNo, retryable: true, partialDelivered: false, hostErrorCode: "cancelled_local" });
+        }
         if (error instanceof MemoryServiceError) throw error;
         throw publicError(error, turnId === null ? "send" : "turn");
       } finally {

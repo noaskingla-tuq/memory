@@ -143,7 +143,8 @@ test("organization status preserves distinct redacted model, schema, journal, ti
     assert.equal(entry.uiStatus.organization.errorPhase, phase, "backend ui.status preserves the worker phase");
     assert.ok(entry.rendered.includes(`<dd>${phase}</dd>`), "statusLine renders the semantic phase");
   }
-  assert.deepEqual([malformed, schemaRejected, checkpoint, timeout].map((entry) => entry.sends), [1, 1, 1, 1]);
+  // why: a reply that is not JSON is sent again twice before the call is final, the other failures are sent once
+  assert.deepEqual([malformed, schemaRejected, checkpoint, timeout].map((entry) => entry.sends), [3, 1, 1, 1]);
   assert.equal(storage.sends, 0);
   assert.ok([malformed, schemaRejected, checkpoint, timeout, storage].every((entry) => entry.row.lastError !== null));
 });

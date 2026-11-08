@@ -10,6 +10,8 @@ import { DEFAULT_TURN_LIMITS, type TurnLimits } from "./turnLimits.js";
 import type { TraceSink } from "../storage/organizationTrace.js";
 import { DETACHED_LOCAL_CODE, REPLY_LIMIT, runTurn, type PairSession, type TurnJournal } from "./turnTracker.js";
 import { BASE_SYSTEM, createTurnSessions, type EffectiveAiOptions, type ResumeAi } from "./turnSession.js";
+import { parseCached, parseReply } from "./replyParse.js";
+import { JSON_PARSE_CODE, isJsonParseRetry } from "./jsonParseRetry.js";
 
 const operations = new Set<MemoryModelOperation>(["select", "rank", "extract", "reconcile", "qualify", "qualifyCandidates", "classify", "relate", "reviewBasis"]);
 const deniedModel = (id: string): boolean => /astra/i.test(id);
@@ -44,24 +46,6 @@ function publicError(error: unknown, phase: string): MemoryServiceError {
 
 function operationRecord(state: Awaited<ReturnType<OrganizationResumeStorePort["readResumeState"]>>, key: string): OrganizationOperationRecord | undefined {
   return state?.operations[key];
-}
-
-function parseCached(call: OrganizationCallRecord): unknown {
-  if (call.replyJson === null) throw serviceError("RESOURCE_BUSY", "A previous memory turn requires reconciliation", undefined, "session_resume");
-  if (typeof call.hostSessionId !== "string" || call.hostSessionId.length === 0 || typeof call.turnId !== "string" || call.turnId.length === 0
-    || !(call.sequenceNo === null || Number.isSafeInteger(call.sequenceNo))) throw serviceError("RESOURCE_BUSY", "Saved memory model reply is not linked to a completed turn", undefined, "session_resume");
-  if (Buffer.byteLength(call.replyJson, "utf8") !== call.responseBytes || sha256(call.replyJson) !== call.replySha256) {
-    throw serviceError("STORAGE_BUSY", "Saved memory recovery state failed integrity validation", false, "state");
-  }
-  try { return JSON.parse(call.replyJson); }
-  catch { throw serviceError("MODEL_OUTPUT_INVALID", "Saved memory model reply is invalid", false, "reply_contract"); }
-}
-
-function parseReply(text: string): unknown {
-  const fence = String.fromCharCode(96).repeat(3);
-  const json = text.trim().replace(new RegExp("^" + fence + "(?:json)?\\s*\\n([\\s\\S]*?)\\n" + fence + "$", "u"), "$1");
-  try { return JSON.parse(json); }
-  catch { throw serviceError("MODEL_OUTPUT_INVALID", "Memory model returned invalid JSON", false, "reply_contract"); }
 }
 
 export function createHostMemoryModelPort(
@@ -235,7 +219,7 @@ export function createHostMemoryModelPort(
     });
   };
 
-  const selectCall = async (context: MemoryModelInvocationContext, key: string): Promise<{ callKey: string; occurrence: number; prior?: OrganizationCallRecord }> => {
+  const selectCall = async (context: MemoryModelInvocationContext, key: string): Promise<{ callKey: string; occurrence: number; jsonFailures: number; prior?: OrganizationCallRecord }> => {
     let state: Awaited<ReturnType<OrganizationResumeStorePort["readResumeState"]>>;
     try { state = await resumeStore!.readResumeState(); }
     catch { throw stateError(); }
@@ -252,6 +236,7 @@ export function createHostMemoryModelPort(
       }
     };
     let occurrence = context.sameRequestOccurrence;
+    let jsonFailures = 0;
     for (;;) {
       const callKey = modelCallKey(key, context.modelOperation, context.operationSystemSha256, context.canonicalRequestSha256, occurrence);
       let actualCallKey = callKey;
@@ -266,10 +251,10 @@ export function createHostMemoryModelPort(
           prior = legacy;
         }
       }
-      if (prior === undefined) return { callKey, occurrence };
-      if (prior.replyJson !== null && ["reply_ready", "commit_retry"].includes(prior.phase)) return { callKey: actualCallKey, occurrence, prior };
-      if (prior.phase === "failed" && prior.retryable && !prior.partialDelivered) { occurrence += 1; continue; }
-      return { callKey: actualCallKey, occurrence, prior };
+      if (prior === undefined) return { callKey, occurrence, jsonFailures };
+      if (prior.replyJson !== null && ["reply_ready", "commit_retry"].includes(prior.phase)) return { callKey: actualCallKey, occurrence, jsonFailures, prior };
+      if (prior.phase === "failed" && prior.retryable && !prior.partialDelivered) { if (prior.hostErrorCode === JSON_PARSE_CODE) jsonFailures += 1; occurrence += 1; continue; }
+      return { callKey: actualCallKey, occurrence, jsonFailures, prior };
     }
   };
 
@@ -427,9 +412,9 @@ export function createHostMemoryModelPort(
                 replySha256: null, responseBytes: 0, occurrence: callInfo?.occurrence ?? activeInvocation.sameRequestOccurrence,
               });
             }
-            return await runTurn({
+            try { return await runTurn({
               current: currentSession, context: activeInvocation, operation: opKey, callKey: selectedCallKey, body,
-              savedCall: stored, priorCall: callInfo?.prior, journal, parseCached, parseReply,
+              savedCall: stored, priorCall: callInfo?.prior, journal, parseCached, parseReply, jsonParseFailures: callInfo?.jsonFailures ?? 0,
               hard: controller.signal, soft: input.signal, limits, isDisposed: () => disposed, ...(trace === undefined ? {} : { trace }),
               setPhase: (phase) => { activePhase = phase; },
               onSent: (at) => { sentAt = at; },
@@ -440,7 +425,9 @@ export function createHostMemoryModelPort(
                 detachedSince.set(controller, sentAt ?? Date.now());
                 rejectDetached(serviceError("MODEL_TIMEOUT", "Memory model operation outlived its caller", undefined, "turn_timeout", DETACHED_LOCAL_CODE));
               },
-            }, publicError);
+            }, publicError); }
+            // why: a broken JSON reply is a model slip, so the same request is sent again on a fresh session unless the caller already left
+            catch (error) { if (!isJsonParseRetry(error) || before.signal.aborted || disposed) throw error; again = true; }
           }
         } finally { await closeTurnSession(pair, currentSession.session); }
         return again ? keyedWork() : undefined;

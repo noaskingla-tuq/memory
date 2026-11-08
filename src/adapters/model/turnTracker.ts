@@ -4,6 +4,7 @@ import type { MemoryModelInvocationContext } from "../../application/modelPort.j
 import type { OrganizationCallRecord, OrganizationSessionRecord } from "../../application/punchDataPorts.js";
 import { DEFAULT_TURN_LIMITS, TURN_BACKSTOP_CODE, type TurnLimits } from "./turnLimits.js";
 import { startTurnTrace } from "./turnTrace.js";
+import { JSON_PARSE_CODE, jsonParseRetryable, markJsonParseRetry } from "./jsonParseRetry.js";
 import type { TraceSink } from "../storage/organizationTrace.js";
 
 export const REPLY_LIMIT = 16_384;
@@ -33,6 +34,8 @@ export interface TurnRequest {
   readonly journal: TurnJournal | undefined;
   readonly parseCached: (call: OrganizationCallRecord) => unknown;
   readonly parseReply: (text: string) => unknown;
+  // why: json_parse failures already journaled for this same request; the cap on retries counts them
+  readonly jsonParseFailures?: number;
   // why: only interrupt() and cancel() raise the hard signal, so a stop the plugin chose is the only thing that ends a turn the host is still running
   readonly hard: AbortSignal;
   // why: the Cairn deadline raises the soft signal, which after the send only detaches the caller and never touches the host turn
@@ -92,8 +95,10 @@ export async function runTurn(request: TurnRequest, publicError: (error: unknown
     try { resolveAnswer?.(request.parseReply(output)); trace.settle(sequenceNo !== null ? "seq" : "grace"); }
     catch (error) {
       trace.settle("error");
-      await writeFailed({ turnId, sequenceNo, retryable: false, partialDelivered: false, hostErrorCode: "json_parse" });
-      rejectAnswer?.(error as Error);
+      // why: without a journal nothing counts the retries and nothing keeps the failed call, so the first bad reply is final
+      const retryable = journal !== undefined && jsonParseRetryable(request.jsonParseFailures ?? 0);
+      await writeFailed({ turnId, sequenceNo, retryable, partialDelivered: false, hostErrorCode: JSON_PARSE_CODE });
+      rejectAnswer?.(retryable ? markJsonParseRetry(error as Error) : error as Error);
     }
   };
   // why: a completed event with output is a reliable reply on its own; contentSaved is only awaited for a short grace and is optional after it

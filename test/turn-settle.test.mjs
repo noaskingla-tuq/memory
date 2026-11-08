@@ -91,7 +91,7 @@ test("a contentSaved that arrives inside the grace is used and settles at once",
   assert.deepEqual([ready.phase, ready.sequenceNo], ["reply_ready", 9]);
 });
 
-test("a reply that is not valid JSON still fails as json_parse after the grace", async (t) => {
+test("a reply that is not valid JSON fails as retryable json_parse after the grace", async (t) => {
   const rig = realCoreHost(t);
   await detach(rig);
   const { session, turnId } = rig.turns[0];
@@ -100,7 +100,33 @@ test("a reply that is not valid JSON still fails as json_parse after the grace",
   session.emit({ turnId, kind: "completed" });
   await pause(LIMITS.graceMs + 60);
   const [call] = await callsOf(rig.store, OP, rig.actor);
-  assert.deepEqual([call.phase, call.hostErrorCode, call.retryable], ["failed", "json_parse", false]);
+  assert.deepEqual([call.phase, call.hostErrorCode, call.retryable], ["failed", "json_parse", true]);
+  assert.equal(call.partialDelivered, false);
+});
+
+test("json_parse failures are counted across calls: a detached one plus two more stop at three turns", async (t) => {
+  const rig = realCoreHost(t);
+  await detach(rig);
+  const broken = (index) => {
+    const { session, turnId } = rig.turns[index];
+    session.turn = { turnId, text: "not json", terminal: { kind: "completed" } };
+    session.emit({ turnId, kind: "textDelta", text: "not json" });
+    session.emit({ turnId, kind: "completed" });
+  };
+  broken(0);
+  await pause(LIMITS.graceMs + 60);
+  const next = invokeScoped(rig.port, rig.actor, OP, { value: 1 }).then(() => null, (error) => error);
+  await ticks();
+  assert.equal(rig.turns.length, 2, "the second call sent on the next occurrence");
+  broken(1);
+  await pause(LIMITS.graceMs + 80);
+  await ticks();
+  assert.equal(rig.turns.length, 3, "the second failure was retried inside the same call");
+  broken(2);
+  const error = await next;
+  assert.equal(error.code, "MODEL_OUTPUT_INVALID");
+  assert.equal(rig.turns.length, 3, "no fourth turn");
+  assert.deepEqual((await callsOf(rig.store, OP, rig.actor)).map((call) => [call.occurrence, call.hostErrorCode, call.retryable]), [[0, "json_parse", true], [1, "json_parse", true], [2, "json_parse", false]]);
 });
 
 test("the cache check no longer asks for a sequenceNo but still checks the hash and the byte length", async (t) => {

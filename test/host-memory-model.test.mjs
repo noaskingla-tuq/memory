@@ -128,6 +128,7 @@ test("invalid JSON, oversized UTF-8 and rejected sends clean up listeners and se
   for (const [reply, code] of [["not json", "MODEL_OUTPUT_INVALID"], [JSON.stringify("測".repeat(6000)), "MODEL_OUTPUT_INVALID"], [null, "RESOURCE_BUSY"]]) {
     const h = mockAi({ send: async ({ emit }) => { if (reply === null) throw new Error("send rejected"); emit({ kind: "textDelta", text: reply }); emit({ kind: "contentSaved", sequenceNo: 4 }); emit({ kind: "completed" }); return { turnId: "t" }; } });
     await assert.rejects(invoke(createHostMemoryModelPort(h.ai, enabled)), { code });
+    assert.equal(h.counters.sent, 1, "without a journal a bad reply is final, never retried");
     assert.equal(h.counters.closed, 1);
     assert.equal(h.counters.off, 1);
   }

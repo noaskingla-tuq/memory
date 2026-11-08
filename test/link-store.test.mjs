@@ -107,7 +107,7 @@ test("a corrupt file fails closed, keeps its bytes and recovers once it is remov
   for (const bytes of cases) {
     writeFileSync(file, bytes);
     const fresh = open();
-    assert.throws(() => fresh.snapshot("plugin:a"), { code: "provider_error" });
+    await assert.rejects(fresh.snapshot("plugin:a"), { code: "provider_error" });
     await assert.rejects(fresh.commit("plugin:a", add(item("two"))), { code: "provider_error" });
     assert.equal(readFileSync(file, "utf8"), bytes);
     assert.equal((await fresh.health("plugin:a")).state, "corrupt");
@@ -126,7 +126,7 @@ test("a file larger than 4 MiB is corrupt without being read", async (t) => {
   const file = join(dirOf(base), `${fileIdOf("core")}.json`);
   writeFileSync(file, " ".repeat(4 * 1024 * 1024 + 1));
   const fresh = open();
-  assert.throws(() => fresh.snapshot("core"), { code: "provider_error" });
+  await assert.rejects(fresh.snapshot("core"), { code: "provider_error" });
   const described = await fresh.describeFile(fileIdOf("core"));
   assert.equal(described.state, "corrupt");
 });
@@ -148,7 +148,7 @@ test("a symlinked partition file is corrupt and discarding it leaves the target 
     throw error;
   }
   const fresh = open();
-  assert.throws(() => fresh.snapshot("plugin:a"), { code: "provider_error" });
+  await assert.rejects(fresh.snapshot("plugin:a"), { code: "provider_error" });
   assert.equal((await fresh.describeFile(fileIdOf("plugin:a"))).state, "corrupt");
   const before = readFileSync(real, "utf8");
   await fresh.discardDamaged(fileIdOf("plugin:a"));
@@ -178,7 +178,7 @@ test("a failing write keeps memory and disk as they were and classifies the Node
   const { base, open } = scratch(t);
   const real = createFsIo(base);
   let failure;
-  const io = { ...real, write(fileId, text) { if (failure !== undefined) throw Object.assign(new Error("boom"), { code: failure }); return real.write(fileId, text); } };
+  const io = { ...real, async write(fileId, text) { if (failure !== undefined) throw Object.assign(new Error("boom"), { code: failure }); return real.write(fileId, text); } };
   const store = open({ io });
   await store.commit("core", add(item("a")));
   const file = join(dirOf(base), `${fileIdOf("core")}.json`);

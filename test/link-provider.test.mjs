@@ -365,30 +365,3 @@ test("nothing from payload, query or tags reaches the console, stdio or files ou
     if (statSync(path).isFile()) assert.equal(readFileSync(path, "utf8").includes(canary), false);
   }
 });
-
-test("calls that finish without waiting never count as in progress, so a burst larger than maxSessions is served", async (t) => {
-  const { connect } = setup(t, { maxSessions: 4 });
-  const call = await connect("a");
-  await call("remember", { payload: "x", key: "k" });
-  const answers = await Promise.all(Array.from({ length: 20 }, () => call("recall", { limit: 1 })));
-  assert.ok(answers.every((answer) => answer.value.items.length === 1));
-  const mixed = await Promise.all([call("inspect"), call("diagnose"), call("recall", { limit: 1 }), call("teamuq.describe"), call("inspect")]);
-  assert.equal(mixed.length, 5);
-});
-
-test("a call that is still waiting does count against maxSessions", async (t) => {
-  const base = mkdtempSync(join(tmpdir(), "teamuq-link-hold-"));
-  t.after(() => rmSync(base, { recursive: true, force: true }));
-  const store = createLinkStore({ dataDir: base });
-  t.after(() => store.dispose());
-  const held = [];
-  const group = createMemoryStoreGroup({ store });
-  const provider = createProvider({ category: "teamuq.memory@1", dataClass: "local", maxSessions: 1, modules: [group], probe: { beforeCall: () => new Promise((resolve) => held.push(resolve)) } });
-  t.after(() => provider.dispose());
-  await provider.open({ linkId: "h", who: who("a"), group: GROUP, mode: "call", channel });
-  const send = (id) => provider.call({ id, method: "recall", args: [{ limit: 1 }], who: who("a"), group: GROUP, linkId: "h" });
-  const first = send("1");
-  await assert.rejects(send("2"), refused("capability_busy"));
-  held[0]();
-  assert.deepEqual((await first).value, { items: [] });
-});

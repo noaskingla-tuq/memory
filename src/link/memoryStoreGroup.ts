@@ -16,7 +16,7 @@ const CURSOR_FORMAT = /^c(\d{1,9})\.([0-9a-f]{16})$/u;
 const ALL_METHODS = Object.freeze(["remember", "recall", "forget", "inspect", "diagnose"]);
 
 type Body = Record<string, unknown>;
-type Handler = (args: unknown[], ctx: HandlerContext) => CallResult | Promise<CallResult>;
+type Handler = (args: unknown[], ctx: HandlerContext) => Promise<CallResult>;
 
 export interface MemoryControl {
   received(name: string): void;
@@ -151,7 +151,7 @@ export function createMemoryStoreGroup(options: MemoryGroupOptions): GroupModule
     return { value: { id, created: outcome.result } };
   };
 
-  const recall: Handler = (args, ctx) => {
+  const recall: Handler = async (args, ctx) => {
     const body = request(args, ["limit", "query", "tags", "ids", "cursor"]);
     const limit = body.limit;
     if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 50) throw invalid();
@@ -169,7 +169,7 @@ export function createMemoryStoreGroup(options: MemoryGroupOptions): GroupModule
       if (parsed === null || parsed[2] !== fingerprint) throw refuse("unsupported_options");
       offset = Number(parsed[1]);
     }
-    const snap = store.snapshot(sourceOf(ctx));
+    const snap = await store.snapshot(sourceOf(ctx));
     const found = snap.items
       .filter((item) => matches(item, filter))
       .map((item) => ({ item, score: query === undefined ? undefined : scoreFor(item, query) }))
@@ -213,20 +213,20 @@ export function createMemoryStoreGroup(options: MemoryGroupOptions): GroupModule
     return { value: { forgotten: outcome.result } };
   };
 
-  const inspect: Handler = (args, ctx) => {
+  const inspect: Handler = async (args, ctx) => {
     if (args.length > 1) throw invalid();
     const body = args.length === 0 ? {} : request(args, ["cursor", "limit"]);
     if (body.limit !== undefined && !(typeof body.limit === "number" && Number.isInteger(body.limit) && body.limit >= 1 && body.limit <= 50)) throw invalid();
     if (body.cursor !== undefined) throw refuse("unsupported_options");
-    const items = liveItems(store.snapshot(sourceOf(ctx)).items, store.now());
+    const items = liveItems((await store.snapshot(sourceOf(ctx))).items, store.now());
     const sizeBytes = items.reduce((sum, item) => sum + payloadBytes(item.payload), 0);
     const updatedAtMs = items.reduce((latest, item) => Math.max(latest, item.updatedAtMs), 0);
     return { value: { summary: { count: items.length, sizeBytes, ...(items.length === 0 ? {} : { updatedAtMs }) }, details: { limits: { items: store.limits.items, bytes: store.limits.bytes } } } };
   };
 
-  const diagnose: Handler = (args, ctx) => {
+  const diagnose: Handler = async (args, ctx) => {
     if (args.length !== 0) throw invalid();
-    const health = store.health(sourceOf(ctx));
+    const health = await store.health(sourceOf(ctx));
     const storeOk = health.state === "ok" || health.state === "empty";
     const storeNote = health.state === "empty" ? "尚無資料" : health.state === "ok" ? "可讀寫" : health.state === "corrupt" ? "資料檔無法讀取，已保留原檔" : "最近一次寫入失敗";
     const quotaOk = health.count < store.limits.items && health.bytes < store.limits.bytes;
@@ -242,12 +242,10 @@ export function createMemoryStoreGroup(options: MemoryGroupOptions): GroupModule
   for (const name of Object.keys(all)) {
     if (!activeMethods.includes(name)) continue;
     const handler = all[name];
-    // why: a call that finishes without waiting must hand its answer back at once so it never counts as in progress against maxSessions
-    methods[name] = (args, ctx) => {
+    methods[name] = async (args, ctx) => {
       control?.received(name);
       try {
-        const out = handler(args, ctx);
-        return out instanceof Promise ? out.catch((error: unknown) => { throw translate(error); }) : out;
+        return await handler(args, ctx);
       } catch (error) {
         throw translate(error);
       }

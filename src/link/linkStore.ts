@@ -60,11 +60,11 @@ export interface LinkStoreOptions {
 }
 
 export interface LinkStore {
-  snapshot(source: string): Snapshot;
+  snapshot(source: string): Promise<Snapshot>;
   commit<T>(source: string, mutate: (snapshot: Snapshot, at: number) => Mutation<T>, expect?: CommitExpect): Promise<CommitOutcome<T>>;
-  health(source: string): SourceHealth;
-  listFiles(): string[];
-  describeFile(fileId: string): FileDescription;
+  health(source: string): Promise<SourceHealth>;
+  listFiles(): Promise<string[]>;
+  describeFile(fileId: string): Promise<FileDescription>;
   discardDamaged(fileId: string): Promise<void>;
   readonly limits: LinkLimits;
   readonly now: () => number;
@@ -92,6 +92,7 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
   const generations = new Map<string, number>();
   const writeFailed = new Set<string>();
   const tails = new Map<string, Promise<void>>();
+  let creation: Promise<void> = Promise.resolve();
   let disposed = false;
 
   const generationOf = (fileId: string): number => generations.get(fileId) ?? 0;
@@ -109,7 +110,7 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
     if (disposed) throw new StoreError("disposed");
   };
 
-  function load(source: string): PartitionState {
+  async function load(source: string): Promise<PartitionState> {
     open();
     const fileId = fileIdOf(source);
     const cached = cache.get(fileId);
@@ -119,7 +120,7 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
       return cached;
     }
     const started = generationOf(fileId);
-    const loaded = loadFile(io, fileId);
+    const loaded = await loadFile(io, fileId);
     if (loaded.kind === "corrupt") throw new StoreError("provider_error", "corrupt");
     if (loaded.kind === "absent") return { source, revision: 0, items: [] };
     if (generationOf(fileId) === started) remember(fileId, loaded.state);
@@ -144,28 +145,36 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
     return grewCount || (after.length > 0 && total(after) > limits.bytes && total(after) > total(before));
   }
 
-  function persist(fileId: string, next: PartitionState): void {
+  async function persist(fileId: string, next: PartitionState): Promise<void> {
     if (next.items.length === 0) {
-      io.remove(fileId);
+      await io.remove(fileId);
       return;
     }
-    if (io.stat(fileId) === undefined && io.list().length >= limits.sources) throw new StoreError("quota_exceeded");
-    io.write(fileId, serializePartition(next));
+    if ((await io.stat(fileId)) !== undefined) {
+      await io.write(fileId, serializePartition(next));
+      return;
+    }
+    const gate = creation.then(async () => {
+      if ((await io.list()).length >= limits.sources) throw new StoreError("quota_exceeded");
+      await io.write(fileId, serializePartition(next));
+    });
+    creation = gate.then(() => undefined, () => undefined);
+    await gate;
   }
 
   return {
     limits,
     now,
 
-    snapshot(source) {
-      const state = load(source);
+    async snapshot(source) {
+      const state = await load(source);
       return { source, revision: state.revision, items: liveItems(state.items, now()) };
     },
 
     commit(source, mutate, expect) {
       const fileId = fileIdOf(source);
       return enqueue(fileId, async () => {
-        const state = load(source);
+        const state = await load(source);
         const at = now();
         const snap: Snapshot = { source, revision: state.revision, items: liveItems(state.items, at) };
         if (expect?.revision !== undefined && snap.revision !== expect.revision) throw new StoreError("conflict");
@@ -180,7 +189,7 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
         if (overQuota(snap.items, out.items)) throw new StoreError("quota_exceeded");
         const next: PartitionState = { source, revision: state.revision + 1, items: out.items };
         try {
-          persist(fileId, next);
+          await persist(fileId, next);
         } catch (error) {
           const failure = classifyWriteError(error);
           if (failure.code !== "quota_exceeded") writeFailed.add(source);
@@ -193,12 +202,12 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
       });
     },
 
-    health(source) {
+    async health(source) {
       open();
       const fileId = fileIdOf(source);
       let state: PartitionState;
       try {
-        state = load(source);
+        state = await load(source);
       } catch (error) {
         if (error instanceof StoreError && error.code === "provider_error") return { state: "corrupt", count: 0, bytes: 0 };
         throw error;
@@ -206,23 +215,23 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
       const items = liveItems(state.items, now());
       const bytes = items.reduce((sum, item) => sum + itemBytes(item), 0);
       if (writeFailed.has(source)) return { state: "write_failed", count: items.length, bytes };
-      const present = state.revision > 0 && io.stat(fileId) !== undefined;
+      const present = state.revision > 0 && (await io.stat(fileId)) !== undefined;
       return { state: present ? "ok" : "empty", count: items.length, bytes };
     },
 
-    listFiles() {
+    async listFiles() {
       open();
       return io.list();
     },
 
-    describeFile(fileId) {
+    async describeFile(fileId) {
       open();
-      const stat = io.stat(fileId);
+      const stat = await io.stat(fileId);
       if (stat === undefined) throw new StoreError("not_found");
       const known = summaries.get(fileId);
       if (known !== undefined && known.stat.size === stat.size && known.stat.mtimeMs === stat.mtimeMs) return known.description;
       const started = generationOf(fileId);
-      const loaded = loadFile(io, fileId);
+      const loaded = await loadFile(io, fileId);
       if (loaded.kind === "absent") throw new StoreError("not_found");
       const description: FileDescription = loaded.kind === "corrupt"
         ? { state: "corrupt", fileId }
@@ -233,11 +242,11 @@ export function createLinkStore(options: LinkStoreOptions): LinkStore {
 
     discardDamaged(fileId) {
       return enqueue(fileId, async () => {
-        const loaded = loadFile(io, fileId);
+        const loaded = await loadFile(io, fileId);
         if (loaded.kind === "absent") throw new StoreError("not_found");
         if (loaded.kind === "ok") throw new StoreError("conflict");
         try {
-          io.remove(fileId);
+          await io.remove(fileId);
         } catch (error) {
           throw classifyWriteError(error);
         }
